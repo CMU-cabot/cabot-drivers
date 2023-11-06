@@ -1,0 +1,8 @@
+version: "2.3"
+
+services:
+  ros2:
+    build:
+      context: ./
+    volumes:
+      - ./:/home/developer/ros2_ws/src/cabot-drivers
