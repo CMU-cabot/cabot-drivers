@@ -28,8 +28,8 @@
 #include <utility>
 #include <vector>
 
-#include "cabot_serial.hpp"
-#include "arduino_serial.hpp"
+#include "cabot_serial/cabot_serial.hpp"
+#include "cabot_serial/arduino_serial.hpp"
 
 using namespace std::chrono_literals;
 

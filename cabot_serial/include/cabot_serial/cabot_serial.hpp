@@ -35,8 +35,6 @@
 #include <exception>
 
 #include <geometry_msgs/msg/twist.hpp>
-#include <visualization_msgs/msg/marker.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/clock.hpp>
 #include <rclcpp/node.hpp>

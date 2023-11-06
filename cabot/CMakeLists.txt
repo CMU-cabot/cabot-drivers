@@ -53,14 +53,6 @@ include_directories(
   include
 )
 
-add_executable(cabot_serial_node
-  src/cabot/cabot_serial.cpp
-  src/cabot/arduino_serial.cpp
-)
-ament_target_dependencies(cabot_serial_node
-  ${dependencies}
-)
-
 add_library(speed_visualize SHARED
   src/cabot/speed_visualize_node.cpp
 )
@@ -150,12 +142,6 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/cabot_serial.py
   scripts/cabot_handle_v2_node.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-# Install executables
-install(TARGETS
-  cabot_serial_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

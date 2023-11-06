@@ -25,7 +25,7 @@
 #include <memory>
 #include <tuple>
 
-#include "arduino_serial.hpp"
+#include "cabot_serial/arduino_serial.hpp"
 
 Serial::Serial(std::string name, int baud, int read_timeout, int write_timeout)
 : name_(name), baud_(baud), read_timeout_(read_timeout), write_timeout_(write_timeout)
