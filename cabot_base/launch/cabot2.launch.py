@@ -238,16 +238,6 @@ def generate_launch_description():
                 parameters=[*param_files, {'use_sim_time': use_sim_time}],
             ),
 
-            # Visualize the current speed on Rviz-
-            Node(
-                package='cabot',
-                executable='speed_visualize_node',
-                namespace='/cabot',
-                name='speed_visualize_node',
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
-            ),
-
             # Microcontroller (Arduino - gt1/gtm or ESP32 - ace)
             Node(
                 package='cabot',
@@ -294,126 +284,6 @@ def generate_launch_description():
                 condition=IfCondition(use_standalone_wifi_scanner),
             ),
 
-            # Costmap clearing issue hacking
-            # Some obstacle points in costmap can be laid between the line of sight of lasers.
-            # This requires the robot to move to clear those points. Usually this problem is
-            # dealed with the rotating recovery behavior[1] in default recovery behaviors,
-            # but this behavior is removed for CaBot because rotation is annoying for the user.
-            # [1] https://github.com/ros-planning/navigation/tree/kinetic-devel/rotate_recovery
-            # So, this node randomly rotate the laser in range of a laser scan step
-            # (360/1440 degree) by changing hokuyo_link tf to remove obstacle points between
-            # two laser scans.
-            Node(  # TODO use component
-                package='cabot',
-                executable='clearing_tf_node',
-                namespace='/cabot',
-                name='clearing_tf_node',
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
-            ),
-
-            # The diagram of Cabot Odometry Adapter & related nodes (*components)
-            # move_base's cmd_vel commands will be filtered through nodes to transform
-            # command for the robot rotation center to the actual robot center.
-            # Motor status will be used for calculating raw odometry of the robot
-            # and will be merged by Robot Localization node to get stabilized
-            # odometry. Odom adapter will convert the raw odometry to the odometry
-            # of the robot rotating center which is controlled by offset.
-            #
-            #                    (5~10Hz)                      /cabot/cmd_vel_adapter (passthrough)
-            # +================+ /cmd_vel    +===============+                   +===============+
-            # |                |============>| *             |==================>| *             |
-            # | Controller     |             | OdomAdapter   |                   | SpeedControl  |
-            # |                |<============|               |                   |               |
-            # +================+ /odom       +===============+                   +===============+
-            #                                            A                                    |
-            #                                            | /cabot/odometry/filtered           | /cabot/cmd_vel  # noqa: E501
-            #                   /cabot/imu/data          | (100Hz)                            | (target_rate: 40hz)
-            # +================+             +===================+                            |
-            # |*Cabot Sensor   |============>| *                 |   (passthrough)            |
-            # |================|             | RobotLocalization |  /cabot/odom_raw           |
-            #                                |                   |<==================+        |
-            #                                +===================+                   |        |
-            #                                                                        |        |
-            #                                                     (passthrough)      |        |
-            #                           (40Hz)                   /cabot/motorStatus  |        v
-            # +================+             +==================+               +===============+
-            # |                |============>|                  |==============>| *             |
-            # | Motor          |   Serial    | MotorControl     |               | MotorAdapter  |
-            # |                |<============|                  |<==============|               |
-            # +================+             +==================+               +===============+
-            #                           (40Hz)                   /cabot/motorTarget (target_rate: 40Hz)
-
-            Node(
-                package='cabot',
-                executable='odom_adapter_node',
-                namespace='/cabot',
-                name='odom_adapter_node',
-                output=output,
-                parameters=[
-                    *param_files,
-                    {
-                        'use_sim_time': use_sim_time,
-                        'max_speed': max_speed
-                    },
-                ],
-            ),
-            # for local odom navigation
-            Node(
-                package='cabot',
-                executable='odom_adapter_node',
-                namespace='/cabot',
-                name='odom_adapter_node2',
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
-            ),
-            # Cabot Lidar Speed Control
-            Node(
-                package='cabot',
-                executable='lidar_speed_control_node',
-                namespace='/cabot',
-                name='lidar_speed_control_node',
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
-            ),
-            # Cabot People SPeed Control
-            Node(
-                package='cabot',
-                executable='people_speed_control_node',
-                namespace='/cabot',
-                name='people_speed_control_node',
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
-            ),
-            # Cabot TF Speed Control
-            Node(
-                package='cabot',
-                executable='tf_speed_control_node',
-                namespace='/cabot',
-                name='tf_speed_control_node',
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
-            ),
-
-            # Cabot Speed Control
-            # This node limit the speed from the move_base based on specified topics
-            #   /cabot/lidar_speed           - control by lidar sensor
-            #   /cabot/map_speed             - control by map speed poi
-            #   /cabot/people_speed          - control by surrounding people
-            #   /cabot/queue_speed           - control by queue
-            #   /cabot/tf_speed              - control by existence of specific tf
-            #   /cabot/touch_speed_switched  - control by touch sensor
-            #                  TODO use touch_enabled argument
-            #   /cabot/user_speed            - control by user
-            Node(
-                package='cabot',
-                executable='speed_control_node',
-                namespace='/cabot',
-                name=PythonExpression(['"speed_control_node_touch_', touch_enabled, '"']),
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
-            ),
-
             # Motor Controller Adapter
             # Convert cmd_vel (linear, rotate) speed to motor target (left, right) speed.
             Node(
@@ -444,15 +314,6 @@ def generate_launch_description():
                 condition=UnlessCondition(use_sim_time),
             ),
 
-            # Sensor fusion for stabilizing odometry
-            Node(
-                package='robot_localization',
-                executable='ekf_node',
-                namespace='/cabot',
-                name='ekf_node',
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
-            ),
         ],
             condition=LaunchConfigurationNotEquals('model', '')
         ),
