@@ -1,7 +1,10 @@
 FROM ros:humble-ros-base-jammy
 
 RUN apt update && apt install -y \
-	ros-humble-diagnostic-updater
+	ros-humble-diagnostic-updater \
+	python3-pip
+
+RUN pip3 install pyserial
 
 ENV USERNAME developer
 # Replace 1000 with your user/group id

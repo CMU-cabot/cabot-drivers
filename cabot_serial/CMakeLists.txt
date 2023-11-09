@@ -39,6 +39,15 @@ ament_target_dependencies(cabot_serial_node
   ${dependencies}
 )
 
+# Install Python modules
+ament_python_install_package(${PROJECT_NAME})
+
+# Install Python executables
+install(PROGRAMS
+  scripts/cabot_serial_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 # Install executables
 install(TARGETS
   cabot_serial_node
@@ -51,7 +60,7 @@ install(
 )
 
 ament_export_include_directories("include/")
-ament_export_libraries(cabot)
+ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(${dependencies})
 
 ament_package()
