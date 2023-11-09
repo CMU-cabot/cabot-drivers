@@ -28,7 +28,8 @@ import rclpy.node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 import std_msgs.msg
-import cabot_base.event
+import cabot_common.event
+from cabot_common import vibration
 
 from cabot_base.handle_v2 import Handle
 
@@ -42,18 +43,18 @@ def event_listener(msg):
     node.get_logger().info(f"{msg}")
     event = None
     if "button" in msg:
-        event = cabot.event.ButtonEvent(**msg)
+        event = cabot_common.event.ButtonEvent(**msg)
 
         # button down confirmation
         if not event.up:
-            handle.execute_stimulus(Handle.BUTTON_CLICK)
+            handle.execute_stimulus(vibration.BUTTON_CLICK)
     if "buttons" in msg:
-        event = cabot.event.ClickEvent(**msg)
+        event = cabot_common.event.ClickEvent(**msg)
 
     if "holddown" in msg:
-        event = cabot.event.HoldDownEvent(**msg)
+        event = cabot_common.event.HoldDownEvent(**msg)
         # button hold down confirmation
-        handle.execute_stimulus(Handle.BUTTON_HOLDDOWN)
+        handle.execute_stimulus(vibration.BUTTON_HOLDDOWN)
 
     if event is not None:
         node.get_logger().info(f"{event}")

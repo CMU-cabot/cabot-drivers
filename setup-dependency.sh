@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/bin/bash
 
-# Copyright (c) 2020, 2022  Carnegie Mellon University
+# Copyright (c) 2023  Carnegie Mellon University
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,13 +20,60 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# deprecated
-# BUTTON_NEXT = 0
-# BUTTON_SELECT = 1
-# BUTTON_PREV = 2
+function blue {
+    echo -en "\033[36m"  ## blue
+    echo $@
+    echo -en "\033[0m"  ## reset color
+}
 
-BUTTON_UP = 1
-BUTTON_DOWN = 2
-BUTTON_LEFT = 3
-BUTTON_RIGHT = 4
-BUTTON_CENTER = 5
+function help {
+    echo "Usage: $0 <option>"
+    echo ""
+    echo "-h                    show this help"
+    echo "-c                    clean (rm -rf) dependency repositories"
+}
+
+clean=0
+
+while getopts "hc" arg; do
+    case $arg in
+	h)
+	    help
+	    exit
+	    ;;
+	c)
+	    clean=1
+	    ;;
+    esac
+done
+
+
+if [[ $clean -eq 1 ]]; then
+    find * -name ".git" | while read -r line; do
+	echo "rm -rf $(dirname $line)"
+	rm -rf $(dirname $line)
+    done
+    exit
+fi
+
+declare -A visited
+
+while true; do
+    files=$(find . -name "dependency.repos")
+
+    flag=0
+    for line in ${files[@]}; do
+	if [[ -z ${visited[$line]} ]]; then
+	    flag=1
+	    visited[$line]=1
+	    
+	    pushd $(dirname $line)
+	    blue "vcs import < $(basename $line)"
+	    vcs import < $(basename $line)
+	    popd
+	fi
+    done
+    if [[ $flag -eq 0 ]]; then
+	break
+    fi
+done

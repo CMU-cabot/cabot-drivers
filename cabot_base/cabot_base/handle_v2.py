@@ -23,7 +23,8 @@
 from rclpy.duration import Duration
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.qos import qos_profile_sensor_data
-from cabot_base import button
+from cabot_common import button
+from cabot_common import vibration
 from std_msgs.msg import Bool
 from std_msgs.msg import String
 from std_msgs.msg import UInt8
@@ -31,23 +32,10 @@ import time
 
 
 class Handle:
-    UNKNOWN = 0
-    LEFT_TURN = 1
-    RIGHT_TURN = 2
-    LEFT_DEV = 3
-    RIGHT_DEV = 4
-    FRONT = 5
-    LEFT_ABOUT_TURN = 6
-    RIGHT_ABOUT_TURN = 7
-    BUTTON_CLICK = 8
-    BUTTON_HOLDDOWN = 9
-    STIMULI_COUNT = 10
-    stimuli_names = ["unknown", "left_turn", "right_turn", "left_dev", "right_dev",
-                     "front", "left_about_turn", "right_about_turn", "button_click", "button_holddown"]
 
     @staticmethod
     def get_name(stimulus):
-        return Handle.stimuli_names[stimulus]
+        return vibration.stimuli_names[stimulus]
 
     def __init__(self, node, realworld_use=True, event_listener=None, button_keys=[]):
         self.node = node
@@ -82,16 +70,16 @@ class Handle:
         self.num_vibrations_button_click = 1
         self.num_vibrations_button_holddown = 1
 
-        self.callbacks = [None]*Handle.STIMULI_COUNT
-        self.callbacks[Handle.LEFT_TURN] = self.vibrate_left_turn
-        self.callbacks[Handle.RIGHT_TURN] = self.vibrate_right_turn
-        self.callbacks[Handle.LEFT_DEV] = self.vibrate_left_deviation
-        self.callbacks[Handle.RIGHT_DEV] = self.vibrate_right_deviation
-        self.callbacks[Handle.FRONT] = self.vibrate_front
-        self.callbacks[Handle.LEFT_ABOUT_TURN] = self.vibrate_about_left_turn
-        self.callbacks[Handle.RIGHT_ABOUT_TURN] = self.vibrate_about_right_turn
-        self.callbacks[Handle.BUTTON_CLICK] = self.vibrate_button_click
-        self.callbacks[Handle.BUTTON_HOLDDOWN] = self.vibrate_button_holddown
+        self.callbacks = [None]*vibration.STIMULI_COUNT
+        self.callbacks[vibration.LEFT_TURN] = self.vibrate_left_turn
+        self.callbacks[vibration.RIGHT_TURN] = self.vibrate_right_turn
+        self.callbacks[vibration.LEFT_DEV] = self.vibrate_left_deviation
+        self.callbacks[vibration.RIGHT_DEV] = self.vibrate_right_deviation
+        self.callbacks[vibration.FRONT] = self.vibrate_front
+        self.callbacks[vibration.LEFT_ABOUT_TURN] = self.vibrate_about_left_turn
+        self.callbacks[vibration.RIGHT_ABOUT_TURN] = self.vibrate_about_right_turn
+        self.callbacks[vibration.BUTTON_CLICK] = self.vibrate_button_click
+        self.callbacks[vibration.BUTTON_HOLDDOWN] = self.vibrate_button_holddown
 
         self.eventSub = node.create_subscription(String, '/cabot/event', self.event_callback, 10, callback_group=MutuallyExclusiveCallbackGroup())
 
@@ -141,8 +129,8 @@ class Handle:
 
     def event_callback(self, msg):
         name = msg.data
-        if name in Handle.stimuli_names:
-            index = Handle.stimuli_names.index(name)
+        if name in vibration.stimuli_names:
+            index = vibration.stimuli_names.index(name)
             self.execute_stimulus(index)
 
     def execute_stimulus(self, index):
