@@ -28,9 +28,9 @@ import rclpy.node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 import std_msgs.msg
-import cabot.event
+import cabot_base.event
 
-from cabot.handle_v2 import Handle
+from cabot_base.handle_v2 import Handle
 
 
 def notification_callback(msg):
