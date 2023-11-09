@@ -230,7 +230,7 @@ def generate_launch_description():
 
             # CaBot related
             Node(
-                package='cabot',
+                package='cabot_base',
                 executable='cabot_handle_v2_node.py',
                 namespace='/cabot',
                 name='cabot_handle_v2_node',
@@ -240,7 +240,7 @@ def generate_launch_description():
 
             # Microcontroller (Arduino - gt1/gtm or ESP32 - ace)
             Node(
-                package='cabot',
+                package='cabot_serial',
                 executable='cabot_serial_node',
                 namespace='/cabot',
                 name='cabot_serial',
@@ -256,7 +256,7 @@ def generate_launch_description():
                 condition=IfCondition(use_sim_time)
             ),
             Node(
-                package='cabot',
+                package='cabot_serial',
                 executable='cabot_serial_node',
                 namespace='/cabot',
                 name='cabot_serial',
@@ -274,7 +274,7 @@ def generate_launch_description():
 
             # optional wifi scanner with ESP32
             Node(
-                package='cabot',
+                package='cabot_serial',
                 executable='cabot_serial.py',
                 namespace='/cabot',
                 name='serial_esp32_wifi_scanner',
