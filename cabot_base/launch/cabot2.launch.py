@@ -68,9 +68,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     model_name = LaunchConfiguration('model')  # need to be set
     touch_params = LaunchConfiguration('touch_params')  # TODO no default value
-    touch_enabled = LaunchConfiguration('touch_enabled')
     use_standalone_wifi_scanner = LaunchConfiguration('use_standalone_wifi_scanner')
-    max_speed = LaunchConfiguration('max_speed')
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
