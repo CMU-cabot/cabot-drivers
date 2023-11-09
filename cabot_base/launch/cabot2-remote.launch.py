@@ -46,7 +46,7 @@ from launch_ros.descriptions import ParameterFile
 
 def generate_launch_description():
     output = 'both'
-    pkg_dir = get_package_share_directory('cabot')
+    pkg_dir = get_package_share_directory('cabot_base')
 
     model_name = LaunchConfiguration('model')  # need to be set
     touch_params = LaunchConfiguration('touch_params')
@@ -133,7 +133,7 @@ def generate_launch_description():
 
         # Microcontroller (Arduino or ESP32)
         Node(
-            package='cabot',
+            package='cabot_serial',
             executable='cabot_serial_node',
             namespace='cabot',
             name='cabot_serial',
