@@ -1,10 +1,25 @@
 FROM ros:humble-ros-base-jammy
 
 RUN apt update && apt install -y \
-	ros-humble-diagnostic-updater \
-	python3-pip
+	libusb-1.0-0 \
+	python3-pip \
+	python3-venv \
+	ros-humble-diagnostic-updater
 
-RUN pip3 install pyserial
+
+RUN pip3 install --no-cache-dir \
+    odrive==0.6.5 \
+    pyserial
+
+# set up venv for keeping compatibility
+RUN mkdir -p /opt/venv
+# cabot2 venv (odrive==0.5.2.post0)
+RUN python3 -m venv --system-site-packages /opt/venv/cabot2 && \
+    . /opt/venv/cabot2/bin/activate && \
+    pip3 install --no-cache-dir odrive==0.5.2.post0 && \
+    deactivate
+# cabot3 venv (odrive==0.6.5)
+RUN python3 -m venv --system-site-packages /opt/venv/cabot3
 
 ENV USERNAME developer
 # Replace 1000 with your user/group id
@@ -25,4 +40,3 @@ ENV HOME /home/$USERNAME
 
 WORKDIR $HOME/ros2_ws
 
-RUN git clone https://github.com/wg-perception/people.git -b ros2 src/people

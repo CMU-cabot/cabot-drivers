@@ -5,4 +5,18 @@ services:
     build:
       context: ./
     volumes:
-      - ./:/home/developer/ros2_ws/src/cabot-drivers
+# device, bluetooth
+      - /dev:/dev
+      - /sys/devices:/sys/devices
+      - /var/lib/bluetooth:/var/lib/bluetooth
+      - /run/dbus:/run/dbus
+      - /var/run/dbus:/var/run/dbus
+# code
+      - ./cabot_base:/home/developer/ros2_ws/src/cabot_base
+      - ./cabot_serial:/home/developer/ros2_ws/src/cabot_serial
+      - ./motor_controller:/home/developer/ros2_ws/src/motor_controller
+      - ./wireless_scanner_ros:/home/developer/ros2_ws/src/wireless_scanner_ros
+    privileged: true
+    devices:
+      - /dev/dri
+    network_mode: host
