@@ -7,9 +7,10 @@ Hardware interface packages for CaBot
 
 |Package|Description|
 |---|---|
-|cabot_serial|node to communicate with Arduino/ESP32 microcontroller|
-|[motor_controller](../motor_controller)|motor driver and adapter|
-|[wireless_scanner_ros](../wireless_scanner_ros)|WiFi/BLE scanner for ROS|
+|[cabot_base](./cabot_base)|launch configurations to bringup cabot hardware drivers|
+|[cabot_serial](./cabot_serial)|node to communicate with Arduino/ESP32 microcontroller|
+|[motor_controller](./motor_controller)|motor driver and adapter|
+|[wireless_scanner_ros](./wireless_scanner_ros)|WiFi/BLE scanner for ROS|
 
 # License
 
