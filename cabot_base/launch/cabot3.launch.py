@@ -63,7 +63,7 @@ from cabot_common.launch import AppendLogDirPrefix
 
 def generate_launch_description():
     output = 'both'
-    pkg_dir = get_package_share_directory('cabot')
+    pkg_dir = get_package_share_directory('cabot_base')
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     model_name = LaunchConfiguration('model')  # need to be set
@@ -121,7 +121,7 @@ def generate_launch_description():
         ),
         # append prefix name to the log directory for convenience
         RegisterEventHandler(
-            OnShutdown(on_shutdown=[AppendLogDirPrefix("cabot")]),
+            OnShutdown(on_shutdown=[AppendLogDirPrefix("cabot_base")]),
             condition=UnlessCondition(use_sim_time)
         ),
         DeclareLaunchArgument(

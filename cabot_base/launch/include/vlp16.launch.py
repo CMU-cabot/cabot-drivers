@@ -33,7 +33,7 @@ from launch_ros.descriptions import ComposableNode
 
 
 def generate_launch_description():
-    pkg_dir = get_package_share_directory('cabot')
+    pkg_dir = get_package_share_directory('cabot_base')
 
     target_container = LaunchConfiguration('target_container')
 
