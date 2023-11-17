@@ -1,0 +1,35 @@
+version: "2.3"
+
+services:
+  driver-base:
+    build:
+      context: ./docker/driver
+    environment:
+      - CABOT_MODEL
+      - CABOT_SIDE
+      - CABOT_TOUCH_PARAMS
+    volumes:
+# device, bluetooth
+      - /dev:/dev
+      - /sys/devices:/sys/devices
+      - /var/lib/bluetooth:/var/lib/bluetooth
+      - /run/dbus:/run/dbus
+      - /var/run/dbus:/var/run/dbus
+# code from dependencies
+      - ./cabot-common/cabot_common:/home/developer/driver_ws/src/cabot_common
+      - ./cabot-common/cabot_msgs:/home/developer/driver_ws/src/cabot_msgs
+      - ./cabot-common/docker/humble-custom/people:/home/developer/driver_ws/src/people
+      - ./cabot-description/cabot_description:/home/developer/driver_ws/src/cabot_description
+# code
+      - ./cabot_base:/home/developer/driver_ws/src/cabot_base
+      - ./cabot_serial:/home/developer/driver_ws/src/cabot_serial
+      - ./motor_controller:/home/developer/driver_ws/src/motor_controller
+      - ./wireless_scanner_ros:/home/developer/driver_ws/src/wireless_scanner_ros
+      - ./script:/home/developer/driver_ws/script
+    privileged: true
+    devices:
+      - /dev/dri
+    network_mode: host
+    command:
+      - "/launch.sh"
+      - "driver"
