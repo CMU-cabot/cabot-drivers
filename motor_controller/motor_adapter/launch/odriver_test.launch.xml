@@ -103,7 +103,7 @@ THE SOFTWARE.
   </group>
 
   <group if="$(var use_imu)">
-    <node pkg="cabot" exec="cabot_serial.py" name="rosserial" output="log">
+    <node pkg="cabot_serial" exec="cabot_serial_node" name="rosserial" output="log">
       <param name="port" value="/dev/ttyARDUINO_MEGA"/>
       <param name="baud" value="115200"/>
     </node>

@@ -273,7 +273,7 @@ def generate_launch_description():
             # optional wifi scanner with ESP32
             Node(
                 package='cabot_serial',
-                executable='cabot_serial.py',
+                executable='cabot_serial_node',
                 namespace='/cabot',
                 name='serial_esp32_wifi_scanner',
                 output=output,
