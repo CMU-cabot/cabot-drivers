@@ -442,7 +442,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
   if (0x20 <= cmd && cmd <= 0x23) {  // vibrator feedback
     vibrations_[cmd - 0x20].current = data[0];
   }
-  if (cmd == 0x30) {  // wifi
+  if (cmd == 0x17) {  // wifi
     std_msgs::msg::String msg;
     msg.data = std::string(data.begin(), data.end());
     wifi_pub_->publish(msg);

@@ -328,7 +328,7 @@ class CaBotSerialNode(rclpy.node.Node, CaBotArduinoSerialDelegate):
             msg.header.frame_id = "bmp_frame"
             self.temperature_pub.publish(msg)
             self.temp_check_task.tick()
-        if cmd == 0x20:  # wifi
+        if cmd == 0x17:  # wifi
             msg = String()
             msg.data = data.decode()
             self.wifi_pub.publish(msg)

@@ -5,6 +5,7 @@ services:
     build:
       context: ./docker/driver
     environment:
+      - ROS_LOG_DIR
       - CABOT_MODEL
       - CABOT_SIDE
       - CABOT_TOUCH_PARAMS
@@ -15,6 +16,8 @@ services:
       - /var/lib/bluetooth:/var/lib/bluetooth
       - /run/dbus:/run/dbus
       - /var/run/dbus:/var/run/dbus
+# bridge - if DDS use shared memory
+      - /dev/shm:/dev/shm
 # code from dependencies
       - ./cabot-common/cabot_common:/home/developer/driver_ws/src/cabot_common
       - ./cabot-common/cabot_msgs:/home/developer/driver_ws/src/cabot_msgs
@@ -33,3 +36,17 @@ services:
     command:
       - "/launch.sh"
       - "driver"
+
+  wifi_scan-base:
+    extends:
+      service: driver-base
+    command:
+      - "/launch.sh"
+      - "wifi-scan"
+
+  ble_scan-base:
+    extends:
+      service: driver-base
+    command:
+      - "/launch.sh"
+      - "ble-scan"

@@ -29,6 +29,8 @@ RUN apt update && apt install -y \
 	libusb-1.0-0 \
 	python3-pip \
 	python3-venv \
+    python3-gi \
+    python3-dbus \
 	ros-${ROS_DISTRO}-diagnostic-updater \
     ros-${ROS_DISTRO}-xacro
 

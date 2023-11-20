@@ -37,6 +37,12 @@ shift $((OPTIND-1))
 if [[ $1 == "driver" ]]; then
     shift 1
     exec ./script/launch_driver.sh $@
+elif [[ $1 == "wifi-scan" ]]; then
+    source install/setup.bash
+    exec ros2 launch wireless_scanner_ros esp32.launch.xml
+elif [[ $1 == "ble-scan" ]]; then
+    source install/setup.bash
+    exec ros2 launch wireless_scanner_ros dbus_ibeacon_scanner.launch.xml
 elif [[ $1 == "build" ]]; then
     shift 1
     exec ./script/build_ws.sh $@
