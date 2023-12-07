@@ -14,10 +14,9 @@ Hardware interface packages for CaBot
 ## Docker environment for test
 
 ```
-docker compose build
-docker compose run --rm ros2 bash
+./build-docker.sh -p -i -w
+docker compose run --rm driver bash
 # inside docker
-colcon build
 source install/setup.bash
 # run node for test
 ```
