@@ -37,7 +37,7 @@ from launch_ros.descriptions import ParameterFile
 
 
 def generate_launch_description():
-    pkg_dir = get_package_share_directory('cabot')
+    pkg_dir = get_package_share_directory('cabot_base')
 
     model_name = LaunchConfiguration('model')
     pandar = LaunchConfiguration('pandar')
