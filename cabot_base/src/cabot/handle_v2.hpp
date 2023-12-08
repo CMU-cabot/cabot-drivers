@@ -63,8 +63,8 @@ public:
 
 private:
   void timer_callback();
-  void buttonCallback(const std_msgs::msg::Bool::SharedPtr msg, int index);
-  void buttonCheck(const std_msgs::msg::Bool::SharedPtr msg, int index);
+  void buttonCallback(const std_msgs::msg::Int8::SharedPtr msg, int index);
+  void buttonCheck(const std_msgs::msg::Bool::SharedPtr bool_msg, int index);
   void eventCallback(const std_msgs::msg::String::SharedPtr msg);
   void vibrate(std::shared_ptr<rclcpp::Publisher<std_msgs::msg::UInt8>> pub);
   void stop(std::shared_ptr<rclcpp::Publisher<std_msgs::msg::UInt8>> pub);
@@ -87,7 +87,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator2_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator3_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator4_pub_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr button_subs[9];
+  rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr button_subs[5];
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr event_sub_;
   rclcpp::Time last_up[9];
   rclcpp::Time last_dwn[9];

@@ -64,15 +64,14 @@ Handle::Handle(
     btn_dwn[i] = false;
   }
   for (int i = 1; i <= static_cast<int>(ButtonType::BUTTON_CENTER); ++i) {
-    std::function<void(const std_msgs::msg::Bool::SharedPtr)> callback =
-      [this, i](const std_msgs::msg::Bool::SharedPtr msg) {
+    std::function<void(const std_msgs::msg::Int8::SharedPtr)> callback =
+      [this, i](const std_msgs::msg::Int8::SharedPtr msg){
         buttonCallback(msg, static_cast<ButtonType>(i));
       };
-    button_subs[i] = node_->create_subscription<std_msgs::msg::Bool>(
-      "/cabot/pushed_" + std::to_string(button_keys(i)), rclcpp::SensorDataQoS(),
-      [this, i](const std_msgs::msg::Bool::SharedPtr msg) {
+    button_subs[i] = node_->create_subscription<std_msgs::msg::Int8>(
+      "/cabot/pushed", rclcpp::SensorDataQoS(), [this, i](const std_msgs::msg::Int8::SharedPtr msg){
         buttonCallback(msg, static_cast<ButtonType>(i));
-      });
+    });
   }
   event_sub_ = node_->create_subscription<std_msgs::msg::String>(
     "/cabot/event", rclcpp::SensorDataQoS(), [this](const std_msgs::msg::String::SharedPtr msg) {
@@ -150,19 +149,25 @@ void Handle::timer_callback()
   }
 }
 
-void Handle::buttonCallback(const std_msgs::msg::Bool::SharedPtr msg, int index)
+void Handle::buttonCallback(const std_msgs::msg::Int8::SharedPtr msg, int index)
 {
-  if (index >= 1 && index <= 5) {
-    buttonCheck(msg, index);
+  if (index >= 1 && index <= static_cast<int>(ButtonType::BUTTON_CENTER)) {
+    int bit = 1 << (index - 1);
+    bool btn_push = (msg->data & bit) != 0;
+    auto bool_msg = std::make_shared<std_msgs::msg::Bool>();
+    bool_msg->data = btn_push;
+    buttonCheck(bool_msg, index);
   }
 }
 
-void Handle::buttonCheck(const std_msgs::msg::Bool::SharedPtr msg, int index)
+void Handle::buttonCheck(const std_msgs::msg::Bool::SharedPtr bool_msg, int index)
 {
   event.clear();
+  //RCLCPP_INFO(logger_, "16bit index : %x", index);
+  RCLCPP_INFO(logger_, "16bit data  : %x", bool_msg->data);
   rclcpp::Time now = node_->get_clock()->now();
   rclcpp::Time zerotime(0, 0, RCL_ROS_TIME);
-  if (msg->data && !btn_dwn[index] &&
+  if (bool_msg->data && !btn_dwn[index] &&
     !(last_up[index] != zerotime && now - last_up[index] < ignore_interval_))
   {
     event.insert(std::make_pair("button", std::to_string(button_keys(index))));
@@ -170,7 +175,7 @@ void Handle::buttonCheck(const std_msgs::msg::Bool::SharedPtr msg, int index)
     btn_dwn[index] = true;
     last_dwn[index] = now;
   }
-  if (!msg->data && btn_dwn[index]) {
+  if (!bool_msg->data && btn_dwn[index]) {
     event.insert(std::make_pair("button", std::to_string(button_keys(index))));
     event.insert(std::make_pair("up", "True"));
     up_count[index]++;
@@ -188,7 +193,7 @@ void Handle::buttonCheck(const std_msgs::msg::Bool::SharedPtr msg, int index)
     last_up[index] = zerotime;
     up_count[index] = 0;
   }
-  if (msg->data && btn_dwn[index] &&
+  if (bool_msg->data && btn_dwn[index] &&
     last_dwn[index] != zerotime &&
     now - last_dwn[index] > holddown_interval_)
   {

@@ -119,7 +119,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_raw_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr button_pub_;
-  std::vector<rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr> btn_pubs;
+  std::vector<rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr> btn_pubs;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
   std::shared_ptr<rclcpp::Time> imu_last_topic_time;
   rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr calibration_pub_;

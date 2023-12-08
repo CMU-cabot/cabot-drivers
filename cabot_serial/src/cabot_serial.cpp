@@ -308,11 +308,11 @@ void CaBotSerialNode::process_button_data(std_msgs::msg::Int8::SharedPtr msg)
   if (btn_pubs.size() == 0) {
     for (size_t i = 0; i < NUMBER_OF_BUTTONS; ++i) {
       btn_pubs.push_back(
-          this->create_publisher<std_msgs::msg::Bool>("pushed_" + std::to_string(i + 1), rclcpp::QoS(10)));
+          this->create_publisher<std_msgs::msg::Int8>("pushed_" + std::to_string(i + 1), rclcpp::QoS(10)));
     }
   }
   for (size_t i = 0; i < NUMBER_OF_BUTTONS; ++i) {
-    std_msgs::msg::Bool temp;
+    std_msgs::msg::Int8 temp;
     temp.data = ((msg->data >> i) & 0x01) == 0x01;
     btn_pubs[i]->publish(temp);
   }
@@ -404,7 +404,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     std_msgs::msg::Int8 msg;
     msg.data = static_cast<int8_t>(data[0]);
     button_pub_->publish(msg);
-    process_button_data(std::make_shared<std_msgs::msg::Int8>(msg));
+    //process_button_data(std::make_shared<std_msgs::msg::Int8>(msg));
     button_check_task_->tick();
   }
   if (cmd == 0x13) {  // imu
