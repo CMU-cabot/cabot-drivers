@@ -27,6 +27,7 @@ else
     popd > /dev/null 2>&1
 fi
 
+error=0
 for model in ${models[@]}; do
     echo -n "$model: "
     export CABOT_MODEL=$model
@@ -35,10 +36,13 @@ for model in ${models[@]}; do
     EXIT_STATUS=$?
 
     if [ $EXIT_STATUS -eq 124 ]; then
-	echo "Looks okay, shutdown the docker"
+	echo "Looks okay"
 	docker compose down > /dev/null 2>&1
     else
 	echo "Something is wrong: $EXIT_STATUS"
 	red $(grep ERROR /tmp/cabot-driver-test.log)
+	error=1
     fi
 done
+
+exit $error
