@@ -32,12 +32,12 @@ include_directories(
   include
 )
 
-add_library(cabot_serial_node SHARED
+add_library(cabot_serial_lib SHARED
   src/cabot_serial.cpp
   src/arduino_serial.cpp
 )
 
-ament_target_dependencies(cabot_serial_node
+ament_target_dependencies(cabot_serial_lib
   ${dependencies}
 )
 
@@ -50,15 +50,15 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-rclcpp_components_register_nodes(cabot_serial_node
+rclcpp_components_register_node(cabot_serial_lib
   PLUGIN "CaBotSerialNode"
   EXECUTABLE cabot_serial_node
 )
 
 # Install executables
 install(TARGETS
-  cabot_serial_node
-  DESTINATION lib/${PROJECT_NAME}
+  cabot_serial_lib
+  DESTINATION lib
 )
 
 install(
