@@ -71,7 +71,7 @@ Handle::Handle(
       };
   }
   */
-  button_subs = node_->create_subscription<std_msgs::msg::Int8>(
+  button_sub_ = node_->create_subscription<std_msgs::msg::Int8>(
     "/cabot/pushed", rclcpp::SensorDataQoS(), [this](const std_msgs::msg::Int8::SharedPtr msg){
       buttonCallback(msg);
     });
@@ -165,7 +165,7 @@ void Handle::buttonCheck(const std_msgs::msg::Int8::SharedPtr msg, int index)
   event.clear();
   int bit = 1 << (index - 1);
   bool btn_push = (msg->data & bit) != 0;
-  auto bool_msg = std::make_shared<std_msgs::msg::Bool>();
+  std::shared_ptr<std_msgs::msg::Bool> bool_msg = std::make_shared<std_msgs::msg::Bool>();
   bool_msg->data = btn_push;
   rclcpp::Time now = node_->get_clock()->now();
   rclcpp::Time zerotime(0, 0, RCL_ROS_TIME);

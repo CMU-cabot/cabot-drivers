@@ -33,7 +33,6 @@
 
 using namespace std::chrono_literals;
 
-
 // global variables
 std::shared_ptr<CaBotArduinoSerial> client_ = nullptr;
 std::shared_ptr<Serial> port_ = nullptr;
@@ -561,3 +560,6 @@ int main(int argc, char ** argv)
   rclcpp::shutdown();
   return 0;
 }
+
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(CaBotSerialNode)

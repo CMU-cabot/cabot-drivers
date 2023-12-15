@@ -87,7 +87,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator2_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator3_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator4_pub_;
-  rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr button_subs;
+  rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr button_sub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr event_sub_;
   rclcpp::Time last_up[9];
   rclcpp::Time last_dwn[9];

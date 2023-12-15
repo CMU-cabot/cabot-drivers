@@ -150,3 +150,6 @@ int main(int argc, char * argv[])
   rclcpp::shutdown();
   return 0;
 }
+
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(CaBotHandleV2Node)
