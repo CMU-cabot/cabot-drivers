@@ -31,7 +31,30 @@ std::shared_ptr<CaBotHandleV2Node> node_;
 
 CaBotHandleV2Node::CaBotHandleV2Node(const rclcpp::NodeOptions & options)
 : rclcpp::Node("cabot_handle_v2_node", options), handle_(nullptr), button_keys_({}), event_pub_(
-    nullptr) {}
+    nullptr) {
+  event_pub_ = create_publisher<std_msgs::msg::String>("/cabot/event", 10);
+  std::vector<std::string> button_keys = declare_parameter("buttons", std::vector<std::string>{});
+  std::string button_keys_str = std::accumulate(
+    button_keys.begin(), button_keys.end(), std::string(),
+    [](const std::string & result, const std::string & key) {
+      return result.empty() ? key : result + ", " + key;
+    });
+  RCLCPP_INFO(get_logger(), "buttons: %s", button_keys_str.c_str());
+  bool no_vibration = declare_parameter("no_vibration", false);
+  RCLCPP_INFO(get_logger(), "no_vibration = %s", no_vibration ? "true" : "false");
+  if (!no_vibration) {
+    rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr notification_sub = create_subscription<std_msgs::msg::Int8>(
+      "/cabot/notification", 10, [this](const std_msgs::msg::Int8::SharedPtr msg) {
+        this->notificationCallback(msg);
+      });
+  }
+  try {
+    rclcpp::spin(shared_from_this());
+  } catch (const std::exception & e) {
+    RCLCPP_ERROR(get_logger(), "Exception during spinning: %s", e.what());
+    printStackTrace();
+  }
+}
 
 void CaBotHandleV2Node::printStackTrace()
 {
@@ -109,43 +132,6 @@ int main(int argc, char * argv[])
   if (!node_) {
     RCLCPP_ERROR(node_->get_logger(), "Failed to allocate memory for CaBotHandleV2Node .");
     return 1;
-  }
-  node_->event_pub_ = node_->create_publisher<std_msgs::msg::String>("/cabot/event", 10);
-  std::vector<std::string> button_keys_ = node_->declare_parameter(
-    "buttons",
-    std::vector<std::string>{""});
-  std::string button_keys_str_ = std::accumulate(
-    button_keys_.begin(), button_keys_.end(), std::string(),
-    [](const std::string & result, const std::string & key) {
-      return result.empty() ? key : result + ", " + key;
-    });
-  node_->handle_ = std::make_shared<Handle>(
-    node_, [node_](const std::map<std::string, std::string> & msg) {
-      node_->eventListener(msg);
-    }, button_keys_);
-  RCLCPP_INFO(node_->get_logger(), "buttons: %s", button_keys_str_.c_str());
-  bool no_vibration = node_->declare_parameter("no_vibration", false);
-  RCLCPP_INFO(node_->get_logger(), "no_vibration = %s", no_vibration ? "true" : "false");
-  rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr notification_sub_;
-  if (!no_vibration) {
-    std::shared_ptr<CaBotHandleV2Node> node_shared = node_;
-    if (!node_shared) {
-      RCLCPP_ERROR(node_->get_logger(), "Invalid shared_ptr for CaBotHandleV2Node .");
-      return 2;
-    }
-    notification_sub_ = node_shared->create_subscription<std_msgs::msg::Int8>(
-      "/cabot/notification", 10, [node_shared](const std_msgs::msg::Int8::SharedPtr msg) {
-        node_shared->notificationCallback(msg);
-      });
-  }
-  rclcpp::Clock::SharedPtr clock = node_->get_clock();
-  RCLCPP_INFO(node_->get_logger(), "Node clock type: %d", clock->get_clock_type());
-  try {
-    rclcpp::spin(node_);
-  } catch (const std::exception & e) {
-    RCLCPP_ERROR(node_->get_logger(), "Exception during spinning: %s", e.what());
-    node_->printStackTrace();
-    return 3;
   }
   rclcpp::shutdown();
   return 0;

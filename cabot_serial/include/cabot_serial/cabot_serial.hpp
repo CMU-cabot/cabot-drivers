@@ -39,6 +39,7 @@
 #include <rclcpp/clock.hpp>
 #include <rclcpp/node.hpp>
 #include <rclcpp/qos.hpp>
+#include <rclcpp_components/register_node_macro.hpp>
 #include <rcl_interfaces/msg/parameter_type.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
 
@@ -106,6 +107,8 @@ public:
   void log_throttle(rclcpp::Logger::Level level, int interval_in_ms, const std::string & text) override;
   void get_param(const std::string & name, std::function<void(const std::vector<int> &)> callback) override;
   void publish(uint8_t cmd, const std::vector<uint8_t> & data) override;
+  static void signalHandler(int signal);
+  static CaBotSerialNode* globalInstance;
 
   std::shared_ptr<CaBotArduinoSerial> client_;
   CaBotSerialNode();
@@ -151,7 +154,7 @@ private:
   void poling();
   double throttle_duration_sec;
   rclcpp::TimerBase::SharedPtr timer_;
-
+  static CaBotSerialNode* instance_;
 
   template<typename T>
   void callback(const T & msg);
@@ -173,4 +176,5 @@ private:
   rclcpp::TimerBase::SharedPtr log_throttle_timer_;
   int count_;
 };
+
 #endif  // CABOT__CABOT_SERIAL_HPP_

@@ -28,6 +28,7 @@
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/int8.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_components/register_node_macro.hpp>
 #include <rclcpp/executors/multi_threaded_executor.hpp>
 #include <rclcpp/callback_group.hpp>
 #include <memory>

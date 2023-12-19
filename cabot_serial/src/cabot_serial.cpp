@@ -27,6 +27,7 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+#include <functional>
 
 #include "cabot_serial/cabot_serial.hpp"
 #include "cabot_serial/arduino_serial.hpp"
@@ -38,6 +39,8 @@ std::shared_ptr<CaBotArduinoSerial> client_ = nullptr;
 std::shared_ptr<Serial> port_ = nullptr;
 rclcpp::TimerBase::SharedPtr timer_ = nullptr;
 rclcpp::TimerBase::SharedPtr polling_ = nullptr;
+static CaBotSerialNode* globalInstance = nullptr;
+CaBotSerialNode* CaBotSerialNode::instance_ = nullptr;
 const char * error_msg_;
 
 std::chrono::time_point<std::chrono::system_clock> topic_alive_{};
@@ -81,6 +84,14 @@ void CheckConnectionTask::run(diagnostic_updater::DiagnosticStatusWrapper & stat
   }
 }
 
+extern "C" void signalHandlerWrapper(int signal)
+{
+  if (globalInstance)
+  {
+    globalInstance->signalHandler(signal);
+  }
+}
+
 CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("cabot_serial_node", options),
   updater_(this),
@@ -93,6 +104,98 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
   // Diagnostic Updater
   check_connection_task_ = std::make_shared<CheckConnectionTask>(this->get_logger(), "Serial Connection");
   updater_.add(*check_connection_task_);
+
+  instance_ = this;
+  globalInstance = this;
+  struct sigaction sa;
+  //sa.sa_handler = signalHandler;
+  sa.sa_handler = signalHandlerWrapper;
+  sigfillset(&sa.sa_mask);
+  sigaction(SIGINT, &sa, NULL);
+  sa.sa_flags = 0;
+  sigemptyset(&sa.sa_mask);
+  if (sigaction(SIGINT, &sa, nullptr) == -1) {
+    RCLCPP_ERROR(get_logger(), "Error setting up signal handler.");
+    std::exit(EXIT_FAILURE);
+  }
+  RCLCPP_INFO(get_logger(), "CABOT ROS Serial CPP Node");
+  std::string port_name_ = declare_parameter("port", "/dev/ttyCABOT");
+  int baud_ = declare_parameter("baud", 115200);  // actually it is not used
+  auto run_once = [this, port_name_]() {
+    if (client_ == nullptr) {
+      return;
+    }
+    RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 1000.0, "run_once");
+    try {
+      client_->run_once();
+    } catch (const std::ios_base::failure & e) {  // IOError
+      error_msg_ = e.what();
+      RCLCPP_ERROR(get_logger(), error_msg_);
+      RCLCPP_ERROR(get_logger(), "try to reconnect usb");
+      client_ = nullptr;
+      if (timer_) {
+        timer_->cancel();
+      }
+    } catch (const std::system_error & e) {  // OSError
+      error_msg_ = e.what();
+      RCLCPP_ERROR(get_logger(), error_msg_);
+      std::cerr << e.what() << std::endl;
+      client_ = nullptr;
+      if (timer_) {
+        timer_->cancel();
+      }
+    } catch (const std::runtime_error & e) {  // termios.error
+      error_msg_ = e.what();
+      RCLCPP_ERROR(get_logger(), error_msg_);
+      RCLCPP_ERROR(get_logger(), "connection disconnected");
+      client_ = nullptr;
+      if (timer_) {
+        timer_->cancel();
+      }
+    } catch (...) {
+      RCLCPP_ERROR(get_logger(), "error occurred");
+      rclcpp::shutdown();
+      std::exit(EXIT_FAILURE);
+    }
+  };
+// polling to check if client (arduino) is disconnected and keep trying to reconnect
+  auto polling = [this, port_name_, baud_, run_once]() {
+    RCLCPP_INFO(get_logger(), "polling");
+    if (client_ && client_->is_alive_) {
+      return;
+    }
+    client_ = nullptr;
+    port_ = nullptr;
+    RCLCPP_INFO(get_logger(), "Connecting to %s at %d baud", port_name_.c_str(), baud_);
+    try {
+      port_ = std::make_shared<Serial>(port_name_, baud_, 5000, 10000);
+    } catch (std::runtime_error & e) {
+      RCLCPP_ERROR(get_logger(), e.what());
+      return;
+    }
+    client_ = std::make_shared<CaBotArduinoSerial>(port_, baud_);
+    //client_->delegate_ = this;
+    client_->delegate_ = std::dynamic_pointer_cast<CaBotArduinoSerialDelegate>(shared_from_this());
+    updater_.setHardwareID(port_name_);
+    topic_alive_ = std::chrono::time_point<std::chrono::system_clock>();
+    client_->start();
+    RCLCPP_INFO(get_logger(), "Serial is ready");
+    // timer_ = create_wall_timer(0.001s, run_once);
+    timer_ = create_wall_timer(0.001s, run_once);
+  };
+
+  polling_ = create_wall_timer(1s, polling);
+  rclcpp::spin(shared_from_this());
+  rclcpp::shutdown();
+
+}
+
+void CaBotSerialNode::signalHandler(int signal)
+{
+  if (instance_)
+  {
+    instance_->stopped();
+  }
 }
 
 void CaBotSerialNode::vib_loop()
@@ -469,94 +572,19 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
 }
 
 std::shared_ptr<CaBotSerialNode> node_;
-
-void signalHandler(int signal) {
+/*
+void CaBotSerialNode::signalHandler(int signal) {
   node_->stopped();
 }
-
+*/
 int main(int argc, char ** argv)
 {
-  struct sigaction sa;
-  sa.sa_handler = signalHandler;
-  sa.sa_flags = 0;
-  sigemptyset(&sa.sa_mask);
-  if (sigaction(SIGINT, &sa, nullptr) == -1) {
-    std::cerr << "Error setting up signal handler." << std::endl;
-    return 1;
-  }
-
   rclcpp::init(argc, argv);
   node_ = std::make_shared<CaBotSerialNode>(rclcpp::NodeOptions());
-  RCLCPP_INFO(node_->get_logger(), "CABOT ROS Serial CPP Node");
-  std::string port_name_ = node_->declare_parameter("port", "/dev/ttyCABOT");
-  int baud_ = node_->declare_parameter("baud", 115200);  // actually it is not used
-
-  auto run_once = [ = ]() {
-      if (client_ == nullptr) {
-        return;
-      }
-      RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000.0, "run_once");
-      try {
-        client_->run_once();
-      } catch (const std::ios_base::failure & e) {  // IOError
-        error_msg_ = e.what();
-        RCLCPP_ERROR(node_->get_logger(), error_msg_);
-        RCLCPP_ERROR(node_->get_logger(), "try to reconnect usb");
-        client_ = nullptr;
-        if (timer_) {
-          timer_->cancel();
-        }
-      } catch (const std::system_error & e) {  // OSError
-        error_msg_ = e.what();
-        RCLCPP_ERROR(node_->get_logger(), error_msg_);
-        std::cerr << e.what() << std::endl;
-        client_ = nullptr;
-        if (timer_) {
-          timer_->cancel();
-        }
-      } catch (const std::runtime_error & e) {  // termios.error
-        error_msg_ = e.what();
-        RCLCPP_ERROR(node_->get_logger(), error_msg_);
-        RCLCPP_ERROR(node_->get_logger(), "connection disconnected");
-        client_ = nullptr;
-        if (timer_) {
-          timer_->cancel();
-        }
-      } catch (...) {
-        RCLCPP_ERROR(node_->get_logger(), "error occurred");
-        rclcpp::shutdown();
-        std::exit(EXIT_FAILURE);
-      }
-    };
-
-  // polling to check if client (arduino) is disconnected and keep trying to reconnect
-  auto polling = [ = ]() {
-      RCLCPP_INFO(node_->get_logger(), "polling");
-      if (client_ && client_->is_alive_) {
-        return;
-      }
-      client_ = nullptr;
-      port_ = nullptr;
-      RCLCPP_INFO(node_->get_logger(), "Connecting to %s at %d baud", port_name_.c_str(), baud_);
-      try {
-        port_ = std::make_shared<Serial>(port_name_, baud_, 5000, 10000);
-      } catch (std::runtime_error & e) {
-        RCLCPP_ERROR(node_->get_logger(), e.what());
-        return;
-      }
-      client_ = std::make_shared<CaBotArduinoSerial>(port_, baud_);
-      node_->client_ = client_;
-      client_->delegate_ = node_;
-      node_->updater_.setHardwareID(port_name_);
-      topic_alive_ = std::chrono::time_point<std::chrono::system_clock>();
-      client_->start();
-      RCLCPP_INFO(node_->get_logger(), "Serial is ready");
-      // timer_ = node_->create_wall_timer(0.001s, run_once);
-      timer_ = node_->create_wall_timer(0.001s, run_once);
-    };
-
-  polling_ = node_->create_wall_timer(1s, polling);
-  rclcpp::spin(node_);
+  if (!node_) {
+    RCLCPP_ERROR(node_->get_logger(), "Failed to allocate memory for CaBotSerialNode .");
+    return 1;
+  }
   rclcpp::shutdown();
   return 0;
 }
