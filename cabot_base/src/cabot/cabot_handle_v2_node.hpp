@@ -28,6 +28,7 @@
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/int8.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_components/register_node_macro.hpp>
 #include <rclcpp/executors/multi_threaded_executor.hpp>
 #include <rclcpp/callback_group.hpp>
 #include <memory>
@@ -51,7 +52,7 @@ public:
   void notificationCallback(const std_msgs::msg::Int8::SharedPtr msg);
   void printStackTrace();
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr event_pub_;
-
+  rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr notification_sub;
 private:
   int main();
 };
