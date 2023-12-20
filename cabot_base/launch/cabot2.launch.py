@@ -246,51 +246,53 @@ def generate_launch_description():
                         # output=output,
                         parameters=[*param_files, {'use_sim_time': use_sim_time}],
                     ),
-                    # Microcontroller (Arduino - gt1/gtm or ESP32 - ace)
-                    ComposableNode(
-                        package='cabot_serial',
-                        plugin='CaBotSerialNode',
-                        # namespace='/cabot',
-                        name='cabot_serial_node',
-                        # output=output,
-                        parameters=[
-                            *param_files,
-                            {'use_sim_time': False, 'touch_params': touch_params}
-                        ],
-                        remappings=[
-                            # ('/cabot/imu', '/cabot/imu/data'),
-                            ('/cabot/touch_speed', '/cabot/touch_speed_raw')
-                        ],
-                        condition=IfCondition(use_sim_time)
-                    ),
-                    ComposableNode(
-                        package='cabot_serial',
-                        plugin='CaBotSerialNode',
-                        # namespace='/cabot',
-                        name='cabot_serial_node',
-                        # output=output,
-                        parameters=[
-                            *param_files,
-                            {'use_sim_time': False, 'touch_params': touch_params}
-                        ],
-                        remappings=[
-                            ('/cabot/imu', '/cabot/imu/data'),
-                            ('/cabot/touch_speed', '/cabot/touch_speed_raw')
-                        ],
-                        condition=IfCondition(use_sim_time)
-                    ),
-                    # optional wifi scanner with ESP32
-                    ComposableNode(
-                        package='cabot_serial',
-                        plugin='CaBotSerialNode',
-                        # namespace='/cabot',
-                        name='serial_esp32_wifi_scanner',
-                        # output=output,
-                        parameters=[*param_files,{'use_sim_time': use_sim_time}],
-                        remappings=[('wifi_scan_str', '/esp32/wifi_scan_str')],
-                        condition=IfCondition(use_standalone_wifi_scanner),
-                    ),
                 ]
+            ),
+
+            # Microcontroller (Arduino - gt1/gtm or ESP32 - ace)
+            Node(
+                package='cabot_serial',
+                executable='cabot_serial_node',
+                namespace='/cabot',
+                name='cabot_serial',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {'use_sim_time': False, 'touch_params': touch_params}
+                ],
+                remappings=[
+                    # ('/cabot/imu', '/cabot/imu/data'),
+                    ('/cabot/touch_speed', '/cabot/touch_speed_raw')
+                ],
+                condition=IfCondition(use_sim_time)
+            ),
+            Node(
+                package='cabot_serial',
+                executable='cabot_serial_node',
+                namespace='/cabot',
+                name='cabot_serial',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {'use_sim_time': False, 'touch_params': touch_params}
+                ],
+                remappings=[
+                    ('/cabot/imu', '/cabot/imu/data'),
+                    ('/cabot/touch_speed', '/cabot/touch_speed_raw')
+                ],
+                condition=UnlessCondition(use_sim_time)
+            ),
+
+            # optional wifi scanner with ESP32
+            Node(
+                package='cabot_serial',
+                executable='cabot_serial_node',
+                namespace='/cabot',
+                name='serial_esp32_wifi_scanner',
+                output=output,
+                parameters=[*param_files, {'use_sim_time': use_sim_time}],
+                remappings=[('wifi_scan_str', '/esp32/wifi_scan_str')],
+                condition=IfCondition(use_standalone_wifi_scanner),
             ),
 
             # Motor Controller Adapter
