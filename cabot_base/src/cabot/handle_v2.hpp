@@ -46,7 +46,7 @@ typedef struct vibration
   int i = 0;
 } Vibration;
 
-class Handle
+class Handle : public std::enable_shared_from_this<Handle>
 {
 public:
   enum button_keys

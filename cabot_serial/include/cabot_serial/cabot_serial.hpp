@@ -108,7 +108,7 @@ public:
   void get_param(const std::string & name, std::function<void(const std::vector<int> &)> callback) override;
   void publish(uint8_t cmd, const std::vector<uint8_t> & data) override;
   static void signalHandler(int signal);
-  static CaBotSerialNode* globalInstance;
+  //static CaBotSerialNode* globalInstance;
 
   std::shared_ptr<CaBotArduinoSerial> client_;
   CaBotSerialNode();

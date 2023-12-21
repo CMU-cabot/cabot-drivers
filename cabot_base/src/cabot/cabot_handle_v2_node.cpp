@@ -42,7 +42,6 @@ CaBotHandleV2Node::CaBotHandleV2Node(const rclcpp::NodeOptions & options)
   callback = [this](const std::map<std::string, std::string>& msg){
     this->eventListener(msg);
   };
-  //handle_ = std::make_shared<Handle>(shared_from_this(), callback, button_keys_);
   handle_ = std::make_shared<Handle>(std::dynamic_pointer_cast<CaBotHandleV2Node>(shared_from_this()), callback, button_keys_);
 
   RCLCPP_INFO(get_logger(), "buttons: %s", button_keys_str.c_str());

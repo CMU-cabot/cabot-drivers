@@ -185,9 +185,6 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
   };
 
   polling_ = create_wall_timer(1s, polling);
-  rclcpp::spin(shared_from_this());
-  rclcpp::shutdown();
-
 }
 
 void CaBotSerialNode::signalHandler(int signal)
@@ -585,6 +582,7 @@ int main(int argc, char ** argv)
     RCLCPP_ERROR(node_->get_logger(), "Failed to allocate memory for CaBotSerialNode .");
     return 1;
   }
+  rclcpp::spin(node_);
   rclcpp::shutdown();
   return 0;
 }

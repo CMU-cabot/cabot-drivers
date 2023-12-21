@@ -63,7 +63,7 @@ install(TARGETS
 
 install(
   DIRECTORY include/
-  DESTINATION include/
+  DESTINATION share/${PROJECT_NAME}/include/
 )
 
 ament_export_include_directories("include/")
