@@ -46,7 +46,7 @@ std::string Handle::get_name(int stimulus)
 }
 
 Handle::Handle(
-  std::shared_ptr<CaBotHandleV2Node> node,
+  CaBotHandleV2Node* node,
   std::function<void(const std::map<std::string, std::string> &)> eventListener,
   const std::vector<std::string> & buttonKeys)
 : node_(node), eventListener_(std::move(eventListener)), buttonKeys_(buttonKeys),
@@ -63,14 +63,6 @@ Handle::Handle(
     up_count[i] = 0;
     btn_dwn[i] = false;
   }
-  /*
-  for (int i = 1; i <= static_cast<int>(ButtonType::BUTTON_CENTER); ++i) {
-    std::function<void(const std_msgs::msg::Int8::SharedPtr)> callback =
-      [this, i](const std_msgs::msg::Int8::SharedPtr msg){
-        buttonCallback(msg, static_cast<ButtonType>(i));
-      };
-  }
-  */
   button_sub_ = node_->create_subscription<std_msgs::msg::Int8>(
     "/cabot/pushed", rclcpp::SensorDataQoS(), [this](const std_msgs::msg::Int8::SharedPtr msg){
       buttonCallback(msg);

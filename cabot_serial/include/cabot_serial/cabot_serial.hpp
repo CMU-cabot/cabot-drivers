@@ -112,6 +112,8 @@ public:
 
   std::shared_ptr<CaBotArduinoSerial> client_;
   CaBotSerialNode();
+  std::string port_name_;
+  int baud_;
   // port_name_ = this->declare_parameter("port", "/dev/ttyCABOT").get<std::string>();
   // const char* port_name_ = "/dev/ttyESP32";
   // const int baud_rate_ = 115200;

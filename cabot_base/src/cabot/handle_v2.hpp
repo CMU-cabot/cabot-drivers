@@ -56,7 +56,7 @@ public:
     STIMULI_COUNT = 10
   };
   Handle(
-    std::shared_ptr<CaBotHandleV2Node> node, std::function<void(const std::map<std::string,
+    CaBotHandleV2Node* node, std::function<void(const std::map<std::string,
     std::string> &)> eventListener, const std::vector<std::string> & buttonKeys);
   void executeStimulus(int index);
   static const char* stimuli_names[];

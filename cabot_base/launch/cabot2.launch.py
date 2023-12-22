@@ -241,7 +241,7 @@ def generate_launch_description():
                     ComposableNode(
                         package='cabot_base',
                         plugin='CaBotHandleV2Node',
-                        # namespace='/cabot',
+                        namespace='/cabot',
                         name='cabot_handle_v2_node',
                         # output=output,
                         parameters=[*param_files, {'use_sim_time': use_sim_time}],
@@ -250,7 +250,7 @@ def generate_launch_description():
                     ComposableNode(
                         package='cabot_serial',
                         plugin='CaBotSerialNode',
-                        # namespace='/cabot',
+                        namespace='/cabot',
                         name='cabot_serial_node',
                         # output=output,
                         parameters=[
@@ -266,7 +266,7 @@ def generate_launch_description():
                     ComposableNode(
                         package='cabot_serial',
                         plugin='CaBotSerialNode',
-                        # namespace='/cabot',
+                        namespace='/cabot',
                         name='cabot_serial_node',
                         # output=output,
                         parameters=[
@@ -283,7 +283,7 @@ def generate_launch_description():
                     ComposableNode(
                         package='cabot_serial',
                         plugin='CaBotSerialNode',
-                        # namespace='/cabot',
+                        namespace='/cabot',
                         name='serial_esp32_wifi_scanner',
                         # output=output,
                         parameters=[*param_files,{'use_sim_time': use_sim_time}],
