@@ -93,7 +93,7 @@ extern "C" void signalHandlerWrapper(int signal)
 }
 
 CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
-: rclcpp::Node("cabot_serial_node", options),
+: rclcpp::Node("cabot_serial_node", options /*rclcpp::NodeOptions(options).use_intra_process_comms(true)*/ ),
   updater_(this),
   client_logger_(rclcpp::get_logger("arduino-serial")),
   vibrations_({})

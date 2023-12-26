@@ -30,8 +30,8 @@
 std::shared_ptr<CaBotHandleV2Node> node_;
 
 CaBotHandleV2Node::CaBotHandleV2Node(const rclcpp::NodeOptions & options)
-: rclcpp::Node("cabot_handle_v2_node", options), handle_(nullptr), button_keys_({}), event_pub_(
-    nullptr) {
+: rclcpp::Node("cabot_handle_v2_node", rclcpp::NodeOptions(options).use_intra_process_comms(true)),
+  handle_(nullptr), button_keys_({}), event_pub_(nullptr) {
   event_pub_ = create_publisher<std_msgs::msg::String>("/cabot/event", 10);
   button_keys_ = declare_parameter("buttons", std::vector<std::string>{""});
   std::string button_keys_str = std::accumulate(
@@ -124,9 +124,15 @@ void CaBotHandleV2Node::eventListener(const std::map<std::string, std::string> &
   }
   if (event) {
     RCLCPP_INFO(get_logger(), event->toString().c_str());
+    /*
     std_msgs::msg::String msg;
     msg.data = event->toString();
     event_pub_->publish(msg);
+    */
+    std::unique_ptr<std_msgs::msg::String> msg = std::make_unique<std_msgs::msg::String>();
+    msg->data = event->toString();
+    event_pub_->publish(std::move(msg));
+    
   }
 }
 
