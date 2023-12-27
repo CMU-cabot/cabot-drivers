@@ -46,8 +46,8 @@ CaBotHandleV2Node::CaBotHandleV2Node(const rclcpp::NodeOptions & options)
   RCLCPP_INFO(get_logger(), "buttons: %s", button_keys_str.c_str());
   bool no_vibration = declare_parameter("no_vibration", false);
   RCLCPP_INFO(get_logger(), "no_vibration = %s", no_vibration ? "true" : "false");
-  notification_callback = [this](const std_msgs::msg::Int8::SharedPtr msg){
-    this->notificationCallback(msg);
+  notification_callback = [this](const std_msgs::msg::Int8::UniquePtr msg){
+    this->notificationCallback(std::move(msg));
   };
   if (!no_vibration) {
     notification_sub = create_subscription<std_msgs::msg::Int8>(
@@ -72,7 +72,7 @@ void CaBotHandleV2Node::printStackTrace()
   free(symbols);
 }
 
-void CaBotHandleV2Node::notificationCallback(const std_msgs::msg::Int8::SharedPtr msg)
+void CaBotHandleV2Node::notificationCallback(const std_msgs::msg::Int8::UniquePtr& msg)
 {
   if (msg) {
     std::string log_msg_ = "Received notification: " + std::to_string(msg->data);
@@ -124,11 +124,6 @@ void CaBotHandleV2Node::eventListener(const std::map<std::string, std::string> &
   }
   if (event) {
     RCLCPP_INFO(get_logger(), event->toString().c_str());
-    /*
-    std_msgs::msg::String msg;
-    msg.data = event->toString();
-    event_pub_->publish(msg);
-    */
     std::unique_ptr<std_msgs::msg::String> msg = std::make_unique<std_msgs::msg::String>();
     msg->data = event->toString();
     event_pub_->publish(std::move(msg));

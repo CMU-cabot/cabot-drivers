@@ -64,12 +64,12 @@ Handle::Handle(
     btn_dwn[i] = false;
   }
   button_sub_ = node_->create_subscription<std_msgs::msg::Int8>(
-    "/cabot/pushed", rclcpp::SensorDataQoS(), [this](const std_msgs::msg::Int8::SharedPtr msg){
-      buttonCallback(msg);
+    "/cabot/pushed", rclcpp::SensorDataQoS(), [this](std_msgs::msg::Int8::UniquePtr msg) {
+      buttonCallback(std::move(msg));
     });
   event_sub_ = node_->create_subscription<std_msgs::msg::String>(
-    "/cabot/event", rclcpp::SensorDataQoS(), [this](const std_msgs::msg::String::SharedPtr msg) {
-      eventCallback(msg);
+    "/cabot/event", rclcpp::SensorDataQoS(), [this](std_msgs::msg::String::UniquePtr msg) {
+      eventCallback(std::move(msg));
     });
   duration_ = 150;
   duration_single_vibration_ = 400;
@@ -126,9 +126,9 @@ void Handle::timer_callback()
       vibration_queue_.erase(vibration_queue_.begin());
       RCLCPP_INFO(rclcpp::get_logger("handle"), "Done");
     } else if (vibration.i == 0 && vibration.numberVibrations > 0) {
-      std_msgs::msg::UInt8 msg;
-      msg.data = vibration.duration * 0.1;
-      vibration.vibratorPub->publish(msg);
+      std::unique_ptr<std_msgs::msg::UInt8> msg = std::make_unique<std_msgs::msg::UInt8>();
+      msg->data = vibration.duration * 0.1;
+      vibration.vibratorPub->publish(std::move(msg));
       RCLCPP_INFO(rclcpp::get_logger("handle"), "publish %d", vibration.duration);
       RCLCPP_INFO(rclcpp::get_logger("handle"), "sleep %d ms", vibration.duration);
       vibration.i++;
@@ -143,35 +143,35 @@ void Handle::timer_callback()
   }
 }
 
-void Handle::buttonCallback(const std_msgs::msg::Int8::SharedPtr msg)
+void Handle::buttonCallback(std_msgs::msg::Int8::UniquePtr msg)
 {
   for (int index = 1; index <= 5; ++index) {
     if (index >= 1 && index <= static_cast<int>(ButtonType::BUTTON_CENTER)) {
-      buttonCheck(msg, index);
+      buttonCheck(std::move(msg), index);
     }
   }
 }
 
-void Handle::buttonCheck(const std_msgs::msg::Int8::SharedPtr msg, int index)
+void Handle::buttonCheck(std_msgs::msg::Int8::UniquePtr msg, int index)
 {
   event.clear();
   int bit = 1 << (index - 1);
   bool btn_push = (msg->data & bit) != 0;
-  std::shared_ptr<std_msgs::msg::Bool> bool_msg = std::make_shared<std_msgs::msg::Bool>();
-  bool_msg->data = btn_push;
+  // std::shared_ptr<std_msgs::msg::Bool> bool_msg = std::make_shared<std_msgs::msg::Bool>();
+  // bool_msg->data = btn_push;
   rclcpp::Time now = node_->get_clock()->now();
   rclcpp::Time zerotime(0, 0, RCL_ROS_TIME);
-  if (bool_msg->data && !btn_dwn[index] &&
+  if (btn_push && !btn_dwn[index] &&
     !(last_up[index] != zerotime && now - last_up[index] < ignore_interval_))
   {
-    event.insert(std::make_pair("button", std::to_string(button_keys(index))));
-    event.insert(std::make_pair("up", "False"));
+    event.insert(std::pair("button", std::to_string(button_keys(index))));
+    event.insert(std::pair("up", "False"));
     btn_dwn[index] = true;
     last_dwn[index] = now;
   }
-  if (!bool_msg->data && btn_dwn[index]) {
-    event.insert(std::make_pair("button", std::to_string(button_keys(index))));
-    event.insert(std::make_pair("up", "True"));
+  if (!btn_push && btn_dwn[index]) {
+    event.insert(std::pair("button", std::to_string(button_keys(index))));
+    event.insert(std::pair("up", "True"));
     up_count[index]++;
     last_up[index] = now;
     btn_dwn[index] = false;
@@ -181,17 +181,17 @@ void Handle::buttonCheck(const std_msgs::msg::Int8::SharedPtr msg, int index)
     now - last_up[index] > double_click_interval_)
   {
     if (last_dwn[index] != zerotime) {
-      event.insert(std::make_pair("buttons", std::to_string(button_keys(index))));
-      event.insert(std::make_pair("count", std::to_string(up_count[index])));
+      event.insert(std::pair("buttons", std::to_string(button_keys(index))));
+      event.insert(std::pair("count", std::to_string(up_count[index])));
     }
     last_up[index] = zerotime;
     up_count[index] = 0;
   }
-  if (bool_msg->data && btn_dwn[index] &&
+  if (btn_push && btn_dwn[index] &&
     last_dwn[index] != zerotime &&
     now - last_dwn[index] > holddown_interval_)
   {
-    event.insert(std::make_pair("holddown", std::to_string(button_keys(index))));
+    event.insert(std::pair("holddown", std::to_string(button_keys(index))));
     last_dwn[index] = zerotime;
   }
   if (!event.empty()) {
@@ -199,7 +199,7 @@ void Handle::buttonCheck(const std_msgs::msg::Int8::SharedPtr msg, int index)
   }
 }
 
-void Handle::eventCallback(const std_msgs::msg::String::SharedPtr msg)
+void Handle::eventCallback(std_msgs::msg::String::UniquePtr msg)
 {
   const size_t stimuli_names_size = std::size(Handle::stimuli_names);
   const std::string name = msg->data;
@@ -238,18 +238,18 @@ void Handle::stop(rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr pub)
 
 void Handle::vibrateAll(int time)
 {
-  std_msgs::msg::UInt8 msg;
-  msg.data = power_;
-  vibrator1_pub_->publish(msg);
-  vibrator2_pub_->publish(msg);
-  vibrator3_pub_->publish(msg);
-  vibrator4_pub_->publish(msg);
+  std::unique_ptr<std_msgs::msg::UInt8> msg = std::make_unique<std_msgs::msg::UInt8>();
+  msg->data = power_;
+  vibrator1_pub_->publish(std::move(msg));
+  vibrator2_pub_->publish(std::move(msg));
+  vibrator3_pub_->publish(std::move(msg));
+  vibrator4_pub_->publish(std::move(msg));
   std::this_thread::sleep_for(std::chrono::milliseconds(time));
-  msg.data = 0;
-  vibrator1_pub_->publish(msg);
-  vibrator2_pub_->publish(msg);
-  vibrator3_pub_->publish(msg);
-  vibrator4_pub_->publish(msg);
+  msg->data = 0;
+  vibrator1_pub_->publish(std::move(msg));
+  vibrator2_pub_->publish(std::move(msg));
+  vibrator3_pub_->publish(std::move(msg));
+  vibrator4_pub_->publish(std::move(msg));
 }
 
 void Handle::vibrateLeftTurn()

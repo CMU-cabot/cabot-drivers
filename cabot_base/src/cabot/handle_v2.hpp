@@ -63,9 +63,9 @@ public:
 
 private:
   void timer_callback();
-  void buttonCallback(const std_msgs::msg::Int8::SharedPtr msg);
-  void buttonCheck(const std_msgs::msg::Int8::SharedPtr msg, int index);
-  void eventCallback(const std_msgs::msg::String::SharedPtr msg);
+  void buttonCallback(std_msgs::msg::Int8::UniquePtr msg);
+  void buttonCheck(std_msgs::msg::Int8::UniquePtr msg, int index);
+  void eventCallback(std_msgs::msg::String::UniquePtr msg);
   void vibrate(std::shared_ptr<rclcpp::Publisher<std_msgs::msg::UInt8>> pub);
   void stop(std::shared_ptr<rclcpp::Publisher<std_msgs::msg::UInt8>> pub);
   void vibrateAll(int time);
