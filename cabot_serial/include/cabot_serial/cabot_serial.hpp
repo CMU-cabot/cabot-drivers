@@ -141,10 +141,10 @@ private:
   static const size_t NUMBER_OF_BUTTONS = 5;
   Vibration vibrations_[4];
   void vib_loop();
-  void vib_callback(const uint8_t cmd, const std_msgs::msg::UInt8::SharedPtr msg);
+  void vib_callback(const uint8_t cmd, const std_msgs::msg::UInt8::UniquePtr msg);
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_data(const std::vector<uint8_t> & data);
-  void process_button_data(const std_msgs::msg::Int8::SharedPtr msg);
-  void touch_callback(const std_msgs::msg::Int16::SharedPtr msg);
+  void process_button_data(std_msgs::msg::Int8::UniquePtr& msg);
+  void touch_callback(std_msgs::msg::Int16::UniquePtr msg);
   void set_touch_speed_active_mode(
     const std_srvs::srv::SetBool::Request::SharedPtr req,
     std_srvs::srv::SetBool::Response::SharedPtr res);

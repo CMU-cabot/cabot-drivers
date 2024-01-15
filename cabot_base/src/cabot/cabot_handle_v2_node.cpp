@@ -42,7 +42,7 @@ CaBotHandleV2Node::CaBotHandleV2Node(const rclcpp::NodeOptions & options)
   eventListener_callback = [this](const std::map<std::string, std::string>& msg){
     this->eventListener(msg);
   };
-  handle_ = std::make_shared<Handle>(this, eventListener_callback, button_keys_);
+  handle_ = std::make_unique<Handle>(this, eventListener_callback, button_keys_);
   RCLCPP_INFO(get_logger(), "buttons: %s", button_keys_str.c_str());
   bool no_vibration = declare_parameter("no_vibration", false);
   RCLCPP_INFO(get_logger(), "no_vibration = %s", no_vibration ? "true" : "false");
@@ -52,11 +52,6 @@ CaBotHandleV2Node::CaBotHandleV2Node(const rclcpp::NodeOptions & options)
   if (!no_vibration) {
     notification_sub = create_subscription<std_msgs::msg::Int8>(
       "/cabot/notification", 10, notification_callback);
-  }
-  try {
-  } catch (const std::exception & e) {
-    RCLCPP_ERROR(get_logger(), "Exception during spinning: %s", e.what());
-    printStackTrace();
   }
 }
 
@@ -76,6 +71,8 @@ void CaBotHandleV2Node::notificationCallback(const std_msgs::msg::Int8::UniquePt
 {
   if (msg) {
     std::string log_msg_ = "Received notification: " + std::to_string(msg->data);
+    // temporary log
+    RCLCPP_INFO(this->get_logger(), "notificationCallback Address:: %p", &(msg->data));
     RCLCPP_INFO(this->get_logger(), log_msg_.c_str());
     this->handle_->executeStimulus(msg->data);
   } else {
@@ -86,7 +83,7 @@ void CaBotHandleV2Node::notificationCallback(const std_msgs::msg::Int8::UniquePt
     this->get_logger(), "Node clock type (in notificationCallback): %d", clock->get_clock_type());
 }
 
-void CaBotHandleV2Node::eventListener(const std::map<std::string, std::string> & msg)
+void CaBotHandleV2Node::eventListener(const std::map<std::string, std::string>& msg)
 {
   std::shared_ptr<BaseEvent> event = nullptr;
   std::string msg_str;
@@ -99,24 +96,23 @@ void CaBotHandleV2Node::eventListener(const std::map<std::string, std::string> &
   msg_str = "{" + msg_str + "}";
   RCLCPP_INFO(get_logger(), msg_str.c_str());
   if (msg_str.find("buttons") != std::string::npos) {
-    int buttons = std::stoi(msg.at("buttons"));
-    int count = std::stoi(msg.at("count"));
+    const int& buttons = std::stoi(msg.at("buttons"));
+    const int& count = std::stoi(msg.at("count"));
     event = std::make_shared<ClickEvent>(buttons, count);
   } else if (msg_str.find("button") != std::string::npos) {
-    int button = std::stoi(msg.at("button"));
-    bool up = (msg.at("up") == "True") ? true : false;
-    bool hold = (msg.find("hold") != msg.end()) ? true : false;
-    event = std::make_shared<ButtonEvent>(button, up, hold);
-    std::shared_ptr<ButtonEvent> buttonEvent = std::dynamic_pointer_cast<ButtonEvent>(event);
+    const int& button = std::stoi(msg.at("button"));
+    const bool& up = (msg.at("up") == "True") ? true : false;
+    const bool& hold = (msg.find("hold") != msg.end()) ? true : false;
+    std::shared_ptr<ButtonEvent> buttonEvent = std::make_shared<ButtonEvent>(button, up, hold);
+    event = buttonEvent;
     // button down confirmation
     if (buttonEvent && !buttonEvent->is_up()) {
       this->handle_->executeStimulus(8);
     }
   } else if (msg_str.find("holddown") != std::string::npos) {
-    int hold = std::stoi(msg.at("holddown"));
-    event = std::make_shared<HoldDownEvent>(hold);
-    std::shared_ptr<HoldDownEvent> holdDownEvent = std::dynamic_pointer_cast<HoldDownEvent>(event);
-
+    const int& hold = std::stoi(msg.at("holddown"));
+    std::shared_ptr<HoldDownEvent> holdDownEvent = std::make_shared<HoldDownEvent>(hold);
+    event = holdDownEvent;
     // button hold down confirmation
     if (holdDownEvent) {
       this->handle_->executeStimulus(9);
@@ -126,8 +122,9 @@ void CaBotHandleV2Node::eventListener(const std::map<std::string, std::string> &
     RCLCPP_INFO(get_logger(), event->toString().c_str());
     std::unique_ptr<std_msgs::msg::String> msg = std::make_unique<std_msgs::msg::String>();
     msg->data = event->toString();
+    // temporary log
+    RCLCPP_INFO(this->get_logger(), "eventListener Address:: %p", &(msg->data));
     event_pub_->publish(std::move(msg));
-    
   }
 }
 

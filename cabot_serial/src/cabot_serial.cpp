@@ -93,7 +93,7 @@ extern "C" void signalHandlerWrapper(int signal)
 }
 
 CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
-: rclcpp::Node("cabot_serial_node", options /*rclcpp::NodeOptions(options).use_intra_process_comms(true)*/ ),
+: rclcpp::Node("cabot_serial_node", rclcpp::NodeOptions(options).use_intra_process_comms(false)),
   updater_(this),
   client_logger_(rclcpp::get_logger("arduino-serial")),
   vibrations_({})
@@ -217,7 +217,7 @@ void CaBotSerialNode::vib_loop()
   }
 }
 
-void CaBotSerialNode::vib_callback(uint8_t cmd, const std_msgs::msg::UInt8::SharedPtr msg)
+void CaBotSerialNode::vib_callback(uint8_t cmd, const std_msgs::msg::UInt8::UniquePtr msg)
 {
   if (client_ == nullptr) { return; }
   std::vector<uint8_t> data;
@@ -402,7 +402,7 @@ std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_data(
   return std::make_shared<sensor_msgs::msg::Imu>(imu_msg);
 }
 
-void CaBotSerialNode::process_button_data(std_msgs::msg::Int8::SharedPtr msg)
+void CaBotSerialNode::process_button_data(std_msgs::msg::Int8::UniquePtr& msg)
 {
   if (btn_pubs.size() == 0) {
     for (size_t i = 0; i < NUMBER_OF_BUTTONS; ++i) {
@@ -417,9 +417,9 @@ void CaBotSerialNode::process_button_data(std_msgs::msg::Int8::SharedPtr msg)
   }
 }
 
-void CaBotSerialNode::touch_callback(std_msgs::msg::Int16::SharedPtr msg)
+void CaBotSerialNode::touch_callback(std_msgs::msg::Int16::UniquePtr msg)
 {
-  std::shared_ptr<std_msgs::msg::Float32> touch_speed_msg = std::make_unique<std_msgs::msg::Float32>();
+  std::unique_ptr<std_msgs::msg::Float32> touch_speed_msg = std::make_unique<std_msgs::msg::Float32>();
   if (touch_speed_active_mode_) {
     touch_speed_msg->data = msg->data ? touch_speed_max_speed_ : 0.0;
   } else {
@@ -466,19 +466,19 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
               &CaBotSerialNode::set_touch_speed_active_mode, this, std::placeholders::_1,
               std::placeholders::_2));
     }
-    std_msgs::msg::Int16 msg;
-    msg.data = static_cast<int16_t>((data[1] << 8) | data[0]);
-    touch_pub_->publish(msg);
-    touch_callback(std::make_shared<std_msgs::msg::Int16>(msg));
+    std::unique_ptr<std_msgs::msg::Int16> msg = std::make_unique<std_msgs::msg::Int16>();
+    msg->data = static_cast<int16_t>((data[1] << 8) | data[0]);
+    touch_pub_->publish(std::move(msg));
+    touch_callback(std::move(msg));
     touch_check_task_->tick();
   }
   if (cmd == 0x11) {  // touch_raw
     if (touch_raw_pub_ == nullptr) {
       touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("touch_raw", rclcpp::QoS(10));
     }
-    std_msgs::msg::Int16 msg;
-    msg.data = static_cast<int16_t>((data[1] << 8) | data[0]);
-    touch_raw_pub_->publish(msg);
+    std::unique_ptr<std_msgs::msg::Int16> msg = std::make_unique<std_msgs::msg::Int16>();
+    msg->data = static_cast<int16_t>((data[1] << 8) | data[0]);
+    touch_raw_pub_->publish(std::move(msg));
   }
   if (cmd == 0x12) {  // buttons
     if (button_pub_ == nullptr) {
@@ -487,22 +487,22 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
 
         // assumes vibrators can be used with buttons
         vib1_sub_ = this->create_subscription<std_msgs::msg::UInt8>(
-            "vibrator1", 10, [this](const std_msgs::msg::UInt8::SharedPtr msg)
-                             {this->vib_callback(0x20, msg);});
+            "vibrator1", 10, [this](std_msgs::msg::UInt8::UniquePtr msg)
+                             {this->vib_callback(0x20, std::move(msg));});
         vib2_sub_ = this->create_subscription<std_msgs::msg::UInt8>(
-            "vibrator2", 10, [this](const std_msgs::msg::UInt8::SharedPtr msg)
-                             {this->vib_callback(0x21, msg);});
+            "vibrator2", 10, [this](std_msgs::msg::UInt8::UniquePtr msg)
+                             {this->vib_callback(0x21, std::move(msg));});
         vib3_sub_ = this->create_subscription<std_msgs::msg::UInt8>(
-            "vibrator3", 10, [this](const std_msgs::msg::UInt8::SharedPtr msg)
-                             {this->vib_callback(0x22, msg);});
+            "vibrator3", 10, [this](std_msgs::msg::UInt8::UniquePtr msg)
+                             {this->vib_callback(0x22, std::move(msg));});
         vib4_sub_ = this->create_subscription<std_msgs::msg::UInt8>(
-            "vibrator4", 10, [this](const std_msgs::msg::UInt8::SharedPtr msg)
-                             {this->vib_callback(0x23, msg);});
+            "vibrator4", 10, [this](std_msgs::msg::UInt8::UniquePtr msg)
+                             {this->vib_callback(0x23, std::move(msg));});
         vib_timer_ = this->create_wall_timer(0.01s, std::bind(&CaBotSerialNode::vib_loop, this));
     }
-    std_msgs::msg::Int8 msg;
-    msg.data = static_cast<int8_t>(data[0]);
-    button_pub_->publish(msg);
+    std::unique_ptr<std_msgs::msg::Int8> msg = std::make_unique<std_msgs::msg::Int8>();
+    msg->data = static_cast<int8_t>(data[0]);
+    button_pub_->publish(std::move(msg));
     //process_button_data(std::make_shared<std_msgs::msg::Int8>(msg));
     button_check_task_->tick();
   }
@@ -521,9 +521,9 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     if (calibration_pub_ == nullptr) {
       calibration_pub_ = this->create_publisher<std_msgs::msg::UInt8MultiArray>("calibration", rclcpp::QoS(10));
     }
-    std_msgs::msg::UInt8MultiArray msg;
-    msg.data = data;
-    calibration_pub_->publish(msg);
+    std::unique_ptr<std_msgs::msg::UInt8MultiArray> msg = std::make_unique<std_msgs::msg::UInt8MultiArray>();
+    msg->data = data;
+    calibration_pub_->publish(std::move(msg));
   }
   if (cmd == 0x15) {  // pressure
     if (pressure_pub_ == nullptr) {
@@ -537,7 +537,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     msg.variance = 0.0;
     msg.header.stamp = this->now();
     msg.header.frame_id = "bmp_frame";
-    pressure_pub_->publish(msg);
+    pressure_pub_->publish(std::move(msg));
     pressure_check_task_->tick();
   }
   if (cmd == 0x16) {  // temperature
@@ -552,7 +552,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     msg.variance = 0.0;
     msg.header.stamp = this->now();
     msg.header.frame_id = "bmp_frame";
-    temperature_pub_->publish(msg);
+    temperature_pub_->publish(std::move(msg));
     temp_check_task_->tick();
   }
   if (0x20 <= cmd && cmd <= 0x23) {  // vibrator feedback
@@ -562,9 +562,9 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     if (wifi_pub_ == nullptr) {
       wifi_pub_ = this->create_publisher<std_msgs::msg::String>("wifi", rclcpp::QoS(10));
     }
-    std_msgs::msg::String msg;
-    msg.data = std::string(data.begin(), data.end());
-    wifi_pub_->publish(msg);
+    std::unique_ptr<std_msgs::msg::String> msg = std::make_unique<std_msgs::msg::String>();
+    msg->data = std::string(data.begin(), data.end());
+    wifi_pub_->publish(std::move(msg));
   }
 }
 

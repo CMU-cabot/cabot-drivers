@@ -46,7 +46,7 @@ class CaBotHandleV2Node : public rclcpp::Node
 {
 public:
   explicit CaBotHandleV2Node(const rclcpp::NodeOptions & options);
-  std::shared_ptr<Handle> handle_ = nullptr;
+  std::unique_ptr<Handle> handle_ = nullptr;
   std::function<void(const std::map<std::string, std::string>&)> eventListener_callback = nullptr;
   std::function<void(const std_msgs::msg::Int8::UniquePtr)> notification_callback = nullptr;
   std::vector<std::string> button_keys_ = {};

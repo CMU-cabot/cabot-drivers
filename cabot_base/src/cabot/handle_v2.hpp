@@ -63,11 +63,11 @@ public:
 
 private:
   void timer_callback();
-  void buttonCallback(std_msgs::msg::Int8::UniquePtr msg);
-  void buttonCheck(std_msgs::msg::Int8::UniquePtr msg, int index);
+  void buttonCallback(std_msgs::msg::Int8::UniquePtr& msg);
+  void buttonCheck(std_msgs::msg::Int8::UniquePtr& msg, int index);
   void eventCallback(std_msgs::msg::String::UniquePtr msg);
-  void vibrate(std::shared_ptr<rclcpp::Publisher<std_msgs::msg::UInt8>> pub);
-  void stop(std::shared_ptr<rclcpp::Publisher<std_msgs::msg::UInt8>> pub);
+  void vibrate(rclcpp::Publisher<std_msgs::msg::UInt8>::UniquePtr pub);
+  void stop(rclcpp::Publisher<std_msgs::msg::UInt8>::UniquePtr pub);
   void vibrateAll(int time);
   void vibrateLeftTurn();
   void vibrateRightTurn();
@@ -80,7 +80,7 @@ private:
   void vibrateButtonClick();
   void vibrateButtonHolddown();
   void vibratePattern(
-    std::shared_ptr<rclcpp::Publisher<std_msgs::msg::UInt8>> vibratorPub,
+    const rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr& vibratorPub,
     int numberVibrations, int duration);
   std::shared_ptr<CaBotHandleV2Node> node_;
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator1_pub_;
