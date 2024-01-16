@@ -220,6 +220,8 @@ void CaBotSerialNode::vib_loop()
 void CaBotSerialNode::vib_callback(uint8_t cmd, const std_msgs::msg::UInt8::UniquePtr msg)
 {
   if (client_ == nullptr) { return; }
+  // temporary log
+  RCLCPP_INFO(this->get_logger(), "vib_callback Address:: %p", &(msg->data));
   std::vector<uint8_t> data;
   data.push_back(msg->data);
   vibrations_[cmd-0x20].target = msg->data;
@@ -413,19 +415,23 @@ void CaBotSerialNode::process_button_data(std_msgs::msg::Int8::UniquePtr& msg)
   for (size_t i = 0; i < NUMBER_OF_BUTTONS; ++i) {
     std_msgs::msg::Int8 temp;
     temp.data = ((msg->data >> i) & 0x01) == 0x01;
+    // temporary log
+    RCLCPP_INFO(this->get_logger(), "process_button_data Address:: %p", &(temp.data));
     btn_pubs[i]->publish(temp);
   }
 }
 
-void CaBotSerialNode::touch_callback(std_msgs::msg::Int16::UniquePtr msg)
+void CaBotSerialNode::touch_callback(std_msgs::msg::Int16& msg)
 {
   std::unique_ptr<std_msgs::msg::Float32> touch_speed_msg = std::make_unique<std_msgs::msg::Float32>();
   if (touch_speed_active_mode_) {
-    touch_speed_msg->data = msg->data ? touch_speed_max_speed_ : 0.0;
+    touch_speed_msg->data = msg.data ? touch_speed_max_speed_ : 0.0;
   } else {
-    touch_speed_msg->data = msg->data ? 0.0 : touch_speed_max_speed_inactive_;
+    touch_speed_msg->data = msg.data ? 0.0 : touch_speed_max_speed_inactive_;
   }
-  touch_speed_switched_pub_->publish(*touch_speed_msg);
+  // temporary log
+  RCLCPP_INFO(this->get_logger(), "touch_callback Address:: %p", &(touch_speed_msg->data));
+  touch_speed_switched_pub_->publish(std::move(touch_speed_msg));
 }
 
 void CaBotSerialNode::set_touch_speed_active_mode(
@@ -468,8 +474,10 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     }
     std::unique_ptr<std_msgs::msg::Int16> msg = std::make_unique<std_msgs::msg::Int16>();
     msg->data = static_cast<int16_t>((data[1] << 8) | data[0]);
+    // temporary log
+    RCLCPP_INFO(this->get_logger(), "publish touch Address:: %p", &(msg->data));
+    touch_callback(*msg);
     touch_pub_->publish(std::move(msg));
-    touch_callback(std::move(msg));
     touch_check_task_->tick();
   }
   if (cmd == 0x11) {  // touch_raw
@@ -478,6 +486,8 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     }
     std::unique_ptr<std_msgs::msg::Int16> msg = std::make_unique<std_msgs::msg::Int16>();
     msg->data = static_cast<int16_t>((data[1] << 8) | data[0]);
+    // temporary log
+    RCLCPP_INFO(this->get_logger(), "publish touch_raw Address:: %p", &(msg->data));
     touch_raw_pub_->publish(std::move(msg));
   }
   if (cmd == 0x12) {  // buttons
@@ -502,6 +512,8 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     }
     std::unique_ptr<std_msgs::msg::Int8> msg = std::make_unique<std_msgs::msg::Int8>();
     msg->data = static_cast<int8_t>(data[0]);
+    // temporary log
+    RCLCPP_INFO(this->get_logger(), "publish buttons Address:: %p", &(msg->data));
     button_pub_->publish(std::move(msg));
     //process_button_data(std::make_shared<std_msgs::msg::Int8>(msg));
     button_check_task_->tick();
@@ -513,6 +525,8 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
         imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(10));
         imu_check_task_ = std::make_shared<TopicCheckTask>(updater_, "IMU", 100);
       }
+      // temporary log
+      // RCLCPP_INFO(this->get_logger(), "publish imu Address:: %p", &(msg->data));
       imu_pub_->publish(*msg);
       imu_check_task_->tick();
     }
@@ -523,6 +537,8 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     }
     std::unique_ptr<std_msgs::msg::UInt8MultiArray> msg = std::make_unique<std_msgs::msg::UInt8MultiArray>();
     msg->data = data;
+    // temporary log
+    RCLCPP_INFO(this->get_logger(), "publish calibration Address:: %p", &(msg->data));
     calibration_pub_->publish(std::move(msg));
   }
   if (cmd == 0x15) {  // pressure
@@ -537,6 +553,8 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     msg.variance = 0.0;
     msg.header.stamp = this->now();
     msg.header.frame_id = "bmp_frame";
+    // temporary log
+    RCLCPP_INFO(this->get_logger(), "publish pressure Address:: %p", &(msg.fluid_pressure));
     pressure_pub_->publish(std::move(msg));
     pressure_check_task_->tick();
   }
@@ -552,6 +570,8 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     msg.variance = 0.0;
     msg.header.stamp = this->now();
     msg.header.frame_id = "bmp_frame";
+    // temporary log
+    RCLCPP_INFO(this->get_logger(), "publish temperature Address:: %p", &(msg.temperature));
     temperature_pub_->publish(std::move(msg));
     temp_check_task_->tick();
   }
@@ -564,6 +584,8 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     }
     std::unique_ptr<std_msgs::msg::String> msg = std::make_unique<std_msgs::msg::String>();
     msg->data = std::string(data.begin(), data.end());
+    // temporary log
+    RCLCPP_INFO(this->get_logger(), "publish wifi Address:: %p", &(msg->data));
     wifi_pub_->publish(std::move(msg));
   }
 }
