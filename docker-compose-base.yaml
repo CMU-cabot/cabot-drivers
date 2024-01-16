@@ -9,6 +9,8 @@ services:
       - CABOT_MODEL
       - CABOT_SIDE
       - CABOT_TOUCH_PARAMS
+      - CABOT_ODRIVER_SERIAL_0
+      - CABOT_ODRIVER_SERIAL_1
     volumes:
 # device, bluetooth
       - /dev:/dev
