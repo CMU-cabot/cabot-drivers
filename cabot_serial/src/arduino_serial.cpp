@@ -195,8 +195,8 @@ void Serial::reset()
 CaBotArduinoSerial::CaBotArduinoSerial(
   std::shared_ptr<Serial> port, int baud,
   std::chrono::milliseconds timeout)
-: Node("cabot_arduino_serial"), is_alive_(true), logger_(get_logger()), port_(port), baud_(baud), timeout_(timeout),
-  read_count_(0), time_synced_(false), no_input_count_(0) {}
+: Node("cabot_arduino_serial"), is_alive_(true), logger_(get_logger()), port_(port), baud_(baud),
+  timeout_(timeout), read_count_(0), time_synced_(false), no_input_count_(0) {}
 
 void CaBotArduinoSerial::start()
 {
@@ -232,13 +232,15 @@ void CaBotArduinoSerial::run_once()
       }
     }
   } catch (const std::exception & e) {
-    delegate_->log(rclcpp::Logger::Level::Error, string_format("exception occurred during reading: %s", e.what()));
+    delegate_->log(rclcpp::Logger::Level::Error, string_format(
+            "exception occurred during reading: %s", e.what()));
     stop();
   }
   try {
     process_write_once();
   } catch (const std::exception & e) {
-    delegate_->log(rclcpp::Logger::Level::Error, string_format("exception occurred during reading: %s", e.what()));
+    delegate_->log(rclcpp::Logger::Level::Error, string_format(
+            "exception occurred during reading: %s", e.what()));
     stop();
   }
 }
@@ -357,11 +359,13 @@ bool CaBotArduinoSerial::process_read_once()
   try_read(1, received);
   checksum1 = received[0];
   uint8_t checksum2 = this->checksum(data);
-  delegate_->log(rclcpp::Logger::Level::Debug, string_format("checksum %d %d", checksum1, checksum2));
+  delegate_->log(rclcpp::Logger::Level::Debug, string_format(
+          "checksum %d %d", checksum1, checksum2));
   if (checksum1 != checksum2) {
     return false;
   }
-  delegate_->log(rclcpp::Logger::Level::Debug, string_format("read data command =%d size =%d", cmd, size));
+  delegate_->log(rclcpp::Logger::Level::Debug, string_format(
+          "read data command =%d size =%d", cmd, size));
   if (cmd == 0x01) {  // timesync
     send_time_sync(data);
   } else if (cmd == 0x02) {  // logdebug

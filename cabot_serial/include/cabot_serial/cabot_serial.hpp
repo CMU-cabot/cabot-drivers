@@ -20,19 +20,8 @@
  * THE SOFTWARE.
  *******************************************************************************/
 
-#ifndef CABOT__CABOT_SERIAL_HPP_
-#define CABOT__CABOT_SERIAL_HPP_
-
-#include <unistd.h>
-#include <termios.h>
-
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <chrono>
-#include <tuple>
-#include <exception>
+#ifndef CABOT_SERIAL__CABOT_SERIAL_HPP_
+#define CABOT_SERIAL__CABOT_SERIAL_HPP_
 
 #include <geometry_msgs/msg/twist.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -42,7 +31,6 @@
 #include <rclcpp_components/register_node_macro.hpp>
 #include <rcl_interfaces/msg/parameter_type.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
-
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/fluid_pressure.hpp>
 #include <sensor_msgs/msg/temperature.hpp>
@@ -54,11 +42,19 @@
 #include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <std_srvs/srv/set_bool.hpp>
-
 #include <diagnostic_updater/publisher.hpp>
 #include <diagnostic_updater/update_functions.hpp>
 // #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 
+#include <unistd.h>
+#include <termios.h>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <tuple>
+#include <exception>
 #include "arduino_serial.hpp"
 
 
@@ -104,11 +100,13 @@ public:
   std::tuple<int, int> system_time() override;
   void stopped() override;
   void log(rclcpp::Logger::Level level, const std::string & text) override;
-  void log_throttle(rclcpp::Logger::Level level, int interval_in_ms, const std::string & text) override;
-  void get_param(const std::string & name, std::function<void(const std::vector<int> &)> callback) override;
+  void log_throttle(
+          rclcpp::Logger::Level level, int interval_in_ms, const std::string & text) override;
+  void get_param(const std::string & name, std::function<void(
+          const std::vector<int> &)> callback) override;
   void publish(uint8_t cmd, const std::vector<uint8_t> & data) override;
   static void signalHandler(int signal);
-  //static CaBotSerialNode* globalInstance;
+  // static CaBotSerialNode* globalInstance;
 
   std::shared_ptr<CaBotArduinoSerial> client_;
   CaBotSerialNode();
@@ -143,7 +141,7 @@ private:
   void vib_loop();
   void vib_callback(const uint8_t cmd, const std_msgs::msg::UInt8::UniquePtr msg);
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_data(const std::vector<uint8_t> & data);
-  void process_button_data(std_msgs::msg::Int8::UniquePtr& msg);
+  void process_button_data(std_msgs::msg::Int8& msg);
   void touch_callback(std_msgs::msg::Int16& msg);
   void set_touch_speed_active_mode(
     const std_srvs::srv::SetBool::Request::SharedPtr req,
@@ -179,4 +177,4 @@ private:
   int count_;
 };
 
-#endif  // CABOT__CABOT_SERIAL_HPP_
+#endif  // CABOT_SERIAL__CABOT_SERIAL_HPP_

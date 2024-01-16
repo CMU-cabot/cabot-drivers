@@ -128,8 +128,6 @@ void Handle::timer_callback()
     } else if (vibration.i == 0 && vibration.numberVibrations > 0) {
       std::unique_ptr<std_msgs::msg::UInt8> msg = std::make_unique<std_msgs::msg::UInt8>();
       msg->data = vibration.duration * 0.1;
-      // temporary log
-      RCLCPP_INFO(rclcpp::get_logger("handle"), "timer_callback Address:: %p", static_cast<void*>(&(vibration)));
       vibration.vibratorPub->publish(std::move(msg));
       RCLCPP_INFO(rclcpp::get_logger("handle"), "publish %d", vibration.duration);
       RCLCPP_INFO(rclcpp::get_logger("handle"), "sleep %d ms", vibration.duration);
@@ -159,8 +157,6 @@ void Handle::buttonCheck(std_msgs::msg::Int8::UniquePtr& msg, int index)
   event.clear();
   int bit = 1 << (index - 1);
   bool btn_push = (msg->data & bit) != 0;
-  // temporary log
-  // RCLCPP_INFO(rclcpp::get_logger("handle"), "buttonCheck Address:: %p", &(msg->data));
   std::unique_ptr<std_msgs::msg::Bool> bool_msg = std::make_unique<std_msgs::msg::Bool>();
   bool_msg->data = btn_push;
   rclcpp::Time now = node_->get_clock()->now();
@@ -207,8 +203,6 @@ void Handle::eventCallback(std_msgs::msg::String::UniquePtr msg)
 {
   const size_t stimuli_names_size = std::size(Handle::stimuli_names);
   const std::string name = msg->data;
-  // temporary log
-  RCLCPP_INFO(rclcpp::get_logger("handle"), "eventCallback Address:: %p", &(msg->data));
   const char** it = std::find(stimuli_names, stimuli_names + stimuli_names_size, name.c_str());
   if(it != stimuli_names + stimuli_names_size){
     int index = std::distance(stimuli_names, it);
@@ -232,8 +226,6 @@ void Handle::vibrate(rclcpp::Publisher<std_msgs::msg::UInt8>::UniquePtr pub)
 {
   std::unique_ptr<std_msgs::msg::UInt8> msg = std::make_unique<std_msgs::msg::UInt8>();
   msg->data = power_;
-  // temporary log
-  RCLCPP_INFO(rclcpp::get_logger("handle"), "vibrate Address:: %p", &(msg->data));
   pub->publish(std::move(msg));
 }
 
@@ -241,8 +233,6 @@ void Handle::stop(rclcpp::Publisher<std_msgs::msg::UInt8>::UniquePtr pub)
 {
   std::unique_ptr<std_msgs::msg::UInt8> msg = std::make_unique<std_msgs::msg::UInt8>();
   msg->data = 0;
-  // temporary log
-  RCLCPP_INFO(rclcpp::get_logger("handle"), "stop Address:: %p", &(msg->data));
   pub->publish(std::move(msg));
 }
 
@@ -250,8 +240,6 @@ void Handle::vibrateAll(int time)
 {
   std::unique_ptr<std_msgs::msg::UInt8> msg = std::make_unique<std_msgs::msg::UInt8>();
   msg->data = power_;
-  // temporary log
-  RCLCPP_INFO(rclcpp::get_logger("handle"), "vibrator_pub Address:: %p", &(msg->data));
   vibrator1_pub_->publish(std::move(msg));
   vibrator2_pub_->publish(std::move(msg));
   vibrator3_pub_->publish(std::move(msg));
@@ -321,8 +309,6 @@ void Handle::vibratePattern(
   int i = 0;
   RCLCPP_INFO(rclcpp::get_logger("handle"), "Start vibratePattern .");
   Vibration vibration;
-  // temporary log
-  RCLCPP_INFO(rclcpp::get_logger("handle"), "vibratePattern Address:: %p", static_cast<void*>(&(vibration.vibratorPub)));
   vibration.duration = duration;
   vibration.numberVibrations = numberVibrations;
   vibration.sleep = sleep_;

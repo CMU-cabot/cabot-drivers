@@ -20,9 +20,10 @@
  * THE SOFTWARE.
  *******************************************************************************/
 
-#ifndef CABOT__ARDUINO_SERIAL_HPP_
-#define CABOT__ARDUINO_SERIAL_HPP_
+#ifndef CABOT_SERIAL__ARDUINO_SERIAL_HPP_
+#define CABOT_SERIAL__ARDUINO_SERIAL_HPP_
 
+#include <rclcpp/rclcpp.hpp>
 #include <unistd.h>
 #include <termios.h>
 #include <sys/ioctl.h>
@@ -41,7 +42,6 @@
 #include <stdexcept>
 #include <memory>
 
-#include <rclcpp/rclcpp.hpp>
 
 // https://stackoverflow.com/a/26221725
 template<typename ... Args>
@@ -85,8 +85,10 @@ public:
   virtual std::tuple<int, int> system_time() = 0;
   virtual void stopped() = 0;
   virtual void log(rclcpp::Logger::Level level, const std::string & text) = 0;
-  virtual void log_throttle(rclcpp::Logger::Level level, int interval_in_ms, const std::string & text) = 0;
-  virtual void get_param(const std::string & name, std::function<void(const std::vector<int> &)> callback) = 0;
+  virtual void log_throttle(
+          rclcpp::Logger::Level level, int interval_in_ms, const std::string & text) = 0;
+  virtual void get_param(
+          const std::string & name, std::function<void(const std::vector<int> &)> callback) = 0;
   virtual void publish(uint8_t cmd, const std::vector<uint8_t> & data) = 0;
 };
 
@@ -148,5 +150,4 @@ void CaBotArduinoSerial::send_param(const T & data)
   RCLCPP_INFO(get_logger(), "%s", data_str.c_str());
 }
 
-
-#endif  // CABOT__ARDUINO_SERIAL_HPP_
+#endif  // CABOT_SERIAL__ARDUINO_SERIAL_HPP_

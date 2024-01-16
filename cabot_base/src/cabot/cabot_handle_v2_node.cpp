@@ -24,6 +24,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <utility>
 
 #include "cabot_handle_v2_node.hpp"
 
@@ -71,8 +72,6 @@ void CaBotHandleV2Node::notificationCallback(const std_msgs::msg::Int8::UniquePt
 {
   if (msg) {
     std::string log_msg_ = "Received notification: " + std::to_string(msg->data);
-    // temporary log
-    RCLCPP_INFO(this->get_logger(), "notificationCallback Address:: %p", &(msg->data));
     RCLCPP_INFO(this->get_logger(), log_msg_.c_str());
     this->handle_->executeStimulus(msg->data);
   } else {
@@ -122,8 +121,6 @@ void CaBotHandleV2Node::eventListener(const std::map<std::string, std::string>& 
     RCLCPP_INFO(get_logger(), event->toString().c_str());
     std::unique_ptr<std_msgs::msg::String> msg = std::make_unique<std_msgs::msg::String>();
     msg->data = event->toString();
-    // temporary log
-    RCLCPP_INFO(this->get_logger(), "eventListener Address:: %p", &(msg->data));
     event_pub_->publish(std::move(msg));
   }
 }
