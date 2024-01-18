@@ -23,6 +23,16 @@
 #ifndef CABOT_SERIAL__CABOT_SERIAL_HPP_
 #define CABOT_SERIAL__CABOT_SERIAL_HPP_
 
+#include <unistd.h>
+#include <termios.h>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <tuple>
+#include <exception>
+
 #include <geometry_msgs/msg/twist.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/clock.hpp>
@@ -44,17 +54,7 @@
 #include <std_srvs/srv/set_bool.hpp>
 #include <diagnostic_updater/publisher.hpp>
 #include <diagnostic_updater/update_functions.hpp>
-// #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 
-#include <unistd.h>
-#include <termios.h>
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <chrono>
-#include <tuple>
-#include <exception>
 #include "arduino_serial.hpp"
 
 
@@ -87,7 +87,8 @@ private:
   std::shared_ptr<CaBotSerialNode> node_;
 };
 
-typedef struct Vibration {
+typedef struct Vibration
+{
   uint8_t current;
   uint8_t target;
   int count;
@@ -107,9 +108,10 @@ public:
   void stopped() override;
   void log(rclcpp::Logger::Level level, const std::string & text) override;
   void log_throttle(
-          rclcpp::Logger::Level level, int interval_in_ms, const std::string & text) override;
-  void get_param(const std::string & name, std::function<void(
-          const std::vector<int> &)> callback) override;
+    rclcpp::Logger::Level level, int interval_in_ms, const std::string & text) override;
+  void get_param(
+    const std::string & name, std::function<void(
+      const std::vector<int> &)> callback) override;
   void publish(uint8_t cmd, const std::vector<uint8_t> & data) override;
   void prepare();
   void tick();
@@ -117,7 +119,8 @@ public:
   void reset();
   static void signalHandler(int signal);
 
-  std::shared_ptr<CaBotSerialNode> shared_from_this() {
+  std::shared_ptr<CaBotSerialNode> shared_from_this()
+  {
     return std::static_pointer_cast<CaBotSerialNode>(rclcpp::Node::shared_from_this());
   }
 
@@ -157,8 +160,8 @@ private:
   void vib_loop();
   void vib_callback(const uint8_t cmd, const std_msgs::msg::UInt8::UniquePtr msg);
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_data(const std::vector<uint8_t> & data);
-  void process_button_data(std_msgs::msg::Int8& msg);
-  void touch_callback(std_msgs::msg::Int16& msg);
+  void process_button_data(std_msgs::msg::Int8 & msg);
+  void touch_callback(std_msgs::msg::Int16 & msg);
   void set_touch_speed_active_mode(
     const std_srvs::srv::SetBool::Request::SharedPtr req,
     std_srvs::srv::SetBool::Response::SharedPtr res);

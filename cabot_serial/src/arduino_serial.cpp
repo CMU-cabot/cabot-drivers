@@ -206,7 +206,7 @@ void CaBotArduinoSerial::start()
 void CaBotArduinoSerial::reset_serial()
 {
   delegate_->log(rclcpp::Logger::Level::Info, "resetting serial port");
-  try{
+  try {
     port_->reset();
   } catch (std::runtime_error & error) {
     delegate_->log(rclcpp::Logger::Level::Error, "cannot reset serial port");
@@ -232,15 +232,17 @@ void CaBotArduinoSerial::run_once()
       }
     }
   } catch (const std::exception & e) {
-    delegate_->log(rclcpp::Logger::Level::Error, string_format(
-            "exception occurred during reading: %s", e.what()));
+    delegate_->log(
+      rclcpp::Logger::Level::Error, string_format(
+        "exception occurred during reading: %s", e.what()));
     stop();
   }
   try {
     process_write_once();
   } catch (const std::exception & e) {
-    delegate_->log(rclcpp::Logger::Level::Error, string_format(
-            "exception occurred during reading: %s", e.what()));
+    delegate_->log(
+      rclcpp::Logger::Level::Error, string_format(
+        "exception occurred during reading: %s", e.what()));
     stop();
   }
 }
@@ -359,13 +361,15 @@ bool CaBotArduinoSerial::process_read_once()
   try_read(1, received);
   checksum1 = received[0];
   uint8_t checksum2 = this->checksum(data);
-  delegate_->log(rclcpp::Logger::Level::Debug, string_format(
-          "checksum %d %d", checksum1, checksum2));
+  delegate_->log(
+    rclcpp::Logger::Level::Debug, string_format(
+      "checksum %d %d", checksum1, checksum2));
   if (checksum1 != checksum2) {
     return false;
   }
-  delegate_->log(rclcpp::Logger::Level::Debug, string_format(
-          "read data command =%d size =%d", cmd, size));
+  delegate_->log(
+    rclcpp::Logger::Level::Debug, string_format(
+      "read data command =%d size =%d", cmd, size));
   if (cmd == 0x01) {  // timesync
     send_time_sync(data);
   } else if (cmd == 0x02) {  // logdebug
