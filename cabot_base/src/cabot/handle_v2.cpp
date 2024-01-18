@@ -157,8 +157,6 @@ void Handle::buttonCheck(std_msgs::msg::Int8::UniquePtr & msg, int index)
   event.clear();
   int bit = 1 << (index - 1);
   bool btn_push = (msg->data & bit) != 0;
-  std::unique_ptr<std_msgs::msg::Bool> bool_msg = std::make_unique<std_msgs::msg::Bool>();
-  bool_msg->data = btn_push;
   rclcpp::Time now = node_->get_clock()->now();
   rclcpp::Time zerotime(0, 0, RCL_ROS_TIME);
   if (btn_push && !btn_dwn[index] &&
@@ -220,36 +218,6 @@ void Handle::executeStimulus(int index)
     callbacks_[index]();
     RCLCPP_INFO(logger_, "executed");
   }
-}
-
-void Handle::vibrate(rclcpp::Publisher<std_msgs::msg::UInt8>::UniquePtr pub)
-{
-  std::unique_ptr<std_msgs::msg::UInt8> msg = std::make_unique<std_msgs::msg::UInt8>();
-  msg->data = power_;
-  pub->publish(std::move(msg));
-}
-
-void Handle::stop(rclcpp::Publisher<std_msgs::msg::UInt8>::UniquePtr pub)
-{
-  std::unique_ptr<std_msgs::msg::UInt8> msg = std::make_unique<std_msgs::msg::UInt8>();
-  msg->data = 0;
-  pub->publish(std::move(msg));
-}
-
-void Handle::vibrateAll(int time)
-{
-  std::unique_ptr<std_msgs::msg::UInt8> msg = std::make_unique<std_msgs::msg::UInt8>();
-  msg->data = power_;
-  vibrator1_pub_->publish(std::move(msg));
-  vibrator2_pub_->publish(std::move(msg));
-  vibrator3_pub_->publish(std::move(msg));
-  vibrator4_pub_->publish(std::move(msg));
-  std::this_thread::sleep_for(std::chrono::milliseconds(time));
-  msg->data = 0;
-  vibrator1_pub_->publish(std::move(msg));
-  vibrator2_pub_->publish(std::move(msg));
-  vibrator3_pub_->publish(std::move(msg));
-  vibrator4_pub_->publish(std::move(msg));
 }
 
 void Handle::vibrateLeftTurn()

@@ -126,18 +126,5 @@ void CaBotHandleV2Node::eventListener(const std::map<std::string, std::string> &
   }
 }
 
-int main(int argc, char * argv[])
-{
-  rclcpp::init(argc, argv);
-  node_ = std::make_shared<CaBotHandleV2Node>(rclcpp::NodeOptions());
-  if (!node_) {
-    RCLCPP_ERROR(node_->get_logger(), "Failed to allocate memory for CaBotHandleV2Node .");
-    return 1;
-  }
-  rclcpp::spin(node_);
-  rclcpp::shutdown();
-  return 0;
-}
-
 #include "rclcpp_components/register_node_macro.hpp"
 RCLCPP_COMPONENTS_REGISTER_NODE(CaBotHandleV2Node)

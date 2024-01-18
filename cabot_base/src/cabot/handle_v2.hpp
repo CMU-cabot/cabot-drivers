@@ -31,6 +31,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/int8.hpp>
 #include <std_msgs/msg/u_int8.hpp>
 #include "button.hpp"
 #include "cabot_handle_v2_node.hpp"
@@ -66,9 +67,6 @@ private:
   void buttonCallback(std_msgs::msg::Int8::UniquePtr & msg);
   void buttonCheck(std_msgs::msg::Int8::UniquePtr & msg, int index);
   void eventCallback(std_msgs::msg::String::UniquePtr msg);
-  void vibrate(rclcpp::Publisher<std_msgs::msg::UInt8>::UniquePtr pub);
-  void stop(rclcpp::Publisher<std_msgs::msg::UInt8>::UniquePtr pub);
-  void vibrateAll(int time);
   void vibrateLeftTurn();
   void vibrateRightTurn();
   void vibrateLeftDeviation();
