@@ -56,8 +56,6 @@ std::string string_format(const std::string & format, Args ... args)
 }
 // end
 
-class CaBotSerialNode;
-
 class Serial
 {
 public:
@@ -100,16 +98,15 @@ public:
     std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));
 
   void start();
-  void send_command(uint8_t command, const std::vector<uint8_t> & arg);
+  void reset_serial();
   void stop();
-
+  void run_once();
+  void send_command(uint8_t command, const std::vector<uint8_t> & arg);
   template<typename T>
   void send_param(const T & data);
 
   std::shared_ptr<CaBotArduinoSerialDelegate> delegate_ = nullptr;
-  void reset_serial();
   bool is_alive_;
-  void run_once();
 
 private:
   std::shared_ptr<Serial> port_;
