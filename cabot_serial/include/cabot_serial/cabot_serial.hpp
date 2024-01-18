@@ -100,8 +100,11 @@ public:
   explicit CaBotSerialNode(const rclcpp::NodeOptions & options);
   ~CaBotSerialNode() = default;
 
-  diagnostic_updater::Updater updater_;
-  rclcpp::Logger client_logger_;
+  void tick();
+  bool is_topic_alive();
+  bool is_client_ready();
+  const char * get_error_msg();
+  void prepare();
 
   // Override and delegate by CaBotArduinoSerialDelegate
   std::tuple<int, int> system_time() override;
@@ -113,31 +116,38 @@ public:
     const std::string & name, std::function<void(
       const std::vector<int> &)> callback) override;
   void publish(uint8_t cmd, const std::vector<uint8_t> & data) override;
-  void prepare();
-  void tick();
-  bool is_topic_alive();
-  void reset();
-  static void signalHandler(int signal);
 
+private:
+  static void signalHandler(int signal);
   std::shared_ptr<CaBotSerialNode> shared_from_this()
   {
     return std::static_pointer_cast<CaBotSerialNode>(rclcpp::Node::shared_from_this());
   }
+  void vib_loop();
+  void vib_callback(const uint8_t cmd, const std_msgs::msg::UInt8::UniquePtr msg);
+  void touch_callback(std_msgs::msg::Int16 & msg);
+  void set_touch_speed_active_mode(
+    const std_srvs::srv::SetBool::Request::SharedPtr req,
+    std_srvs::srv::SetBool::Response::SharedPtr res);
+  std::shared_ptr<sensor_msgs::msg::Imu> process_imu_data(const std::vector<uint8_t> & data);
 
-  std::shared_ptr<CaBotArduinoSerial> client_ = nullptr;
-  std::string port_name_;
-  int baud_;
+  std::shared_ptr<CaBotArduinoSerial> client_;
+  std::shared_ptr<Serial> port_;
   const char * error_msg_;
+  diagnostic_updater::Updater updater_;
+  rclcpp::Logger client_logger_;
+  Vibration vibrations_[4];
 
-private:
+  bool touch_speed_active_mode_;
+  double touch_speed_max_speed_;
+  double touch_speed_max_speed_inactive_;
+
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr touch_speed_switched_pub_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr set_touch_speed_active_mode_srv;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_raw_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr button_pub_;
-  std::vector<rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr> btn_pubs;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
-  std::shared_ptr<rclcpp::Time> imu_last_topic_time;
   rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr calibration_pub_;
   rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_pub_;
@@ -146,35 +156,13 @@ private:
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vib2_sub_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vib3_sub_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vib4_sub_;
-  rclcpp::TimerBase::SharedPtr vib_timer_ = nullptr;
 
-  std::shared_ptr<Serial> port_ = nullptr;
-  rclcpp::TimerBase::SharedPtr timer_ = nullptr;
-  rclcpp::TimerBase::SharedPtr polling_ = nullptr;
-  std::chrono::time_point<std::chrono::system_clock> topic_alive_{};
-  // ends
+  rclcpp::TimerBase::SharedPtr vib_timer_;
+  rclcpp::TimerBase::SharedPtr run_timer_;
+  rclcpp::TimerBase::SharedPtr polling_timer_;
 
-  bool is_alive_;
-  static const size_t NUMBER_OF_BUTTONS = 5;
-  Vibration vibrations_[4];
-  void vib_loop();
-  void vib_callback(const uint8_t cmd, const std_msgs::msg::UInt8::UniquePtr msg);
-  std::shared_ptr<sensor_msgs::msg::Imu> process_imu_data(const std::vector<uint8_t> & data);
-  void process_button_data(std_msgs::msg::Int8 & msg);
-  void touch_callback(std_msgs::msg::Int16 & msg);
-  void set_touch_speed_active_mode(
-    const std_srvs::srv::SetBool::Request::SharedPtr req,
-    std_srvs::srv::SetBool::Response::SharedPtr res);
-  bool touch_speed_active_mode_;
-  double touch_speed_max_speed_;
-  double touch_speed_max_speed_inactive_;
-  int main();
-  void run_once();
-  void poling();
-  double throttle_duration_sec;
-
-  template<typename T>
-  void callback(const T & msg);
+  std::chrono::time_point<std::chrono::system_clock> last_topic_alive_time_{};
+  std::shared_ptr<rclcpp::Time> imu_last_topic_time;
 
   // Diagnostic Updater
   std::shared_ptr<TopicCheckTask> imu_check_task_;
@@ -183,15 +171,6 @@ private:
   std::shared_ptr<TopicCheckTask> pressure_check_task_;
   std::shared_ptr<TopicCheckTask> temp_check_task_;
   std::shared_ptr<CheckConnectionTask> check_connection_task_;
-
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr serial_pub_;
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr serial_sub_;
-  rclcpp::Subscription<std_msgs::msg::UInt8MultiArray>::SharedPtr vib_sub_;
-  // std::shared_ptr<serial::Serial> port_;
-  rclcpp::TimerBase::SharedPtr system_timer_;
-  double system_time_;
-  rclcpp::TimerBase::SharedPtr log_throttle_timer_;
-  int count_;
 };
 
 #endif  // CABOT_SERIAL__CABOT_SERIAL_HPP_

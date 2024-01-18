@@ -55,18 +55,18 @@ CheckConnectionTask::CheckConnectionTask(
 
 void CheckConnectionTask::run(diagnostic_updater::DiagnosticStatusWrapper & stat)
 {
-  if (node_->client_ == nullptr) {
-    if (node_->error_msg_ == nullptr) {
+  if (node_->is_client_ready()) {
+    if (node_->get_error_msg() == nullptr) {
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "connecting");
     } else {
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, node_->error_msg_);
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, node_->get_error_msg());
     }
   } else {
     if (node_->is_topic_alive()) {
       RCLCPP_ERROR(node_->get_logger(), "connected but no message coming");
       stat.summary(
         diagnostic_msgs::msg::DiagnosticStatus::ERROR, "connected but no message coming");
-      node_->reset();
+      node_->stopped();
     } else {
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "working");
     }
@@ -75,9 +75,15 @@ void CheckConnectionTask::run(diagnostic_updater::DiagnosticStatusWrapper & stat
 
 CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("cabot_serial_node", rclcpp::NodeOptions(options).use_intra_process_comms(false)),
+  client_(nullptr),
+  port_(nullptr),
+  error_msg_(nullptr),
   updater_(this),
   client_logger_(rclcpp::get_logger("arduino-serial")),
-  vibrations_({})
+  vibrations_{},
+  touch_speed_active_mode_(false),
+  touch_speed_max_speed_(2.0),
+  touch_speed_max_speed_inactive_(0.5)
 {
   // use_intra_process_comms is currently not supported
   // publishers, diagnostic tasks, and related services
@@ -99,24 +105,24 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
         RCLCPP_ERROR(get_logger(), error_msg_);
         RCLCPP_ERROR(get_logger(), "try to reconnect usb");
         client_ = nullptr;
-        if (timer_) {
-          timer_->cancel();
+        if (run_timer_) {
+          run_timer_->cancel();
         }
       } catch (const std::system_error & e) {  // OSError
         error_msg_ = e.what();
         RCLCPP_ERROR(get_logger(), error_msg_);
         std::cerr << e.what() << std::endl;
         client_ = nullptr;
-        if (timer_) {
-          timer_->cancel();
+        if (run_timer_) {
+          run_timer_->cancel();
         }
       } catch (const std::runtime_error & e) {  // termios.error
         error_msg_ = e.what();
         RCLCPP_ERROR(get_logger(), error_msg_);
         RCLCPP_ERROR(get_logger(), "connection disconnected");
         client_ = nullptr;
-        if (timer_) {
-          timer_->cancel();
+        if (run_timer_) {
+          run_timer_->cancel();
         }
       } catch (...) {
         RCLCPP_ERROR(get_logger(), "error occurred");
@@ -144,19 +150,34 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
       // client_->delegate_ = this;
       client_->delegate_ = std::dynamic_pointer_cast<CaBotArduinoSerialDelegate>(shared_from_this());
       updater_.setHardwareID(port_name_);
-      topic_alive_ = std::chrono::time_point<std::chrono::system_clock>();
+      last_topic_alive_time_ = std::chrono::time_point<std::chrono::system_clock>();
       client_->start();
       RCLCPP_INFO(get_logger(), "Serial is ready");
-      // timer_ = create_wall_timer(0.001s, run_once);
-      timer_ = create_wall_timer(0.001s, run_once);
+      run_timer_ = create_wall_timer(0.001s, run_once);
     };
 
-  polling_ = create_wall_timer(1s, polling);
+  polling_timer_ = create_wall_timer(1s, polling);
 }
 
-void CaBotSerialNode::signalHandler(int signal)
+void CaBotSerialNode::tick()
 {
-  exit(0);
+  last_topic_alive_time_ = std::chrono::system_clock::now();
+}
+
+bool CaBotSerialNode::is_topic_alive()
+{
+  return last_topic_alive_time_.time_since_epoch().count() > 0 &&
+         (std::chrono::system_clock::now() - last_topic_alive_time_) > 1s;
+}
+
+bool CaBotSerialNode::is_client_ready()
+{
+  return client_ != nullptr;
+}
+
+const char * CaBotSerialNode::get_error_msg()
+{
+  return error_msg_;
 }
 
 void CaBotSerialNode::prepare()
@@ -168,56 +189,7 @@ void CaBotSerialNode::prepare()
   }
 }
 
-void CaBotSerialNode::tick()
-{
-  topic_alive_ = std::chrono::system_clock::now();
-}
-
-bool CaBotSerialNode::is_topic_alive()
-{
-  return topic_alive_.time_since_epoch().count() > 0 &&
-         (std::chrono::system_clock::now() - topic_alive_) > 1s;
-}
-
-void CaBotSerialNode::reset()
-{
-  client_ = nullptr;
-  port_ = nullptr;
-}
-
-// Private methods
-
-void CaBotSerialNode::vib_loop()
-{
-  if (client_ == nullptr) {
-    return;
-  }
-  for (int i = 0; i < 4; i++) {
-    // resend vibration command if the value of vibrator is not updated
-    if (vibrations_[i].target > 0) {
-      if (vibrations_[i].target != vibrations_[i].current) {
-        vibrations_[i].count++;
-        std::vector<uint8_t> data;
-        data.push_back(vibrations_[i].target);
-        client_->send_command(0x20 + i, data);
-        RCLCPP_INFO(
-          get_logger(), "resend vibrator %d value (%d != %d) [count=%d]",
-          i, vibrations_[i].target, vibrations_[i].current, vibrations_[i].count);
-      } else {
-        vibrations_[i].target = vibrations_[i].current = vibrations_[i].count = 0;
-      }
-    }
-  }
-}
-
-void CaBotSerialNode::vib_callback(uint8_t cmd, const std_msgs::msg::UInt8::UniquePtr msg)
-{
-  if (client_ == nullptr) {return;}
-  std::vector<uint8_t> data;
-  data.push_back(msg->data);
-  vibrations_[cmd - 0x20].target = msg->data;
-  client_->send_command(cmd, data);
-}
+// CaBotArduinoSerialDelegate
 
 std::tuple<int, int> CaBotSerialNode::system_time()
 {
@@ -235,7 +207,7 @@ void CaBotSerialNode::stopped()
   client_->reset_serial();
   client_ = nullptr;
   port_ = nullptr;
-  topic_alive_ = std::chrono::time_point<std::chrono::system_clock>();
+  last_topic_alive_time_ = std::chrono::time_point<std::chrono::system_clock>();
   RCLCPP_INFO(get_logger(), "stopped");
 }
 
@@ -314,113 +286,6 @@ void CaBotSerialNode::get_param(
   callback(val);
 }
 
-std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_data(
-  const std::vector<uint8_t> & data)
-{
-  // Discard possible corrupted data
-  int count = 0;
-  std::vector<int> data1;
-  std::vector<float> data2;
-  data2.reserve(12);
-  for (int i = 0; i < 12; ++i) {
-    if (i < 2) {
-      int value;
-      std::memcpy(&value, &data[i * 4], sizeof(int));
-      data1.push_back(value);
-    } else {
-      float value;
-      std::memcpy(&value, &data[i * 4], sizeof(float));
-      data2.push_back(value);
-    }
-  }
-  // check IMU linear acc
-  for (int i = 7; i < 10; ++i) {
-    if (data2[i] == 0) {
-      count++;
-    }
-  }
-  if (count == 3) {
-    std::string temp = "Linear acc data could be broken, drop a message: ";
-    for (int i = 0; i < 10; i++) {
-      if (i > 0) {temp += ",";}
-      temp += std::to_string(data2[i]);
-    }
-    RCLCPP_ERROR(get_logger(), temp.c_str());
-    return nullptr;
-  }
-  sensor_msgs::msg::Imu imu_msg;
-  imu_msg.orientation_covariance[0] = 0.1;
-  imu_msg.orientation_covariance[4] = 0.1;
-  imu_msg.orientation_covariance[8] = 0.1;
-
-  // Convert float(32) to int(32)
-  imu_msg.header.stamp.sec = data1[0];
-  imu_msg.header.stamp.nanosec = data1[1];
-  rclcpp::Time imu_time = rclcpp::Time(
-    imu_msg.header.stamp.sec, imu_msg.header.stamp.nanosec,
-    get_clock()->get_clock_type());
-
-  // Check if the difference of time between the current time and the imu stamp is bigger than 1 sec
-  rclcpp::Time now = this->get_clock()->now();
-  RCLCPP_INFO_THROTTLE(
-    get_logger(), *get_clock(), 1000, "time diff = %ld",
-    std::abs((now - imu_time).nanoseconds()));
-  if (std::abs((now - imu_time).nanoseconds()) > 1e9) {
-    RCLCPP_ERROR(
-      get_logger(), "IMU timestamp jumps more than 1 second, drop a message\n"
-      "imu time: %ld > current time: %ld", imu_time.nanoseconds(), now.nanoseconds());
-    return nullptr;
-  }
-  if (imu_last_topic_time != nullptr) {
-    if (*imu_last_topic_time > imu_time) {
-      RCLCPP_ERROR_THROTTLE(
-        get_logger(), *get_clock(), 1000,
-        "IMU timestamp is not consistent, drop a message\n"
-        "last imu time: %ld > current imu time: %ld",
-        imu_last_topic_time->nanoseconds(), imu_time.nanoseconds());
-      return nullptr;
-    }
-  }
-  imu_msg.header.frame_id = "imu_frame";
-  imu_last_topic_time = std::make_shared<rclcpp::Time>(imu_time);
-  imu_msg.orientation.x = data2[0];
-  imu_msg.orientation.y = data2[1];
-  imu_msg.orientation.z = data2[2];
-  imu_msg.orientation.w = data2[3];
-  imu_msg.angular_velocity.x = data2[4];
-  imu_msg.angular_velocity.y = data2[5];
-  imu_msg.angular_velocity.z = data2[6];
-  imu_msg.linear_acceleration.x = data2[7];
-  imu_msg.linear_acceleration.y = data2[8];
-  imu_msg.linear_acceleration.z = data2[9];
-  return std::make_shared<sensor_msgs::msg::Imu>(imu_msg);
-}
-
-void CaBotSerialNode::touch_callback(std_msgs::msg::Int16 & msg)
-{
-  std::unique_ptr<std_msgs::msg::Float32> touch_speed_msg =
-    std::make_unique<std_msgs::msg::Float32>();
-  if (touch_speed_active_mode_) {
-    touch_speed_msg->data = msg.data ? touch_speed_max_speed_ : 0.0;
-  } else {
-    touch_speed_msg->data = msg.data ? 0.0 : touch_speed_max_speed_inactive_;
-  }
-  touch_speed_switched_pub_->publish(std::move(touch_speed_msg));
-}
-
-void CaBotSerialNode::set_touch_speed_active_mode(
-  const std_srvs::srv::SetBool::Request::SharedPtr req,
-  std_srvs::srv::SetBool::Response::SharedPtr res)
-{
-  touch_speed_active_mode_ = req->data;
-  if (touch_speed_active_mode_) {
-    res->message = "touch speed active mode = True";
-  } else {
-    res->message = "touch speed active mode = False";
-  }
-  res->success = true;
-}
-
 void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
 {
   if (cmd == 0x10) {  // touch
@@ -434,9 +299,9 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
        * False: Touch - no go, Not Touch - go
        */
       touch_speed_active_mode_ = true;
-      touch_speed_max_speed_ = this->declare_parameter("touch_speed_max_speed", 2.0);
+      touch_speed_max_speed_ = this->declare_parameter("touch_speed_max_speed", touch_speed_max_speed_);
       touch_speed_max_speed_inactive_ =
-        this->declare_parameter("touch_speed_max_speed_inactive", 0.5);
+        this->declare_parameter("touch_speed_max_speed_inactive", touch_speed_max_speed_inactive_);
       rclcpp::QoS transient_local_qos(1);
       transient_local_qos.transient_local();
       touch_speed_switched_pub_ = this->create_publisher<std_msgs::msg::Float32>(
@@ -551,23 +416,151 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
   }
 }
 
-std::shared_ptr<CaBotSerialNode> node_;
-/*
-void CaBotSerialNode::signalHandler(int signal) {
-  node_->stopped();
-}
-*/
-int main(int argc, char ** argv)
+// Private methods
+
+void CaBotSerialNode::signalHandler(int signal)
 {
-  rclcpp::init(argc, argv);
-  node_ = std::make_shared<CaBotSerialNode>(rclcpp::NodeOptions());
-  if (!node_) {
-    RCLCPP_ERROR(node_->get_logger(), "Failed to allocate memory for CaBotSerialNode .");
-    return 1;
+  (void)signal;  // avoid unused variable warning
+  exit(0);
+}
+
+void CaBotSerialNode::vib_loop()
+{
+  if (client_ == nullptr) {
+    return;
   }
-  rclcpp::spin(node_);
-  rclcpp::shutdown();
-  return 0;
+  for (int i = 0; i < 4; i++) {
+    // resend vibration command if the value of vibrator is not updated
+    if (vibrations_[i].target > 0) {
+      if (vibrations_[i].target != vibrations_[i].current) {
+        vibrations_[i].count++;
+        std::vector<uint8_t> data;
+        data.push_back(vibrations_[i].target);
+        client_->send_command(0x20 + i, data);
+        RCLCPP_INFO(
+          get_logger(), "resend vibrator %d value (%d != %d) [count=%d]",
+          i, vibrations_[i].target, vibrations_[i].current, vibrations_[i].count);
+      } else {
+        vibrations_[i].target = vibrations_[i].current = vibrations_[i].count = 0;
+      }
+    }
+  }
+}
+
+void CaBotSerialNode::vib_callback(uint8_t cmd, const std_msgs::msg::UInt8::UniquePtr msg)
+{
+  if (client_ == nullptr) {return;}
+  std::vector<uint8_t> data;
+  data.push_back(msg->data);
+  vibrations_[cmd - 0x20].target = msg->data;
+  client_->send_command(cmd, data);
+}
+
+void CaBotSerialNode::touch_callback(std_msgs::msg::Int16 & msg)
+{
+  std::unique_ptr<std_msgs::msg::Float32> touch_speed_msg =
+    std::make_unique<std_msgs::msg::Float32>();
+  if (touch_speed_active_mode_) {
+    touch_speed_msg->data = msg.data ? touch_speed_max_speed_ : 0.0;
+  } else {
+    touch_speed_msg->data = msg.data ? 0.0 : touch_speed_max_speed_inactive_;
+  }
+  touch_speed_switched_pub_->publish(std::move(touch_speed_msg));
+}
+
+void CaBotSerialNode::set_touch_speed_active_mode(
+  const std_srvs::srv::SetBool::Request::SharedPtr req,
+  std_srvs::srv::SetBool::Response::SharedPtr res)
+{
+  touch_speed_active_mode_ = req->data;
+  if (touch_speed_active_mode_) {
+    res->message = "touch speed active mode = True";
+  } else {
+    res->message = "touch speed active mode = False";
+  }
+  res->success = true;
+}
+
+std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_data(
+  const std::vector<uint8_t> & data)
+{
+  // Discard possible corrupted data
+  int count = 0;
+  std::vector<int> data1;
+  std::vector<float> data2;
+  data2.reserve(12);
+  for (int i = 0; i < 12; ++i) {
+    if (i < 2) {
+      int value;
+      std::memcpy(&value, &data[i * 4], sizeof(int));
+      data1.push_back(value);
+    } else {
+      float value;
+      std::memcpy(&value, &data[i * 4], sizeof(float));
+      data2.push_back(value);
+    }
+  }
+  // check IMU linear acc
+  for (int i = 7; i < 10; ++i) {
+    if (data2[i] == 0) {
+      count++;
+    }
+  }
+  if (count == 3) {
+    std::string temp = "Linear acc data could be broken, drop a message: ";
+    for (int i = 0; i < 10; i++) {
+      if (i > 0) {temp += ",";}
+      temp += std::to_string(data2[i]);
+    }
+    RCLCPP_ERROR(get_logger(), temp.c_str());
+    return nullptr;
+  }
+  sensor_msgs::msg::Imu imu_msg;
+  imu_msg.orientation_covariance[0] = 0.1;
+  imu_msg.orientation_covariance[4] = 0.1;
+  imu_msg.orientation_covariance[8] = 0.1;
+
+  // Convert float(32) to int(32)
+  imu_msg.header.stamp.sec = data1[0];
+  imu_msg.header.stamp.nanosec = data1[1];
+  rclcpp::Time imu_time = rclcpp::Time(
+    imu_msg.header.stamp.sec, imu_msg.header.stamp.nanosec,
+    get_clock()->get_clock_type());
+
+  // Check if the difference of time between the current time and the imu stamp is bigger than 1 sec
+  rclcpp::Time now = this->get_clock()->now();
+  RCLCPP_INFO_THROTTLE(
+    get_logger(), *get_clock(), 1000, "time diff = %ld",
+    std::abs((now - imu_time).nanoseconds()));
+  if (std::abs((now - imu_time).nanoseconds()) > 1e9) {
+    RCLCPP_ERROR(
+      get_logger(), "IMU timestamp jumps more than 1 second, drop a message\n"
+      "imu time: %ld > current time: %ld", imu_time.nanoseconds(), now.nanoseconds());
+    return nullptr;
+  }
+  if (imu_last_topic_time != nullptr) {
+    if (*imu_last_topic_time > imu_time) {
+      RCLCPP_ERROR_THROTTLE(
+        get_logger(), *get_clock(), 1000,
+        "IMU timestamp is not consistent, drop a message\n"
+        "last imu time: %ld > current imu time: %ld",
+        imu_last_topic_time->nanoseconds(), imu_time.nanoseconds());
+      return nullptr;
+    }
+  }
+  imu_msg.header.frame_id = "imu_frame";
+  imu_last_topic_time = std::make_shared<rclcpp::Time>(imu_time);
+  imu_msg.orientation.x = data2[0];
+  imu_msg.orientation.y = data2[1];
+  imu_msg.orientation.z = data2[2];
+  imu_msg.orientation.w = data2[3];
+  imu_msg.angular_velocity.x = data2[4];
+  imu_msg.angular_velocity.y = data2[5];
+  imu_msg.angular_velocity.z = data2[6];
+  imu_msg.linear_acceleration.x = data2[7];
+  imu_msg.linear_acceleration.y = data2[8];
+  imu_msg.linear_acceleration.z = data2[9];
+  return std::make_shared<sensor_msgs::msg::Imu>(imu_msg);
 }
 
 #include "rclcpp_components/register_node_macro.hpp"
