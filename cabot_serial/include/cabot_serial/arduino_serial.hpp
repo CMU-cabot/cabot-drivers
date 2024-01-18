@@ -92,7 +92,7 @@ public:
   virtual void publish(uint8_t cmd, const std::vector<uint8_t> & data) = 0;
 };
 
-class CaBotArduinoSerial : public rclcpp::Node
+class CaBotArduinoSerial
 {
 public:
   CaBotArduinoSerial(
@@ -112,7 +112,6 @@ public:
   void run_once();
 
 private:
-  rclcpp::Logger logger_;
   std::shared_ptr<Serial> port_;
   int baud_;
   std::chrono::milliseconds timeout_;
@@ -147,7 +146,7 @@ void CaBotArduinoSerial::send_param(const T & data)
     typename T::value_type d = *D;
     data_str += std::to_string(d) + " ";
   }
-  RCLCPP_INFO(get_logger(), "%s", data_str.c_str());
+  delegate_->log(rclcpp::Logger::Level::Info, string_format("%s", data_str.c_str()));
 }
 
 #endif  // CABOT_SERIAL__ARDUINO_SERIAL_HPP_

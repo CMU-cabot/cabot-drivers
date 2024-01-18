@@ -195,7 +195,7 @@ void Serial::reset()
 CaBotArduinoSerial::CaBotArduinoSerial(
   std::shared_ptr<Serial> port, int baud,
   std::chrono::milliseconds timeout)
-: Node("cabot_arduino_serial"), is_alive_(true), logger_(get_logger()), port_(port), baud_(baud),
+: is_alive_(true), port_(port), baud_(baud),
   timeout_(timeout), read_count_(0), time_synced_(false), no_input_count_(0) {}
 
 void CaBotArduinoSerial::start()
@@ -281,7 +281,7 @@ bool CaBotArduinoSerial::process_write_once()
   while (total < length) {
     int write_result = port_->write(data, length - total);
     if (write_result < 0) {
-      RCLCPP_ERROR(get_logger(), "error writing data ");
+      delegate_->log(rclcpp::Logger::Level::Error, "error writing data");
       return false;
     }
     total += write_result;
