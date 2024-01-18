@@ -24,14 +24,14 @@
 #define CABOT__HANDLE_V2_HPP_
 
 #include <time.h>
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/bool.hpp>
-#include <std_msgs/msg/string.hpp>
-#include <std_msgs/msg/u_int8.hpp>
 #include <memory>
 #include <vector>
 #include <map>
 #include <string>
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/u_int8.hpp>
 #include "button.hpp"
 #include "cabot_handle_v2_node.hpp"
 
@@ -56,15 +56,15 @@ public:
     STIMULI_COUNT = 10
   };
   Handle(
-    CaBotHandleV2Node* node, std::function<void(const std::map<std::string,
+    CaBotHandleV2Node * node, std::function<void(const std::map<std::string,
     std::string> &)> eventListener, const std::vector<std::string> & buttonKeys);
   void executeStimulus(int index);
-  static const char* stimuli_names[];
+  static const char * stimuli_names[];
 
 private:
   void timer_callback();
-  void buttonCallback(std_msgs::msg::Int8::UniquePtr& msg);
-  void buttonCheck(std_msgs::msg::Int8::UniquePtr& msg, int index);
+  void buttonCallback(std_msgs::msg::Int8::UniquePtr & msg);
+  void buttonCheck(std_msgs::msg::Int8::UniquePtr & msg, int index);
   void eventCallback(std_msgs::msg::String::UniquePtr msg);
   void vibrate(rclcpp::Publisher<std_msgs::msg::UInt8>::UniquePtr pub);
   void stop(rclcpp::Publisher<std_msgs::msg::UInt8>::UniquePtr pub);
@@ -80,7 +80,7 @@ private:
   void vibrateButtonClick();
   void vibrateButtonHolddown();
   void vibratePattern(
-    const rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr& vibratorPub,
+    const rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr & vibratorPub,
     int numberVibrations, int duration);
   std::shared_ptr<CaBotHandleV2Node> node_;
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator1_pub_;

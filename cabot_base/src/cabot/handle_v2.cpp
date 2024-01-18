@@ -33,7 +33,7 @@
 
 using namespace std::chrono_literals;
 
-const char* Handle::stimuli_names[] =
+const char * Handle::stimuli_names[] =
 {"unknown", "left_turn", "right_turn", "left_dev", "right_dev", "front",
   "left_about_turn", "right_about_turn", "button_click", "button_holddown"};
 const rclcpp::Duration Handle::double_click_interval_ = rclcpp::Duration(0, 250000000);
@@ -46,17 +46,17 @@ std::string Handle::get_name(int stimulus)
 }
 
 Handle::Handle(
-  CaBotHandleV2Node* node,
+  CaBotHandleV2Node * node,
   std::function<void(const std::map<std::string, std::string> &)> eventListener,
   const std::vector<std::string> & buttonKeys)
 : node_(node), eventListener_(std::move(eventListener)), buttonKeys_(buttonKeys),
-      logger_(rclcpp::get_logger("handle"))
+  logger_(rclcpp::get_logger("handle"))
 {
   power_ = 255;
-  vibrator1_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("/cabot/vibrator1", 100);
-  vibrator2_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("/cabot/vibrator2", 100);
-  vibrator3_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("/cabot/vibrator3", 100);
-  vibrator4_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("/cabot/vibrator4", 100);
+  vibrator1_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("vibrator1", 100);
+  vibrator2_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("vibrator2", 100);
+  vibrator3_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("vibrator3", 100);
+  vibrator4_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("vibrator4", 100);
   for (int i = 0; i < 9; ++i) {
     last_up[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
     last_dwn[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
@@ -64,11 +64,11 @@ Handle::Handle(
     btn_dwn[i] = false;
   }
   button_sub_ = node_->create_subscription<std_msgs::msg::Int8>(
-    "/cabot/pushed", rclcpp::SensorDataQoS(), [this](std_msgs::msg::Int8::UniquePtr msg) {
+    "pushed", rclcpp::SensorDataQoS(), [this](std_msgs::msg::Int8::UniquePtr msg) {
       buttonCallback(msg);
     });
   event_sub_ = node_->create_subscription<std_msgs::msg::String>(
-    "/cabot/event", rclcpp::SensorDataQoS(), [this](std_msgs::msg::String::UniquePtr msg) {
+    "event", rclcpp::SensorDataQoS(), [this](std_msgs::msg::String::UniquePtr msg) {
       eventCallback(std::move(msg));
     });
   duration_ = 150;
@@ -132,7 +132,7 @@ void Handle::timer_callback()
       RCLCPP_INFO(rclcpp::get_logger("handle"), "publish %d", vibration.duration);
       RCLCPP_INFO(rclcpp::get_logger("handle"), "sleep %d ms", vibration.duration);
       vibration.i++;
-    } else if (vibration.i == vibration.duration * 0.1  && vibration.numberVibrations == 1) {
+    } else if (vibration.i == vibration.duration * 0.1 && vibration.numberVibrations == 1) {
       vibration.numberVibrations = 0;
     } else if (vibration.i < (vibration.duration + vibration.sleep) * 0.1) {
       vibration.i++;
@@ -143,7 +143,7 @@ void Handle::timer_callback()
   }
 }
 
-void Handle::buttonCallback(std_msgs::msg::Int8::UniquePtr& msg)
+void Handle::buttonCallback(std_msgs::msg::Int8::UniquePtr & msg)
 {
   for (int index = 1; index <= 5; ++index) {
     if (index >= 1 && index <= static_cast<int>(ButtonType::BUTTON_CENTER)) {
@@ -152,7 +152,7 @@ void Handle::buttonCallback(std_msgs::msg::Int8::UniquePtr& msg)
   }
 }
 
-void Handle::buttonCheck(std_msgs::msg::Int8::UniquePtr& msg, int index)
+void Handle::buttonCheck(std_msgs::msg::Int8::UniquePtr & msg, int index)
 {
   event.clear();
   int bit = 1 << (index - 1);
@@ -203,11 +203,11 @@ void Handle::eventCallback(std_msgs::msg::String::UniquePtr msg)
 {
   const size_t stimuli_names_size = std::size(Handle::stimuli_names);
   const std::string name = msg->data;
-  const char** it = std::find(stimuli_names, stimuli_names + stimuli_names_size, name.c_str());
-  if(it != stimuli_names + stimuli_names_size){
+  const char ** it = std::find(stimuli_names, stimuli_names + stimuli_names_size, name.c_str());
+  if (it != stimuli_names + stimuli_names_size) {
     int index = std::distance(stimuli_names, it);
     executeStimulus(index);
-  }else{
+  } else {
     RCLCPP_DEBUG(logger_, "Stimulus '%s' not found.", name.c_str());
   }
 }
@@ -303,7 +303,7 @@ void Handle::vibrateButtonHolddown()
 }
 
 void Handle::vibratePattern(
-  const rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr& vibratorPub,
+  const rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr & vibratorPub,
   int numberVibrations, int duration)
 {
   int i = 0;
