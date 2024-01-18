@@ -405,22 +405,6 @@ std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_data(
   return std::make_shared<sensor_msgs::msg::Imu>(imu_msg);
 }
 
-void CaBotSerialNode::process_button_data(std_msgs::msg::Int8& msg)
-{
-  if (btn_pubs.size() == 0) {
-    for (size_t i = 0; i < NUMBER_OF_BUTTONS; ++i) {
-      btn_pubs.push_back(
-          this->create_publisher<std_msgs::msg::Int8>(
-                  "pushed_" + std::to_string(i + 1), rclcpp::QoS(10)));
-    }
-  }
-  for (size_t i = 0; i < NUMBER_OF_BUTTONS; ++i) {
-    std_msgs::msg::Int8 temp;
-    temp.data = ((msg.data >> i) & 0x01) == 0x01;
-    btn_pubs[i]->publish(temp);
-  }
-}
-
 void CaBotSerialNode::touch_callback(std_msgs::msg::Int16& msg)
 {
   std::unique_ptr<std_msgs::msg::Float32> touch_speed_msg =
@@ -507,7 +491,6 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     }
     std::unique_ptr<std_msgs::msg::Int8> msg = std::make_unique<std_msgs::msg::Int8>();
     msg->data = static_cast<int8_t>(data[0]);
-    process_button_data(*msg);
     button_pub_->publish(std::move(msg));
     button_check_task_->tick();
   }
