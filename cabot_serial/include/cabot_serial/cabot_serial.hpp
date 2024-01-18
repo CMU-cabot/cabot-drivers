@@ -63,10 +63,14 @@ class CaBotSerialNode;
 class TopicCheckTask : public diagnostic_updater::HeaderlessTopicDiagnostic
 {
 public:
-  TopicCheckTask(diagnostic_updater::Updater & updater, const std::string & name, double freq);
+  TopicCheckTask(
+    diagnostic_updater::Updater & updater,
+    std::shared_ptr<CaBotSerialNode> node,
+    const std::string & name, double freq);
   void tick();
 
 private:
+  std::shared_ptr<CaBotSerialNode> node_;
   double min;
   double max;
 };
@@ -74,11 +78,13 @@ private:
 class CheckConnectionTask : public diagnostic_updater::DiagnosticTask
 {
 public:
-  CheckConnectionTask(rclcpp::Logger logger, const std::string & name);
+  CheckConnectionTask(
+    std::shared_ptr<CaBotSerialNode> node,
+    const std::string & name);
   void run(diagnostic_updater::DiagnosticStatusWrapper & stat);
 
 private:
-  rclcpp::Logger logger_;
+  std::shared_ptr<CaBotSerialNode> node_;
 };
 
 typedef struct Vibration {
@@ -105,16 +111,20 @@ public:
   void get_param(const std::string & name, std::function<void(
           const std::vector<int> &)> callback) override;
   void publish(uint8_t cmd, const std::vector<uint8_t> & data) override;
+  void prepare();
+  void tick();
+  bool is_topic_alive();
+  void reset();
   static void signalHandler(int signal);
-  // static CaBotSerialNode* globalInstance;
 
-  std::shared_ptr<CaBotArduinoSerial> client_;
-  CaBotSerialNode();
+  std::shared_ptr<CaBotSerialNode> shared_from_this() {
+    return std::static_pointer_cast<CaBotSerialNode>(rclcpp::Node::shared_from_this());
+  }
+
+  std::shared_ptr<CaBotArduinoSerial> client_ = nullptr;
   std::string port_name_;
   int baud_;
-  // port_name_ = this->declare_parameter("port", "/dev/ttyCABOT").get<std::string>();
-  // const char* port_name_ = "/dev/ttyESP32";
-  // const int baud_rate_ = 115200;
+  const char * error_msg_;
 
 private:
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr touch_speed_switched_pub_;
@@ -135,6 +145,12 @@ private:
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vib4_sub_;
   rclcpp::TimerBase::SharedPtr vib_timer_ = nullptr;
 
+  std::shared_ptr<Serial> port_ = nullptr;
+  rclcpp::TimerBase::SharedPtr timer_ = nullptr;
+  rclcpp::TimerBase::SharedPtr polling_ = nullptr;
+  std::chrono::time_point<std::chrono::system_clock> topic_alive_{};
+  // ends
+
   bool is_alive_;
   static const size_t NUMBER_OF_BUTTONS = 5;
   Vibration vibrations_[4];
@@ -153,8 +169,6 @@ private:
   void run_once();
   void poling();
   double throttle_duration_sec;
-  rclcpp::TimerBase::SharedPtr timer_;
-  static CaBotSerialNode* instance_;
 
   template<typename T>
   void callback(const T & msg);

@@ -34,65 +34,45 @@
 
 using namespace std::chrono_literals;
 
-// global variables
-std::shared_ptr<CaBotArduinoSerial> client_ = nullptr;
-std::shared_ptr<Serial> port_ = nullptr;
-rclcpp::TimerBase::SharedPtr timer_ = nullptr;
-rclcpp::TimerBase::SharedPtr polling_ = nullptr;
-static CaBotSerialNode* globalInstance = nullptr;
-CaBotSerialNode* CaBotSerialNode::instance_ = nullptr;
-const char * error_msg_;
-
-std::chrono::time_point<std::chrono::system_clock> topic_alive_{};
-
 TopicCheckTask::TopicCheckTask(
   diagnostic_updater::Updater & updater,
+  std::shared_ptr<CaBotSerialNode> node,
   const std::string & name, double freq)
 : diagnostic_updater::HeaderlessTopicDiagnostic(
     name, updater, diagnostic_updater::FrequencyStatusParam(&min, &max, 0.1, 2)),
-  min(freq), max(freq) {}
+  node_(node), min(freq), max(freq) {}
 
 void TopicCheckTask::tick()
 {
-  topic_alive_ = std::chrono::system_clock::now();
+  node_->tick();
   diagnostic_updater::HeaderlessTopicDiagnostic::tick();
 }
 
 CheckConnectionTask::CheckConnectionTask(
-  rclcpp::Logger logger,
+  std::shared_ptr<CaBotSerialNode> node,
   const std::string & name)
-: diagnostic_updater::DiagnosticTask(name), logger_(logger) {}
+: diagnostic_updater::DiagnosticTask(name), node_(node) {}
 
 void CheckConnectionTask::run(diagnostic_updater::DiagnosticStatusWrapper & stat)
 {
-  if (client_ == nullptr) {
-    if (error_msg_ == nullptr) {
+  if (node_->client_ == nullptr) {
+    if (node_->error_msg_ == nullptr) {
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "connecting");
     } else {
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, error_msg_);
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, node_->error_msg_);
     }
   } else {
-    if (topic_alive_.time_since_epoch().count() > 0 &&
-             (std::chrono::system_clock::now() - topic_alive_) > 1s) {
-      RCLCPP_ERROR(logger_, "connected but no message coming");
+    if (node_->is_topic_alive()) {
+      RCLCPP_ERROR(node_->get_logger(), "connected but no message coming");
       stat.summary(
               diagnostic_msgs::msg::DiagnosticStatus::ERROR, "connected but no message coming");
-      client_ = nullptr;
-      port_ = nullptr;
-      topic_alive_ = std::chrono::time_point<std::chrono::system_clock>();
+      node_->reset();
     } else {
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "working");
     }
   }
 }
 
-extern "C" void signalHandlerWrapper(int signal)
-{
-  if (globalInstance)
-  {
-    globalInstance->signalHandler(signal);
-  }
-}
 CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("cabot_serial_node", rclcpp::NodeOptions(options).use_intra_process_comms(false)),
   updater_(this),
@@ -102,26 +82,9 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
   // use_intra_process_comms is currently not supported
   // publishers, diagnostic tasks, and related services
   // will be initialized when corresponding meesage arrives
-  //
-  // Diagnostic Updater
-  check_connection_task_ =
-          std::make_shared<CheckConnectionTask>(this->get_logger(), "Serial Connection");
-  updater_.add(*check_connection_task_);
-
-  instance_ = this;
-  globalInstance = this;
-  struct sigaction sa;
-  // sa.sa_handler = signalHandler;
-  sa.sa_handler = signalHandlerWrapper;
-  sigfillset(&sa.sa_mask);
-  sigaction(SIGINT, &sa, NULL);
-  sa.sa_flags = 0;
-  sigemptyset(&sa.sa_mask);
-  if (sigaction(SIGINT, &sa, nullptr) == -1) {
-    RCLCPP_ERROR(get_logger(), "Error setting up signal handler.");
-    std::exit(EXIT_FAILURE);
-  }
   RCLCPP_INFO(get_logger(), "CABOT ROS Serial CPP Node");
+
+  signal(SIGINT, CaBotSerialNode::signalHandler);
   std::string port_name_ = declare_parameter("port", "/dev/ttyCABOT");
   int baud_ = declare_parameter("baud", 115200);  // actually it is not used
   auto run_once = [this, port_name_]() {
@@ -163,6 +126,7 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
   };
 // polling to check if client (arduino) is disconnected and keep trying to reconnect
   auto polling = [this, port_name_, baud_, run_once]() {
+    this->prepare();
     RCLCPP_INFO(get_logger(), "polling");
     if (client_ && client_->is_alive_) {
       return;
@@ -192,11 +156,32 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
 
 void CaBotSerialNode::signalHandler(int signal)
 {
-  if (instance_)
-  {
-    instance_->stopped();
-  }
+  exit(0);
 }
+
+void CaBotSerialNode::prepare() {
+  if (!check_connection_task_) {
+      check_connection_task_ =
+            std::make_shared<CheckConnectionTask>(shared_from_this(), "Serial Connection");
+      updater_.add(*check_connection_task_);
+    }
+}
+
+void CaBotSerialNode::tick() {
+  topic_alive_ = std::chrono::system_clock::now();
+}
+
+bool CaBotSerialNode::is_topic_alive() {
+  return topic_alive_.time_since_epoch().count() > 0 &&
+    (std::chrono::system_clock::now() - topic_alive_) > 1s;
+}
+
+void CaBotSerialNode::reset() {
+  client_ = nullptr;
+  port_ = nullptr;
+}
+
+// Private methods
 
 void CaBotSerialNode::vib_loop()
 {
@@ -435,7 +420,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
   if (cmd == 0x10) {  // touch
     if (touch_pub_ == nullptr) {
       touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("touch", rclcpp::QoS(10));
-      touch_check_task_ = std::make_shared<TopicCheckTask>(updater_, "Touch sensor", 50);
+      touch_check_task_ = std::make_shared<TopicCheckTask>(updater_, shared_from_this(), "Touch sensor", 50);
 
       /* touch speed control
        * touch speed activw mode
@@ -472,7 +457,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
   if (cmd == 0x12) {  // buttons
     if (button_pub_ == nullptr) {
         button_pub_ = this->create_publisher<std_msgs::msg::Int8>("pushed", rclcpp::QoS(10));
-        button_check_task_ = std::make_shared<TopicCheckTask>(updater_, "Push Button", 50);
+        button_check_task_ = std::make_shared<TopicCheckTask>(updater_, shared_from_this(), "Push Button", 50);
 
         // assumes vibrators can be used with buttons
         vib1_sub_ = this->create_subscription<std_msgs::msg::UInt8>(
@@ -499,7 +484,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     if (msg) {
       if (imu_pub_ == nullptr) {
         imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(10));
-        imu_check_task_ = std::make_shared<TopicCheckTask>(updater_, "IMU", 100);
+        imu_check_task_ = std::make_shared<TopicCheckTask>(updater_, shared_from_this(), "IMU", 100);
       }
       imu_pub_->publish(*msg);
       imu_check_task_->tick();
@@ -519,7 +504,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     if (pressure_pub_ == nullptr) {
       pressure_pub_ = this->create_publisher<sensor_msgs::msg::FluidPressure>(
               "pressure", rclcpp::QoS(10));
-      pressure_check_task_ = std::make_shared<TopicCheckTask>(updater_, "Pressure", 2);
+      pressure_check_task_ = std::make_shared<TopicCheckTask>(updater_, shared_from_this(), "Pressure", 2);
     }
     sensor_msgs::msg::FluidPressure msg;
     float pressure;
@@ -535,7 +520,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     if (temperature_pub_ == nullptr) {
       temperature_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>(
               "temparature", rclcpp::QoS(10));
-      temp_check_task_ = std::make_shared<TopicCheckTask>(updater_, "Temperature", 2);
+      temp_check_task_ = std::make_shared<TopicCheckTask>(updater_, shared_from_this(), "Temperature", 2);
     }
     sensor_msgs::msg::Temperature msg;
     float temperature;
