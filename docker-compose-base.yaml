@@ -37,6 +37,7 @@ services:
     network_mode: host
     command:
       - "/launch.sh"
+      - "-c"
       - "driver"
 
   wifi_scan-base:

@@ -25,11 +25,6 @@
 
 #include <unistd.h>
 #include <execinfo.h>
-#include <std_msgs/msg/string.hpp>
-#include <std_msgs/msg/int8.hpp>
-#include <rclcpp/rclcpp.hpp>
-#include <rclcpp/executors/multi_threaded_executor.hpp>
-#include <rclcpp/callback_group.hpp>
 #include <memory>
 #include <vector>
 #include <map>
@@ -38,6 +33,12 @@
 #include <iostream>
 #include "event.hpp"
 #include "handle_v2.hpp"
+#include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/int8.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_components/register_node_macro.hpp>
+#include <rclcpp/executors/multi_threaded_executor.hpp>
+#include <rclcpp/callback_group.hpp>
 
 class Handle;
 
@@ -45,12 +46,15 @@ class CaBotHandleV2Node : public rclcpp::Node
 {
 public:
   explicit CaBotHandleV2Node(const rclcpp::NodeOptions & options);
-  std::shared_ptr<Handle> handle_ = nullptr;
+  std::unique_ptr<Handle> handle_ = nullptr;
+  std::function<void(const std::map<std::string, std::string> &)> eventListener_callback = nullptr;
+  std::function<void(const std_msgs::msg::Int8::UniquePtr)> notification_callback = nullptr;
   std::vector<std::string> button_keys_ = {};
   void eventListener(const std::map<std::string, std::string> & msg);
-  void notificationCallback(const std_msgs::msg::Int8::SharedPtr msg);
+  void notificationCallback(const std_msgs::msg::Int8::UniquePtr & msg);
   void printStackTrace();
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr event_pub_;
+  rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr notification_sub;
 
 private:
   int main();

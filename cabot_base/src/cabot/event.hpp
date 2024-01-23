@@ -23,12 +23,12 @@
 #ifndef CABOT__EVENT_HPP_
 #define CABOT__EVENT_HPP_
 
-#include <boost/algorithm/string.hpp>
 #include <map>
 #include <string>
 #include <stdexcept>
 #include <vector>
 #include <memory>
+#include <boost/algorithm/string.hpp>
 
 class BaseEvent
 {
@@ -47,7 +47,7 @@ private:
 class ButtonEvent : public BaseEvent
 {
 public:
-  static const char* TYPE;
+  static const char * TYPE;
   explicit ButtonEvent(int button = 0, bool up = false, bool hold = false);
   bool operator==(const ButtonEvent & other) const;
   int get_button() const;
@@ -67,14 +67,14 @@ private:
 class JoyButtonEvent : public ButtonEvent
 {
 public:
-  static const char* TYPE;
+  static const char * TYPE;
   explicit JoyButtonEvent(int button = 0, bool up = false, bool hold = false);
 };
 
 class ClickEvent : public BaseEvent
 {
 public:
-  static const char* TYPE;
+  static const char * TYPE;
   explicit ClickEvent(int buttons = 0, int count = 0);
   bool operator==(const ClickEvent & other) const;
   int get_buttons() const;
@@ -91,7 +91,7 @@ private:
 class HoldDownEvent : public BaseEvent
 {
 public:
-  static const char* TYPE;
+  static const char * TYPE;
   explicit HoldDownEvent(int holddown = 0);
   bool operator==(const HoldDownEvent & other) const;
   int get_holddown() const;
@@ -106,7 +106,7 @@ private:
 class JoyClickEvent : public ClickEvent
 {
 public:
-  static const char* TYPE;
+  static const char * TYPE;
   explicit JoyClickEvent(int buttons = 0, int count = 0);
 };
 

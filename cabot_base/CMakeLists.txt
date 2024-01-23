@@ -7,15 +7,18 @@ find_package(ament_cmake REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(std_msgs REQUIRED)
 
-add_executable(cabot_handle_v2_node
+add_library(cabot_handle_v2_lib SHARED
   src/cabot/cabot_handle_v2_node.cpp
   src/cabot/handle_v2.cpp
   src/cabot/event.cpp
 )
-ament_target_dependencies(cabot_handle_v2_node
+
+ament_target_dependencies(cabot_handle_v2_lib
   rclcpp
+  rclcpp_components
   std_msgs
 )
 
@@ -39,9 +42,14 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+rclcpp_components_register_node(cabot_handle_v2_lib
+  PLUGIN "CaBotHandleV2Node"
+  EXECUTABLE cabot_handle_v2_node
+)
+
 install(TARGETS
-  cabot_handle_v2_node
-  DESTINATION lib/${PROJECT_NAME}
+  cabot_handle_v2_lib
+  DESTINATION lib
 )
 
 install(DIRECTORY config/ DESTINATION share/${PROJECT_NAME}/config/)
