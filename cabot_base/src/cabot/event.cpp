@@ -50,7 +50,7 @@ BaseEvent * BaseEvent::parse(const std::string & text)
   return nullptr;
 }
 
-BaseEvent * BaseEvent::_parse(const std::string&, const std::string&)
+BaseEvent * BaseEvent::_parse(const std::string &, const std::string &)
 {
   return nullptr;
 }
@@ -89,7 +89,7 @@ std::string ButtonEvent::toString() const
   std::string subtype = is_hold() ? "hold" : (is_up() ? "up" : "down");
   return getType() + "_" + subtype + "_" + std::to_string(_button);
 }
-BaseEvent * ButtonEvent::_parse(const std::string & text, const std::string&)
+BaseEvent * ButtonEvent::_parse(const std::string & text, const std::string &)
 {
   if (text.find(TYPE) == 0) {
     std::vector<std::string> items;
@@ -108,12 +108,12 @@ BaseEvent * ButtonEvent::_parse(const std::string & text, const std::string&)
   return nullptr;
 }
 
-const char* ButtonEvent::TYPE = "button";
+const char * ButtonEvent::TYPE = "button";
 
 JoyButtonEvent::JoyButtonEvent(int button, bool up, bool hold)
 : ButtonEvent(button, up, hold) {}
 
-const char* JoyButtonEvent::TYPE = "joybutton";
+const char * JoyButtonEvent::TYPE = "joybutton";
 
 ClickEvent::ClickEvent(int buttons, int count)
 : BaseEvent("click"), _buttons(buttons), _count(count) {}
@@ -133,7 +133,7 @@ std::string ClickEvent::toString() const
 {
   return getType() + "_" + std::to_string(_buttons) + "_" + std::to_string(_count);
 }
-BaseEvent * ClickEvent::_parse(const std::string & text, const std::string&)
+BaseEvent * ClickEvent::_parse(const std::string & text, const std::string &)
 {
   if (text.find(TYPE) == 0) {
     std::vector<std::string> items;
@@ -145,7 +145,7 @@ BaseEvent * ClickEvent::_parse(const std::string & text, const std::string&)
   return nullptr;
 }
 
-const char* ClickEvent::TYPE = "click";
+const char * ClickEvent::TYPE = "click";
 
 HoldDownEvent::HoldDownEvent(int holddown)
 : BaseEvent("holddown"), _holddown(holddown) {}
@@ -162,9 +162,9 @@ std::string HoldDownEvent::toString() const
   return getType() + "_" + std::to_string(_holddown);
 }
 
-const char* HoldDownEvent::TYPE = "holddown";
+const char * HoldDownEvent::TYPE = "holddown";
 
-BaseEvent * HoldDownEvent::_parse(const std::string & text, const std::string&)
+BaseEvent * HoldDownEvent::_parse(const std::string & text, const std::string &)
 {
   if (text.find(TYPE) == 0) {
     std::vector<std::string> items;
@@ -178,4 +178,4 @@ BaseEvent * HoldDownEvent::_parse(const std::string & text, const std::string&)
 JoyClickEvent::JoyClickEvent(int buttons, int count)
 : ClickEvent(buttons, count) {}
 
-const char* JoyClickEvent::TYPE = "joyclick";
+const char * JoyClickEvent::TYPE = "joyclick";

@@ -17,6 +17,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 
 set(dependencies
   diagnostic_updater
@@ -24,18 +25,19 @@ set(dependencies
   std_msgs
   std_srvs
   rclcpp
+  rclcpp_components
 )
 
 include_directories(
   include
 )
 
-add_executable(cabot_serial_node
+add_library(cabot_serial_lib SHARED
   src/cabot_serial.cpp
   src/arduino_serial.cpp
 )
 
-ament_target_dependencies(cabot_serial_node
+ament_target_dependencies(cabot_serial_lib
   ${dependencies}
 )
 
@@ -48,15 +50,20 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+rclcpp_components_register_node(cabot_serial_lib
+  PLUGIN "CaBotSerialNode"
+  EXECUTABLE cabot_serial_node
+)
+
 # Install executables
 install(TARGETS
-  cabot_serial_node
-  DESTINATION lib/${PROJECT_NAME}
+  cabot_serial_lib
+  DESTINATION lib
 )
 
 install(
   DIRECTORY include/
-  DESTINATION include/
+  DESTINATION share/${PROJECT_NAME}/include/
 )
 
 ament_export_include_directories("include/")

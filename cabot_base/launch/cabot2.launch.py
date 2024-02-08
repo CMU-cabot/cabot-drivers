@@ -226,60 +226,82 @@ def generate_launch_description():
                 ]
             ),
 
-            # CaBot related
-            Node(
-                package='cabot_base',
-                executable='cabot_handle_v2_node',
-                namespace='/cabot',
-                name='cabot_handle_v2_node',
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
+            ComposableNodeContainer(
+                name='cabot_nodes_container',
+                namespace='',
+                package='rclcpp_components',
+                executable='component_container',
+                composable_node_descriptions=[],
             ),
 
-            # Microcontroller (Arduino - gt1/gtm or ESP32 - ace)
-            Node(
-                package='cabot_serial',
-                executable='cabot_serial_node',
-                namespace='/cabot',
-                name='cabot_serial',
-                output=output,
-                parameters=[
-                    *param_files,
-                    {'use_sim_time': False, 'touch_params': touch_params}
-                ],
-                remappings=[
-                    # ('/cabot/imu', '/cabot/imu/data'),
-                    ('/cabot/touch_speed', '/cabot/touch_speed_raw')
-                ],
-                condition=IfCondition(use_sim_time)
+            LoadComposableNodes(
+                target_container= '/cabot_nodes_container',
+                composable_node_descriptions=[
+                    # CaBot related
+                    ComposableNode(
+                        package='cabot_base',
+                        plugin='CaBotHandleV2Node',
+                        namespace='/cabot',
+                        name='cabot_handle_v2_node',
+                        parameters=[*param_files, {'use_sim_time': use_sim_time}],
+                    ),
+                ]
             ),
-            Node(
-                package='cabot_serial',
-                executable='cabot_serial_node',
-                namespace='/cabot',
-                name='cabot_serial',
-                output=output,
-                parameters=[
-                    *param_files,
-                    {'use_sim_time': False, 'touch_params': touch_params}
-                ],
-                remappings=[
-                    ('/cabot/imu', '/cabot/imu/data'),
-                    ('/cabot/touch_speed', '/cabot/touch_speed_raw')
-                ],
-                condition=UnlessCondition(use_sim_time)
+            LoadComposableNodes(
+                target_container= '/cabot_nodes_container',
+                condition=IfCondition(use_sim_time) ,
+                composable_node_descriptions=[
+                    # Microcontroller (Arduino - gt1/gtm or ESP32 - ace)
+                    ComposableNode(
+                        package='cabot_serial',
+                        plugin='CaBotSerialNode',
+                        namespace='/cabot',
+                        name='cabot_serial',
+                        parameters=[
+                            *param_files,
+                            {'use_sim_time': False, 'touch_params': touch_params}
+                        ],
+                        remappings=[
+                            # ('/cabot/imu', '/cabot/imu/data'),
+                            ('/cabot/touch_speed', '/cabot/touch_speed_raw')
+                        ],
+                    ),
+                ]
             ),
-
-            # optional wifi scanner with ESP32
-            Node(
-                package='cabot_serial',
-                executable='cabot_serial_node',
-                namespace='/cabot',
-                name='serial_esp32_wifi_scanner',
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
-                remappings=[('wifi_scan_str', '/esp32/wifi_scan_str')],
-                condition=IfCondition(use_standalone_wifi_scanner),
+            LoadComposableNodes(
+                target_container= '/cabot_nodes_container',
+                condition=UnlessCondition(use_sim_time) ,
+                composable_node_descriptions=[
+                    ComposableNode(
+                        package='cabot_serial',
+                        plugin='CaBotSerialNode',
+                        namespace='/cabot',
+                        name='cabot_serial',
+                        parameters=[
+                            *param_files,
+                            {'use_sim_time': False, 'touch_params': touch_params}
+                        ],
+                        remappings=[
+                            ('/cabot/imu', '/cabot/imu/data'),
+                            ('/cabot/touch_speed', '/cabot/touch_speed_raw')
+                        ],
+                    ),
+                ]
+            ),
+            LoadComposableNodes(
+                target_container= '/cabot_nodes_container',
+                condition=IfCondition(use_standalone_wifi_scanner) ,
+                composable_node_descriptions=[
+                    # optional wifi scanner with ESP32
+                    ComposableNode(
+                        package='cabot_serial',
+                        plugin='CaBotSerialNode',
+                        namespace='/cabot',
+                        name='serial_esp32_wifi_scanner',
+                        parameters=[*param_files,{'use_sim_time': use_sim_time}],
+                        remappings=[('wifi_scan_str', '/esp32/wifi_scan_str')],
+                    ),
+                ]
             ),
 
             # Motor Controller Adapter

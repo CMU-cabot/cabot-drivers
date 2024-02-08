@@ -20,8 +20,8 @@
  * THE SOFTWARE.
  *******************************************************************************/
 
-#ifndef CABOT__ARDUINO_SERIAL_HPP_
-#define CABOT__ARDUINO_SERIAL_HPP_
+#ifndef CABOT_SERIAL__ARDUINO_SERIAL_HPP_
+#define CABOT_SERIAL__ARDUINO_SERIAL_HPP_
 
 #include <unistd.h>
 #include <termios.h>
@@ -56,8 +56,6 @@ std::string string_format(const std::string & format, Args ... args)
 }
 // end
 
-class CaBotSerialNode;
-
 class Serial
 {
 public:
@@ -85,12 +83,14 @@ public:
   virtual std::tuple<int, int> system_time() = 0;
   virtual void stopped() = 0;
   virtual void log(rclcpp::Logger::Level level, const std::string & text) = 0;
-  virtual void log_throttle(rclcpp::Logger::Level level, int interval_in_ms, const std::string & text) = 0;
-  virtual void get_param(const std::string & name, std::function<void(const std::vector<int> &)> callback) = 0;
+  virtual void log_throttle(
+    rclcpp::Logger::Level level, int interval_in_ms, const std::string & text) = 0;
+  virtual void get_param(
+    const std::string & name, std::function<void(const std::vector<int> &)> callback) = 0;
   virtual void publish(uint8_t cmd, const std::vector<uint8_t> & data) = 0;
 };
 
-class CaBotArduinoSerial : public rclcpp::Node
+class CaBotArduinoSerial
 {
 public:
   CaBotArduinoSerial(
@@ -98,19 +98,17 @@ public:
     std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));
 
   void start();
-  void send_command(uint8_t command, const std::vector<uint8_t> & arg);
+  void reset_serial();
   void stop();
-
+  void run_once();
+  void send_command(uint8_t command, const std::vector<uint8_t> & arg);
   template<typename T>
   void send_param(const T & data);
 
   std::shared_ptr<CaBotArduinoSerialDelegate> delegate_ = nullptr;
-  void reset_serial();
   bool is_alive_;
-  void run_once();
 
 private:
-  rclcpp::Logger logger_;
   std::shared_ptr<Serial> port_;
   int baud_;
   std::chrono::milliseconds timeout_;
@@ -145,8 +143,7 @@ void CaBotArduinoSerial::send_param(const T & data)
     typename T::value_type d = *D;
     data_str += std::to_string(d) + " ";
   }
-  RCLCPP_INFO(get_logger(), "%s", data_str.c_str());
+  delegate_->log(rclcpp::Logger::Level::Info, string_format("%s", data_str.c_str()));
 }
 
-
-#endif  // CABOT__ARDUINO_SERIAL_HPP_
+#endif  // CABOT_SERIAL__ARDUINO_SERIAL_HPP_
