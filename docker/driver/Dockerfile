@@ -37,7 +37,8 @@ RUN apt update && apt install -y \
     python3-dbus \
 	ros-${ROS_DISTRO}-diagnostic-updater \
     ros-${ROS_DISTRO}-xacro \
-    ros-${ROS_DISTRO}-realsense2-description
+    ros-${ROS_DISTRO}-realsense2-description \
+    ros-${ROS_DISTRO}-pointcloud-to-laserscan
 
 RUN pip3 install --no-cache-dir \
     odrive==0.6.5 \
