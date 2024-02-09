@@ -25,7 +25,7 @@ cabot:
 
   cabot_serial:
     ros__parameters:
-      port: /dev/ttyARDUINO_MEGA
+      port: /dev/ttyESP32
 
   odriver_adapter_node:
     ros__parameters:
