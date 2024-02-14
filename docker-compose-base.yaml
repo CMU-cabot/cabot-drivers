@@ -11,6 +11,10 @@ services:
       - CABOT_TOUCH_PARAMS
       - CABOT_ODRIVER_SERIAL_0
       - CABOT_ODRIVER_SERIAL_1
+      - RMW_IMPLEMENTATION
+      - CYCLONEDDS_URI
+      - CYCLONEDDS_NETWORK_INTERFACE_NAME
+      - CYCLONEDDS_NETWORK_INTERFACE_AUTODETERMINE # set automatically by launch.sh
     volumes:
 # device, bluetooth
       - /dev:/dev
