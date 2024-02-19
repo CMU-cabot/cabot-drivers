@@ -56,12 +56,6 @@ CheckConnectionTask::CheckConnectionTask(
 void CheckConnectionTask::run(diagnostic_updater::DiagnosticStatusWrapper & stat)
 {
   if (node_->is_client_ready()) {
-    if (node_->get_error_msg() == nullptr) {
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "connecting");
-    } else {
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, node_->get_error_msg());
-    }
-  } else {
     if (node_->is_topic_alive()) {
       RCLCPP_ERROR(node_->get_logger(), "connected but no message coming");
       stat.summary(
@@ -69,6 +63,12 @@ void CheckConnectionTask::run(diagnostic_updater::DiagnosticStatusWrapper & stat
       node_->stopped();
     } else {
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "working");
+    }
+  } else {
+    if (node_->get_error_msg() == nullptr) {
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "connecting");
+    } else {
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, node_->get_error_msg());
     }
   }
 }
