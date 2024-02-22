@@ -73,6 +73,35 @@ void CheckConnectionTask::run(diagnostic_updater::DiagnosticStatusWrapper & stat
   }
 }
 
+CheckTouchRawTask::CheckTouchRawTask(
+  rclcpp::Logger logger,
+  const std::string & name)
+: diagnostic_updater::DiagnosticTask(name),
+  logger_(logger),
+  ros_clock_(RCL_ROS_TIME),
+  touch_raw_status_(diagnostic_msgs::msg::DiagnosticStatus::OK),
+  touch_raw_diag_message_("working"),
+  reception_time_()
+  {}
+
+void CheckTouchRawTask::run(diagnostic_updater::DiagnosticStatusWrapper & stat)
+{
+  if (((ros_clock_.now() - reception_time_).nanoseconds() / 1e9) > 3.0){
+    touch_raw_status_ = diagnostic_msgs::msg::DiagnosticStatus::STALE;
+    touch_raw_diag_message_ = "no message coming";
+  } else if (touch_raw_status_ == diagnostic_msgs::msg::DiagnosticStatus::ERROR) {
+    RCLCPP_ERROR(logger_, touch_raw_diag_message_.c_str());
+  }
+  stat.summary(touch_raw_status_, touch_raw_diag_message_);
+}
+
+void CheckTouchRawTask::set_touch_raw_status(int status, std::string message, rclcpp::Time time)
+{
+  touch_raw_status_ = status;
+  touch_raw_diag_message_ = message;
+  reception_time_ = time;
+}
+
 CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("cabot_serial_node", rclcpp::NodeOptions(options).use_intra_process_comms(false)),
   client_(nullptr),
@@ -188,7 +217,6 @@ void CaBotSerialNode::prepare()
     updater_.add(*check_connection_task_);
   }
 }
-
 // CaBotArduinoSerialDelegate
 
 std::tuple<int, int> CaBotSerialNode::system_time()
@@ -413,6 +441,14 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     std::unique_ptr<std_msgs::msg::String> msg = std::make_unique<std_msgs::msg::String>();
     msg->data = std::string(data.begin(), data.end());
     wifi_pub_->publish(std::move(msg));
+  }
+  if (cmd ==0x30) {
+    if (!check_touch_raw_task_) {
+      check_touch_raw_task_ =
+        std::make_shared<CheckTouchRawTask>(get_logger(), "Touch Raw");
+      updater_.add(*check_touch_raw_task_);
+    }
+    check_touch_raw_task_->set_touch_raw_status(data[0], std::string(data.begin() + 1, data.end()), this->now());
   }
 }
 
