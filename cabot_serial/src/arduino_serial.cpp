@@ -385,6 +385,8 @@ bool CaBotArduinoSerial::process_read_once()
       std::string(data.begin(), data.end()), [this](const std::vector<int> & data) {
         this->send_param(data);
       });
+  } else if (cmd == 0x09) {
+    stop();
   } else if (0x10 <= cmd) {
     delegate_->publish(cmd, data);
   } else {

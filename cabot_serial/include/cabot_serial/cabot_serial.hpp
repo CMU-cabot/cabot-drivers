@@ -87,6 +87,23 @@ private:
   std::shared_ptr<CaBotSerialNode> node_;
 };
 
+class CheckTouchRawTask : public diagnostic_updater::DiagnosticTask
+{
+public:
+  CheckTouchRawTask(
+    rclcpp::Logger logger,
+    const std::string & name);
+  void run(diagnostic_updater::DiagnosticStatusWrapper & stat);
+  void set_touch_raw_status(int status, std::string message, rclcpp::Time time);
+
+private:
+  rclcpp::Logger logger_;
+  rclcpp::Clock ros_clock_;
+  int touch_raw_status_;
+  std::string touch_raw_diag_message_;
+  rclcpp::Time reception_time_;
+};
+
 typedef struct Vibration
 {
   uint8_t current;
@@ -171,6 +188,7 @@ private:
   std::shared_ptr<TopicCheckTask> pressure_check_task_;
   std::shared_ptr<TopicCheckTask> temp_check_task_;
   std::shared_ptr<CheckConnectionTask> check_connection_task_;
+  std::shared_ptr<CheckTouchRawTask> check_touch_raw_task_;
 };
 
 #endif  // CABOT_SERIAL__CABOT_SERIAL_HPP_
