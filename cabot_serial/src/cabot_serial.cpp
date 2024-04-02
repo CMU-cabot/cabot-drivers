@@ -124,6 +124,9 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
   int baud_ = declare_parameter("baud", 115200);  // actually it is not used
   imu_frame_ = declare_parameter("imu_frame", "imu_frame");
   pressure_frame_ = declare_parameter("pressure_frame", "bmp_frame");
+  publish_imu_raw_ = declare_parameter("publish_imu_raw", true); // parameter to set whether to publish imu_raw or not.
+  imu_accel_bias_ = declare_parameter("imu_accel_bias", std::vector<double>(3, 0.0)); // parameters for adjusting linear acceleration. default value = [0,0, 0.0, 0.0]
+  imu_gyro_bias_ = declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0)); // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
 
   auto run_once = [this, port_name_]() {
       if (client_ == nullptr) {
@@ -384,11 +387,16 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
   if (cmd == 0x13) {  // imu
     std::shared_ptr<sensor_msgs::msg::Imu> msg = process_imu_data(data);
     if (msg) {
+      auto msg_adjusted = this->adjust_imu_message(msg);
       if (imu_pub_ == nullptr) {
         imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(10));
+        imu_raw_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu_raw", rclcpp::QoS(10));
         imu_check_task_ = std::make_shared<TopicCheckTask>(updater_, shared_from_this(), "IMU", 100);
       }
-      imu_pub_->publish(*msg);
+      if (this->publish_imu_raw_){
+        imu_raw_pub_->publish(*msg);
+      }
+      imu_pub_->publish(*msg_adjusted);
       imu_check_task_->tick();
     }
   }
@@ -602,5 +610,19 @@ std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_data(
   return std::make_shared<sensor_msgs::msg::Imu>(imu_msg);
 }
 
+std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::adjust_imu_message(const std::shared_ptr<sensor_msgs::msg::Imu>& msg)
+{
+  std::shared_ptr<sensor_msgs::msg::Imu> msg_adjusted = std::make_shared<sensor_msgs::msg::Imu>(*msg);
+
+  msg_adjusted->linear_acceleration.x -= this->imu_accel_bias_.at(0);
+  msg_adjusted->linear_acceleration.y -= this->imu_accel_bias_.at(1);
+  msg_adjusted->linear_acceleration.z -= this->imu_accel_bias_.at(2);
+
+  msg_adjusted->angular_velocity.x -= this->imu_gyro_bias_.at(0);
+  msg_adjusted->angular_velocity.y -= this->imu_gyro_bias_.at(1);
+  msg_adjusted->angular_velocity.z -= this->imu_gyro_bias_.at(2);
+
+  return msg_adjusted;
+}
 #include "rclcpp_components/register_node_macro.hpp"
 RCLCPP_COMPONENTS_REGISTER_NODE(CaBotSerialNode)

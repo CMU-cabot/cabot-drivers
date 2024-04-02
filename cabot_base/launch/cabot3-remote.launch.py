@@ -44,7 +44,7 @@ from launch_ros.descriptions import ParameterFile
 
 def generate_launch_description():
     output = 'both'
-    pkg_dir = get_package_share_directory('cabot')
+    pkg_dir = get_package_share_directory('cabot_base')
 
     model_name = LaunchConfiguration('model')  # need to be set
     touch_params = LaunchConfiguration('touch_params')
@@ -54,6 +54,8 @@ def generate_launch_description():
     use_imu = OrSubstitution(is_model_ace, LaunchConfiguration('use_imu'))
     odrive_left_serial_number = LaunchConfiguration('odrive_left_serial_number')
     odrive_right_serial_number = LaunchConfiguration('odrive_right_serial_number')
+    imu_accel_bias = LaunchConfiguration('imu_accel_bias')
+    imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
 
     param_files = [
         ParameterFile(PathJoinSubstitution([
@@ -112,6 +114,16 @@ def generate_launch_description():
             default_value=EnvironmentVariable('CABOT_ODRIVER_SERIAL_1', default_value=''),
             description='Set odrive serial number (right wheel)'
         ),
+        DeclareLaunchArgument(
+            'imu_accel_bias',
+            default_value=EnvironmentVariable('CABOT_IMU_ACCEL_BIAS', default_value='[0.0, 0.0, 0.0]'),
+            description='An array of three values for adjusting imu acceleration'
+        ),
+        DeclareLaunchArgument(
+            'imu_gyro_bias',
+            default_value=EnvironmentVariable('CABOT_IMU_GYRO_BIAS', default_value='[0.0, 0.0, 0.0]'),
+            description='An array of three values for adjusting imu angular velocity'
+        ),
 
         # Motor Controller Adapter
         # Convert cmd_vel (linear, rotate) speed to motor target (left, right) speed.
@@ -156,10 +168,15 @@ def generate_launch_description():
             output='log',
             parameters=[
                 *param_files,
-                {'touch_params': touch_params}
+                {
+                    'touch_params': touch_params,
+                    'imu_accel_bias': imu_accel_bias,
+                    'imu_gyro_bias': imu_gyro_bias
+                }
             ],
             remappings=[
                 ('/cabot/imu', '/cabot/imu/data'),
+                ('/cabot/imu_raw', '/cabot/imu_raw/data'),
             ],
             condition=IfCondition(use_imu),
         ),

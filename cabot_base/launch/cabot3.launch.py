@@ -71,6 +71,8 @@ def generate_launch_description():
     use_standalone_wifi_scanner = LaunchConfiguration('use_standalone_wifi_scanner')
     odrive_left_serial_number = LaunchConfiguration('odrive_left_serial_number')
     odrive_right_serial_number = LaunchConfiguration('odrive_right_serial_number')
+    imu_accel_bias = LaunchConfiguration('imu_accel_bias')
+    imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
 
     # switch lidar node based on model_name
     use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2"]'])
@@ -159,6 +161,16 @@ def generate_launch_description():
             'odrive_right_serial_number',
             default_value=EnvironmentVariable('CABOT_ODRIVER_SERIAL_1', default_value='yyyy'),
             description='Set odrive serial number (right wheel)'
+        ),
+        DeclareLaunchArgument(
+            'imu_accel_bias',
+            default_value=EnvironmentVariable('CABOT_IMU_ACCEL_BIAS', default_value='[0.0, 0.0, 0.0]'),
+            description='An array of three values for adjusting imu acceleration'
+        ),
+        DeclareLaunchArgument(
+            'imu_gyro_bias',
+            default_value=EnvironmentVariable('CABOT_IMU_GYRO_BIAS', default_value='[0.0, 0.0, 0.0]'),
+            description='An array of three values for adjusting imu angular velocity'
         ),
 
         # Kind error message
@@ -292,10 +304,16 @@ def generate_launch_description():
                 output=output,
                 parameters=[
                     *param_files,
-                    {'use_sim_time': use_sim_time, 'touch_params': touch_params}
+                    {
+                        'use_sim_time': use_sim_time,
+                        'touch_params': touch_params,
+                        'imu_accel_bias': imu_accel_bias,
+                        'imu_gyro_bias': imu_gyro_bias
+                    }
                 ],
                 remappings=[
                     ('/cabot/imu', '/cabot/imu/data'),
+                    ('/cabot/imu_raw', '/cabot/imu_raw/data'),
                     ('/cabot/touch_speed', '/cabot/touch_speed_raw')
                 ],
                 condition=UnlessCondition(use_sim_time)
