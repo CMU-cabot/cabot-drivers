@@ -155,6 +155,10 @@ private:
   rclcpp::Logger client_logger_;
   Vibration vibrations_[4];
 
+  // topic frame
+  std::string imu_frame_;
+  std::string pressure_frame_;
+
   bool touch_speed_active_mode_;
   double touch_speed_max_speed_;
   double touch_speed_max_speed_inactive_;

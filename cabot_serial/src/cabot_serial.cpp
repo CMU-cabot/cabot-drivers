@@ -122,6 +122,9 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
   signal(SIGINT, CaBotSerialNode::signalHandler);
   std::string port_name_ = declare_parameter("port", "/dev/ttyCABOT");
   int baud_ = declare_parameter("baud", 115200);  // actually it is not used
+  imu_frame_ = declare_parameter("imu_frame", "imu_frame");
+  pressure_frame_ = declare_parameter("pressure_frame", "bmp_frame");
+
   auto run_once = [this, port_name_]() {
       if (client_ == nullptr) {
         return;
@@ -411,7 +414,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     msg.fluid_pressure = pressure;
     msg.variance = 0.0;
     msg.header.stamp = this->now();
-    msg.header.frame_id = "bmp_frame";
+    msg.header.frame_id = pressure_frame_;
     pressure_pub_->publish(std::move(msg));
     pressure_check_task_->tick();
   }
@@ -427,7 +430,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     msg.temperature = temperature;
     msg.variance = 0.0;
     msg.header.stamp = this->now();
-    msg.header.frame_id = "bmp_frame";
+    msg.header.frame_id = pressure_frame_;
     temperature_pub_->publish(std::move(msg));
     temp_check_task_->tick();
   }
@@ -584,7 +587,7 @@ std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_data(
       return nullptr;
     }
   }
-  imu_msg.header.frame_id = "imu_frame";
+  imu_msg.header.frame_id = imu_frame_;
   imu_last_topic_time = std::make_shared<rclcpp::Time>(imu_time);
   imu_msg.orientation.x = data2[0];
   imu_msg.orientation.y = data2[1];
