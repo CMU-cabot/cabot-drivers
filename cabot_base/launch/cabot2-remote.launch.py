@@ -54,6 +54,8 @@ def generate_launch_description():
     use_keyboard = LaunchConfiguration('use_keyboard')
     is_model_ace = PythonExpression(['"', model_name, '"=="cabot2-ace"'])
     use_imu = OrSubstitution(is_model_ace, LaunchConfiguration('use_imu'))
+    imu_accel_bias = LaunchConfiguration('imu_accel_bias')
+    imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
 
     param_files = [
         ParameterFile(PathJoinSubstitution([
@@ -102,6 +104,16 @@ def generate_launch_description():
             default_value='False',
             description='If true use IMU for rotation adjustment'
         ),
+        DeclareLaunchArgument(
+            'imu_accel_bias',
+            default_value=EnvironmentVariable('CABOT_IMU_ACCEL_BIAS', default_value='[0.0, 0.0, 0.0]'),
+            description='An array of three values for adjusting imu acceleration'
+        ),
+        DeclareLaunchArgument(
+            'imu_gyro_bias',
+            default_value=EnvironmentVariable('CABOT_IMU_GYRO_BIAS', default_value='[0.0, 0.0, 0.0]'),
+            description='An array of three values for adjusting imu angular velocity'
+        ),
 
         # Motor Controller Adapter
         # Convert cmd_vel (linear, rotate) speed to motor target (left, right) speed.
@@ -140,10 +152,15 @@ def generate_launch_description():
             output='log',
             parameters=[
                 *param_files,
-                {'touch_params': touch_params}
+                {
+                    'touch_params': touch_params,
+                    'imu_accel_bias': imu_accel_bias,
+                    'imu_gyro_bias': imu_gyro_bias
+                }
             ],
             remappings=[
                 ('/cabot/imu', '/cabot/imu/data'),
+                ('/cabot/imu_raw', '/cabot/imu_raw/data'),
             ],
             condition=IfCondition(use_imu),
         ),

@@ -147,6 +147,7 @@ private:
     const std_srvs::srv::SetBool::Request::SharedPtr req,
     std_srvs::srv::SetBool::Response::SharedPtr res);
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_data(const std::vector<uint8_t> & data);
+  std::shared_ptr<sensor_msgs::msg::Imu> adjust_imu_message(const std::shared_ptr<sensor_msgs::msg::Imu>& msg);
 
   std::shared_ptr<CaBotArduinoSerial> client_;
   std::shared_ptr<Serial> port_;
@@ -154,6 +155,14 @@ private:
   diagnostic_updater::Updater updater_;
   rclcpp::Logger client_logger_;
   Vibration vibrations_[4];
+
+  // topic frame
+  std::string imu_frame_;
+  std::string pressure_frame_;
+  // parameters to adjust imu readings without explicit calibration
+  bool publish_imu_raw_;
+  std::vector<double> imu_accel_bias_;
+  std::vector<double> imu_gyro_bias_;
 
   bool touch_speed_active_mode_;
   double touch_speed_max_speed_;
@@ -165,6 +174,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr button_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_raw_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr calibration_pub_;
   rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_pub_;

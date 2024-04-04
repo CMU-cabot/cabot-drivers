@@ -69,6 +69,8 @@ def generate_launch_description():
     model_name = LaunchConfiguration('model')  # need to be set
     touch_params = LaunchConfiguration('touch_params')  # TODO no default value
     use_standalone_wifi_scanner = LaunchConfiguration('use_standalone_wifi_scanner')
+    imu_accel_bias = LaunchConfiguration('imu_accel_bias')
+    imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -143,6 +145,16 @@ def generate_launch_description():
             'max_speed',
             default_value=EnvironmentVariable('CABOT_MAX_SPEED', default_value='1.0'),
             description='Set maximum speed of the robot'
+        ),
+        DeclareLaunchArgument(
+            'imu_accel_bias',
+            default_value=EnvironmentVariable('CABOT_IMU_ACCEL_BIAS', default_value='[0.0, 0.0, 0.0]'),
+            description='An array of three values for adjusting imu acceleration'
+        ),
+        DeclareLaunchArgument(
+            'imu_gyro_bias',
+            default_value=EnvironmentVariable('CABOT_IMU_GYRO_BIAS', default_value='[0.0, 0.0, 0.0]'),
+            description='An array of three values for adjusting imu angular velocity'
         ),
 
         # Kind error message
@@ -279,10 +291,16 @@ def generate_launch_description():
                         name='cabot_serial',
                         parameters=[
                             *param_files,
-                            {'use_sim_time': False, 'touch_params': touch_params}
+                            {
+                                'use_sim_time': False,
+                                'touch_params': touch_params,
+                                'imu_accel_bias': imu_accel_bias,
+                                'imu_gyro_bias': imu_gyro_bias
+                            }
                         ],
                         remappings=[
                             ('/cabot/imu', '/cabot/imu/data'),
+                            ('/cabot/imu_raw', '/cabot/imu_raw/data'),
                             ('/cabot/touch_speed', '/cabot/touch_speed_raw')
                         ],
                     ),
