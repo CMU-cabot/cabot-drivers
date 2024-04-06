@@ -1,24 +1,22 @@
-/*******************************************************************************
- * Copyright (c) 2019, 2022  Carnegie Mellon University
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *******************************************************************************/
+// Copyright (c) 2019, 2022  Carnegie Mellon University
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 /*
  * Odriver motor controller adapter
@@ -93,7 +91,7 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   pauseControlSub = create_subscription<std_msgs::msg::Bool>(
     pauseControlInput_, 10, std::bind(&ODriverNode::pauseControlCallback, this, _1));
 
-  
+
   imuSub = create_subscription<sensor_msgs::msg::Imu>("/imu", rclcpp::SensorDataQoS(), std::bind(&ODriverNode::imuCallback, this, _1));
 
   maxAcc_ = declare_parameter("max_acc", maxAcc_);
@@ -157,11 +155,12 @@ void ODriverNode::cmdVelLoop(int publishRate)
 
     // linear and velocity error feedback
     // apply feedback only when the following conditions are met to prevent integrator error accumulation
-    if (lastOdomTime_ > rclcpp::Time(0, 0, get_clock()->get_clock_type()) // after receiving at least one motorStatus message
-        && get_clock()->now() - lastOdomTime_ < rclcpp::Duration(200ms) // last odometry is almost up-to-date (within 200ms)
-        && target.loop_ctrl  // loop control is on
-        && !(targetSpdLinear_ == 0.0 and targetSpdTurn_ == 0.0)  // command velocity is non-zero
-        ) {
+    if (lastOdomTime_ > rclcpp::Time(0, 0, get_clock()->get_clock_type()) &&  // after receiving at least one motorStatus message
+      get_clock()->now() - lastOdomTime_ < rclcpp::Duration(200ms) &&  // last odometry is almost up-to-date (within 200ms)
+      target.loop_ctrl &&  // loop control is on
+      !(targetSpdLinear_ == 0.0 && targetSpdTurn_ == 0.0)  // command velocity is non-zero
+    )
+    {
       rclcpp::Time now = get_clock()->now();
       double dt = 1.0 / publishRate;
       double fixedMeasuredSpdTurn = measuredSpdTurn_;
@@ -202,7 +201,6 @@ void ODriverNode::cmdVelLoop(int publishRate)
 
     motorPub->publish(target);
 
-    double now = this->get_clock()->now().seconds();
     double errorSpdLinear = currentSpdLinear_ - measuredSpdLinear_;
     double errorSpdTurn = targetSpdTurn_ - measuredSpdTurn_;
 
