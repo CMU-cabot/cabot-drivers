@@ -1,24 +1,22 @@
-/*******************************************************************************
- * Copyright (c) 2023  Miraikan and Carnegie Mellon University
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *******************************************************************************/
+// Copyright (c) 2023  Miraikan and Carnegie Mellon University
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 #include <csignal>
 #include <string>
@@ -82,11 +80,11 @@ CheckTouchRawTask::CheckTouchRawTask(
   touch_raw_status_(diagnostic_msgs::msg::DiagnosticStatus::OK),
   touch_raw_diag_message_("working"),
   reception_time_()
-  {}
+{}
 
 void CheckTouchRawTask::run(diagnostic_updater::DiagnosticStatusWrapper & stat)
 {
-  if (((ros_clock_.now() - reception_time_).nanoseconds() / 1e9) > 3.0){
+  if (((ros_clock_.now() - reception_time_).nanoseconds() / 1e9) > 3.0) {
     touch_raw_status_ = diagnostic_msgs::msg::DiagnosticStatus::STALE;
     touch_raw_diag_message_ = "no message coming";
   } else if (touch_raw_status_ == diagnostic_msgs::msg::DiagnosticStatus::ERROR) {
@@ -124,9 +122,9 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
   int baud_ = declare_parameter("baud", 115200);  // actually it is not used
   imu_frame_ = declare_parameter("imu_frame", "imu_frame");
   pressure_frame_ = declare_parameter("pressure_frame", "bmp_frame");
-  publish_imu_raw_ = declare_parameter("publish_imu_raw", true); // parameter to set whether to publish imu_raw or not.
-  imu_accel_bias_ = declare_parameter("imu_accel_bias", std::vector<double>(3, 0.0)); // parameters for adjusting linear acceleration. default value = [0,0, 0.0, 0.0]
-  imu_gyro_bias_ = declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0)); // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
+  publish_imu_raw_ = declare_parameter("publish_imu_raw", true);  // parameter to set whether to publish imu_raw or not.
+  imu_accel_bias_ = declare_parameter("imu_accel_bias", std::vector<double>(3, 0.0));  // parameters for adjusting linear acceleration. default value = [0,0, 0.0, 0.0]
+  imu_gyro_bias_ = declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0));  // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
 
   auto run_once = [this, port_name_]() {
       if (client_ == nullptr) {
@@ -393,7 +391,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
         imu_raw_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu_raw", rclcpp::QoS(10));
         imu_check_task_ = std::make_shared<TopicCheckTask>(updater_, shared_from_this(), "IMU", 100);
       }
-      if (this->publish_imu_raw_){
+      if (this->publish_imu_raw_) {
         imu_raw_pub_->publish(*msg);
       }
       imu_pub_->publish(*msg_adjusted);
@@ -453,7 +451,7 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     msg->data = std::string(data.begin(), data.end());
     wifi_pub_->publish(std::move(msg));
   }
-  if (cmd ==0x30) {
+  if (cmd == 0x30) {
     if (!check_touch_raw_task_) {
       check_touch_raw_task_ =
         std::make_shared<CheckTouchRawTask>(get_logger(), "Touch Raw");
@@ -610,7 +608,7 @@ std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_data(
   return std::make_shared<sensor_msgs::msg::Imu>(imu_msg);
 }
 
-std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::adjust_imu_message(const std::shared_ptr<sensor_msgs::msg::Imu>& msg)
+std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::adjust_imu_message(const std::shared_ptr<sensor_msgs::msg::Imu> & msg)
 {
   std::shared_ptr<sensor_msgs::msg::Imu> msg_adjusted = std::make_shared<sensor_msgs::msg::Imu>(*msg);
 
