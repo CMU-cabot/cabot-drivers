@@ -35,6 +35,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
+from launch.conditions import UnlessCondition
 from launch.substitutions import EnvironmentVariable
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import OrSubstitution
@@ -51,6 +52,7 @@ def generate_launch_description():
     model_name = LaunchConfiguration('model')  # need to be set
     touch_params = LaunchConfiguration('touch_params')
     gamepad = LaunchConfiguration('gamepad')
+    use_joy_linux = LaunchConfiguration('use_joy_linux')
     use_keyboard = LaunchConfiguration('use_keyboard')
     is_model_ace = PythonExpression(['"', model_name, '"=="cabot2-ace"'])
     use_imu = OrSubstitution(is_model_ace, LaunchConfiguration('use_imu'))
@@ -95,6 +97,11 @@ def generate_launch_description():
             description='Gamepad name ps4 or pro (Switch Pro Con)'
         ),
         DeclareLaunchArgument(
+            'use_joy_linux',
+            default_value='False',
+            description='If true use joy_linux_node instead of joy_node'
+        ),
+        DeclareLaunchArgument(
             'use_keyboard',
             default_value='False',
             description='If true you can control the robot via the keyboard'
@@ -126,6 +133,7 @@ def generate_launch_description():
             parameters=[*param_files],
             remappings=[
                 ('/imu', '/cabot/imu/data'),
+                ('/cmd_vel', '/cabot/cmd_vel'), # /cabot/cmd_vel is directly input to motor_adapter in remote mode
             ],
         ),
 
@@ -171,6 +179,16 @@ def generate_launch_description():
             namespace='cabot',
             name='joy_node',
             parameters=[*param_files],
+            condition=UnlessCondition(use_joy_linux),
+        ),
+
+        Node(
+            package='joy_linux',
+            executable='joy_linux_node',
+            namespace='cabot',
+            name='joy_node', # keep the node name joy_node to keep using the same parameters
+            parameters=[*param_files],
+            condition=IfCondition(use_joy_linux),
         ),
 
         Node(
