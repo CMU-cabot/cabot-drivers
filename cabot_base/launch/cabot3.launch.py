@@ -75,8 +75,9 @@ def generate_launch_description():
     imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
 
     # switch lidar node based on model_name
-    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2"]'])
+    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-s2"]'])
     use_velodyne = NotSubstitution(use_hesai)
+    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-s2"]'])
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -267,6 +268,21 @@ def generate_launch_description():
                     'pandar': '/velodyne_points'
                 }.items(),
                 condition=IfCondition(AndSubstitution(use_hesai, NotSubstitution(use_sim_time)))  # if (use_hesai and (not use_simtime))
+            ),
+
+            # launch livox node
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([
+                    PathJoinSubstitution([
+                        pkg_dir, 'launch', 'include', 'livox_lidar_msg.launch.py'
+                    ])
+                ]),
+                launch_arguments={
+                    'frame_id': 'livox_link',
+                    'xfer_format': '0',
+                    'output': output
+                }.items(),
+                condition=IfCondition(AndSubstitution(use_livox, NotSubstitution(use_sim_time)))
             ),
 
             # CaBot related
