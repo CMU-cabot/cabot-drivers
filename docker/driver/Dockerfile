@@ -36,6 +36,7 @@ RUN apt update && apt install -y \
     python3-gi \
     python3-dbus \
 	ros-${ROS_DISTRO}-diagnostic-updater \
+    ros-${ROS_DISTRO}-joy-linux \
     ros-${ROS_DISTRO}-xacro \
     ros-${ROS_DISTRO}-realsense2-description \
     ros-${ROS_DISTRO}-pointcloud-to-laserscan
