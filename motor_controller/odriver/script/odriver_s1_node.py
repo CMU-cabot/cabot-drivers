@@ -181,9 +181,16 @@ def find_controller(odrv_index, odrv_serial_number, clear=False, reset_watchdog_
 
 
 def reset_error_watchdog_timer_expired(odrv_index):
-    if odrvs[odrv_index].axis0.active_errors & ODriveError.WATCHDOG_TIMER_EXPIRED != 0:
-        odrvs[odrv_index].axis0.active_errors= odrvs[odrv_index].axis0.active_errors & ~ODriveError.WATCHDOG_TIMER_EXPIRED
-        logger.info("Reset odrv"+str(odrv_index)+".axis0.error from AXIS_ERROR_WATCHDOG_TIMER_EXPIRED to AXIS_ERROR_NONE.")
+    # clear errors only if error exactly match with ODriveError.WATCHDOG_TIMER_EXPIRED
+    if odrvs[odrv_index].axis0.active_errors == ODriveError.WATCHDOG_TIMER_EXPIRED or \
+         odrvs[odrv_index].axis0.disarm_reason == ODriveError.WATCHDOG_TIMER_EXPIRED:
+        clear_errors(odrvs[odrv_index])
+        logger.info("Clear odrv"+str(odrv_index)+".axis0 errors in reset_error_watchdog_timer_expired.")
+    elif odrvs[odrv_index].axis0.active_errors == ODriveError.NONE and \
+         odrvs[odrv_index].axis0.disarm_reason == ODriveError.NONE:
+         pass # pass if no error
+    else:
+        logger.info("odrv"+str(odrv_index)+" watchdog error was not cleared.")
 
 
 def _odrv_has_error(odrv):
@@ -447,6 +454,7 @@ def main():
         else:
             # recovery from inactive
             if not odrv_is_active:
+                logger.error("odrv is inactive.")
                 try:
                     # reset odrv0 control
                     stop_control()
@@ -471,6 +479,7 @@ def main():
                     "\nErrors of odrv1 \n" + str(format_errors(odrvs[1])) 
                 logger.error(odrive_error_str, throttle_duration_sec=1.0)
                 time_disconnect = node.get_clock().now()
+                odrv_is_active = False
                 od_writeMode(0)
                 mode_written = None
                 spd0_c_written , spd1_c_written = None , None
