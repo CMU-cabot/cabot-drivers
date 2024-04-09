@@ -247,7 +247,7 @@ def generate_launch_description():
             ),
 
             LoadComposableNodes(
-                target_container= '/cabot_nodes_container',
+                target_container='/cabot_nodes_container',
                 composable_node_descriptions=[
                     # CaBot related
                     ComposableNode(
@@ -260,8 +260,8 @@ def generate_launch_description():
                 ]
             ),
             LoadComposableNodes(
-                target_container= '/cabot_nodes_container',
-                condition=IfCondition(use_sim_time) ,
+                target_container='/cabot_nodes_container',
+                condition=IfCondition(use_sim_time),
                 composable_node_descriptions=[
                     # Microcontroller (Arduino - gt1/gtm or ESP32 - ace)
                     ComposableNode(
@@ -281,8 +281,8 @@ def generate_launch_description():
                 ]
             ),
             LoadComposableNodes(
-                target_container= '/cabot_nodes_container',
-                condition=UnlessCondition(use_sim_time) ,
+                target_container='/cabot_nodes_container',
+                condition=UnlessCondition(use_sim_time),
                 composable_node_descriptions=[
                     ComposableNode(
                         package='cabot_serial',
@@ -307,8 +307,8 @@ def generate_launch_description():
                 ]
             ),
             LoadComposableNodes(
-                target_container= '/cabot_nodes_container',
-                condition=IfCondition(use_standalone_wifi_scanner) ,
+                target_container='/cabot_nodes_container',
+                condition=IfCondition(use_standalone_wifi_scanner),
                 composable_node_descriptions=[
                     # optional wifi scanner with ESP32
                     ComposableNode(
@@ -316,7 +316,7 @@ def generate_launch_description():
                         plugin='CaBotSerialNode',
                         namespace='/cabot',
                         name='serial_esp32_wifi_scanner',
-                        parameters=[*param_files,{'use_sim_time': use_sim_time}],
+                        parameters=[*param_files, {'use_sim_time': use_sim_time}],
                         remappings=[('wifi_scan_str', '/esp32/wifi_scan_str')],
                     ),
                 ]
