@@ -3,7 +3,7 @@
 - python/cpp implementation to communicate with CaBot's microcontroller
     - [cabot-arduino](https://github.com/CMU-cabot/cabot-arduino)
         - Single microcontroller configuration
-    - [cabot-arduino-ace](https://github.com/CMU-cabot/cabot-arduino-ace)
+    - [cabot-arduino-di](https://github.com/CMU-cabot/cabot-arduino-di)
         - Two microcontrollers configuration (Sensor + Handle)
 
 ## Node
@@ -51,8 +51,12 @@
 - **/touch_raw** (std_msgs/msg/Int16): touch sensor's raw value (for debug) - 50Hz
 - **/touch_speed_switched** (float): speed control by handle - see above - 50Hz
 - **/wifi** (std_msgs/msg/String): wifi scan string - depends on how often WiFi signal is scanned (only with ESP32 microcontroller)
+- **/servo_pos** (std_msgs/msg/Int16): current servo position - 50Hz
 
 ### Subscribers
+
+- **/servo_target** (std_msgs/msg/Int16): servo position (-90 ~ +90)
+- **/servo_free** (std_msgs/msg/Bool): `true` -> set free, `false` -> no operation
 - **/vibrator1** (std_msgs/msg/UInt8): front
 - **/vibrator2** (std_msgs/msg/UInt8): back (not used)
 - **/vibrator3** (std_msgs/msg/UInt8): left
@@ -76,4 +80,11 @@ ros2 run rqt_runtime_monitor rqt_runtime_monitor
 ros2 topic pub -1 /vibrator1 std_msgs/msg/UInt8 "data: 10"
 ros2 topic pub -1 /vibrator3 std_msgs/msg/UInt8 "data: 10"
 ros2 topic pub -1 /vibrator4 std_msgs/msg/UInt8 "data: 10"
+```
+
+- check if the servo (direction indicator) rotates
+```
+ros2 topic pub -1 /servo_target std_msgs/msg/Int16 "data: 90"
+ros2 topic pub -1 /servo_target std_msgs/msg/Int16 "data: -90"
+ros2 topic pub -1 /servo_target std_msgs/msg/Int16 "data: 0"
 ```

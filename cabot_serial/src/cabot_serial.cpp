@@ -1,5 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2023  Miraikan and Carnegie Mellon University
+ * Copyright (c) 2024  ALPS ALPINE CO., LTD.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -461,6 +462,21 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     }
     check_touch_raw_task_->set_touch_raw_status(data[0], std::string(data.begin() + 1, data.end()), this->now());
   }
+  if (cmd == 0x38) {
+    if (servo_pos_pub_ == nullptr) {
+      servo_pos_pub_ = this->create_publisher<std_msgs::msg::Int16>("servo_pos", rclcpp::QoS(10));
+
+      servo_target_sub_ = this->create_subscription<std_msgs::msg::Int16>(
+        "servo_target", 10, [this](std_msgs::msg::Int16::SharedPtr msg)
+        {this->handle_callback(0x36, msg);});
+      servo_free_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+        "servo_free", 10, [this](std_msgs::msg::Bool::SharedPtr msg)
+        {this->handle_callback(0x37, msg);});
+    }
+    std::unique_ptr<std_msgs::msg::Int16> msg = std::make_unique<std_msgs::msg::Int16>();
+    msg->data = static_cast<int16_t>((data[1] << 8) | data[0]);
+    servo_pos_pub_->publish(std::move(msg));
+  }
 }
 
 // Private methods
@@ -500,6 +516,32 @@ void CaBotSerialNode::vib_callback(uint8_t cmd, const std_msgs::msg::UInt8::Uniq
   std::vector<uint8_t> data;
   data.push_back(msg->data);
   vibrations_[cmd - 0x20].target = msg->data;
+  client_->send_command(cmd, data);
+}
+
+void CaBotSerialNode::handle_callback(uint8_t cmd, const std_msgs::msg::UInt8::SharedPtr msg)
+{
+  if (client_ == nullptr) { return; }
+  std::vector<uint8_t>data;
+  data.push_back(msg->data);
+  client_->send_command(cmd, data);
+}
+
+void CaBotSerialNode::handle_callback(uint8_t cmd, const std_msgs::msg::Int16::SharedPtr msg)
+{
+  if (client_ == nullptr) { return; }
+  std::vector<uint8_t>data;
+  // data encoding as Little Endian
+  data.push_back((uint8_t)(msg->data));
+  data.push_back((uint8_t)(msg->data >> 8));
+  client_->send_command(cmd, data);
+}
+
+void CaBotSerialNode::handle_callback(uint8_t cmd, const std_msgs::msg::Bool::SharedPtr msg)
+{
+  if (client_ == nullptr) { return; }
+  std::vector<uint8_t>data;
+  data.push_back((uint8_t)msg->data);
   client_->send_command(cmd, data);
 }
 

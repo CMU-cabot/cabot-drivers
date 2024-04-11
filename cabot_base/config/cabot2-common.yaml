@@ -36,7 +36,7 @@ filter_crop_box_node:
 #------ vlp.16.launch.xml
 
 cabot:
-  cabot_handle_v2_node:
+  cabot_handle_v3_node:
     ros__parameters:
       no_vibration: false
       buttons: ['NEED_TO_BE_CONFIGURED']

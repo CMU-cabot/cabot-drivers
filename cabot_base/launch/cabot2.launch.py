@@ -1,4 +1,5 @@
 # Copyright (c) 2022, 2023  Carnegie Mellon University
+# Copyright (c) 2024  ALPS ALPINE CO., LTD.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -247,14 +248,14 @@ def generate_launch_description():
             ),
 
             LoadComposableNodes(
-                target_container= '/cabot_nodes_container',
+                target_container='/cabot_nodes_container',
                 composable_node_descriptions=[
                     # CaBot related
                     ComposableNode(
                         package='cabot_base',
-                        plugin='CaBotHandleV2Node',
+                        plugin='CaBotHandleV3Node',
                         namespace='/cabot',
-                        name='cabot_handle_v2_node',
+                        name='cabot_handle_v3_node',
                         parameters=[*param_files, {'use_sim_time': use_sim_time}],
                     ),
                 ]
