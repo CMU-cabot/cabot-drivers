@@ -104,8 +104,6 @@ Handle::Handle(
   current_yaw_degrees_ = 0.0;
   start_yaw_degrees_ = 0.0;
   target_yaw_degrees_ = 0.0;
-  vib_freq_state_ = 0;
-  vib_power_state_ = 0;
   callbacks_.resize(stimuli_names.size(), nullptr);
   callbacks_[1] = [this]() {
       vibrateLeftTurn();
