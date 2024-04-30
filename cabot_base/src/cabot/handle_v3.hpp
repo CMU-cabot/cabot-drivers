@@ -59,16 +59,16 @@ namespace VibConst
     static constexpr unsigned int ABOUT_TURN = 400;
     static constexpr unsigned int DEVIATION = 50;
     static constexpr unsigned int SINGLE_VIBRATION = 400;
-    static constexpr unsigned int BUTTON_CLICK = 200;
-    static constexpr unsigned int BUTTON_HOLDDOWN = 200;
+    static constexpr unsigned int BUTTON_CLICK = 50;
+    static constexpr unsigned int BUTTON_HOLDDOWN = 100;
     static constexpr unsigned int CAUTION = 1000;
-    static constexpr unsigned int WAITING = 200;
+    static constexpr unsigned int WAITING = 20;
   }
   namespace Sleep
   {
     static constexpr unsigned int DEFAULT = 150;
     static constexpr unsigned int CAUTION = 0;
-    static constexpr unsigned int WAITING = 800;
+    static constexpr unsigned int WAITING = 980;
   }
   namespace NumVibrations {
     static constexpr unsigned int TURN = 3;
@@ -148,6 +148,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator2_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator3_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr vibrator4_pub_;
+
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr servo_free_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr servo_target_pub_;
   rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr button_sub_;
@@ -171,6 +172,8 @@ private:
   float current_yaw_degrees_;
   float start_yaw_degrees_;
   float target_yaw_degrees_;
+  uint16_t vib_freq_state_;
+  uint8_t vib_power_state_;
   std::map<std::string, std::string> event;
   std::function<void(const std::map<std::string, std::string> &)> eventListener_;
   std::vector<std::string> buttonKeys_;
