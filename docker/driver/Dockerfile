@@ -75,5 +75,3 @@ USER $USERNAME
 ENV HOME /home/$USERNAME
 
 WORKDIR $HOME/driver_ws
-
-RUN mkdir -p src && git clone http://github.com/wg-perception/people.git -b ros2 src/people
