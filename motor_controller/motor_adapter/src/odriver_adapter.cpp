@@ -152,11 +152,12 @@ void ODriverNode::cmdVelLoop(int publishRate)
     }
 
     // linear and velocity error feedback
-    // apply feedback after receiving at least one motorStatus message, when loop control is on, and
-    // last odometry is new (within 200ms) to prevent integrator error accumulation
-    if (lastOdomTime_ > rclcpp::Time(0, 0, get_clock()->get_clock_type())
-        && get_clock()->now() - lastOdomTime_ < rclcpp::Duration(200ms)
-        && target.loop_ctrl ) {
+    // apply feedback only when the following conditions are met to prevent integrator error accumulation
+    if (lastOdomTime_ > rclcpp::Time(0, 0, get_clock()->get_clock_type()) // after receiving at least one motorStatus message
+        && get_clock()->now() - lastOdomTime_ < rclcpp::Duration(200ms) // last odometry is almost up-to-date (within 200ms)
+        && target.loop_ctrl  // loop control is on
+        && !(targetSpdLinear_ == 0.0 and targetSpdTurn_ == 0.0)  // command velocity is non-zero
+        ) {
       rclcpp::Time now = get_clock()->now();
       double dt = 1.0 / publishRate;
       double fixedMeasuredSpdTurn = measuredSpdTurn_;
