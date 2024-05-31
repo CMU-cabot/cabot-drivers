@@ -54,7 +54,7 @@
 #include <std_srvs/srv/set_bool.hpp>
 #include <diagnostic_updater/publisher.hpp>
 #include <diagnostic_updater/update_functions.hpp>
-#include <linux/rtc.h>
+#include <sys/time.h>
 
 #include "arduino_serial.hpp"
 
@@ -150,9 +150,8 @@ private:
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_data(const std::vector<uint8_t> & data);
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_dev_data(const std::vector<uint8_t> & data);
   std::shared_ptr<sensor_msgs::msg::Imu> adjust_imu_message(const std::shared_ptr<sensor_msgs::msg::Imu>& msg);
-  std::shared_ptr<sensor_msgs::msg::Imu> adjust_imu_dev_message(const std::shared_ptr<sensor_msgs::msg::Imu>& msg_dev);
 
-  uint32_t get_device_time();
+  uint64_t get_device_time();
 
   std::shared_ptr<CaBotArduinoSerial> client_;
   std::shared_ptr<Serial> port_;
@@ -163,11 +162,9 @@ private:
 
   // topic frame
   std::string imu_frame_;
-  std::string imu_dev_frame_;
   std::string pressure_frame_;
   // parameters to adjust imu readings without explicit calibration
   bool publish_imu_raw_;
-  bool publish_imu_dev_raw_;
   std::vector<double> imu_accel_bias_;
   std::vector<double> imu_gyro_bias_;
 
@@ -183,7 +180,6 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_dev_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_raw_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_dev_raw_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr calibration_pub_;
   rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_pub_;
@@ -199,11 +195,9 @@ private:
 
   std::chrono::time_point<std::chrono::system_clock> last_topic_alive_time_{};
   std::shared_ptr<rclcpp::Time> imu_last_topic_time;
-  std::shared_ptr<rclcpp::Time> imu_dev_last_topic_time;
 
   // Diagnostic Updater
   std::shared_ptr<TopicCheckTask> imu_check_task_;
-  std::shared_ptr<TopicCheckTask> imu_dev_check_task_;
   std::shared_ptr<TopicCheckTask> touch_check_task_;
   std::shared_ptr<TopicCheckTask> button_check_task_;
   std::shared_ptr<TopicCheckTask> pressure_check_task_;
