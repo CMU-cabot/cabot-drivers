@@ -192,6 +192,7 @@ private:
 
   std::chrono::time_point<std::chrono::system_clock> last_topic_alive_time_{};
   std::shared_ptr<rclcpp::Time> imu_last_topic_time;
+  std::shared_ptr<rclcpp::Time> imu_dev_last_topic_time;
 
   // Diagnostic Updater
   std::shared_ptr<TopicCheckTask> imu_check_task_;

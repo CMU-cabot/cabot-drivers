@@ -662,7 +662,6 @@ std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_dev_data(
     get_clock()->get_clock_type());
 
   // Check if the difference of time between the current time and the imu stamp is bigger than 1 sec
-  /*
   rclcpp::Time now = this->get_clock()->now();
   RCLCPP_INFO_THROTTLE(
     get_logger(), *get_clock(), 1000, "time diff = %ld",
@@ -670,22 +669,21 @@ std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_dev_data(
   if (std::abs((now - imu_time).nanoseconds()) > 1e9) {
     RCLCPP_ERROR(
       get_logger(), "IMU timestamp jumps more than 1 second, drop a message\n"
-      "imu time: %ld > current time: %ld", imu_time.nanoseconds(), now.nanoseconds());
+      "imu_dev time: %ld > current time: %ld", imu_time.nanoseconds(), now.nanoseconds());
     return nullptr;
   }
-  if (imu_last_topic_time != nullptr) {
-    if (*imu_last_topic_time > imu_time) {
+  if (imu_dev_last_topic_time != nullptr) {
+    if (*imu_dev_last_topic_time > imu_time) {
       RCLCPP_ERROR_THROTTLE(
         get_logger(), *get_clock(), 1000,
         "IMU timestamp is not consistent, drop a message\n"
-        "last imu time: %ld > current imu time: %ld",
-        imu_last_topic_time->nanoseconds(), imu_time.nanoseconds());
+        "last imu_dev time: %ld > current imu time: %ld",
+        imu_dev_last_topic_time->nanoseconds(), imu_time.nanoseconds());
       return nullptr;
     }
   }
-  */
   imu_msg.header.frame_id = imu_frame_;
-  imu_last_topic_time = std::make_shared<rclcpp::Time>(imu_time);
+  imu_dev_last_topic_time = std::make_shared<rclcpp::Time>(imu_time);
   imu_msg.orientation.x = data2[0];
   imu_msg.orientation.y = data2[1];
   imu_msg.orientation.z = data2[2];
