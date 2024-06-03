@@ -390,14 +390,12 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     std::shared_ptr<sensor_msgs::msg::Imu> msg_dev = process_imu_dev_data(data);
     if (msg) {
       auto msg_adjusted = this->adjust_imu_message(msg);
-
       if (imu_pub_ == nullptr) {
         imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(10));
         imu_raw_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu_raw", rclcpp::QoS(10));
 	imu_dev_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu_dev", rclcpp::QoS(10));
         imu_check_task_ = std::make_shared<TopicCheckTask>(updater_, shared_from_this(), "IMU", 100);
       }
-
       if (this->publish_imu_raw_){
         imu_raw_pub_->publish(*msg);
       }
@@ -406,7 +404,6 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
       imu_check_task_->tick();
     }
   }
-
   if (cmd == 0x14) {  // calibration
     if (calibration_pub_ == nullptr) {
       calibration_pub_ = this->create_publisher<std_msgs::msg::UInt8MultiArray>(
@@ -618,16 +615,6 @@ std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_data(
   return std::make_shared<sensor_msgs::msg::Imu>(imu_msg);
 }
 
-uint64_t CaBotSerialNode::get_device_time() {
-  struct timeval tv;
-  if (gettimeofday(&tv, nullptr) < 0) {
-    perror("gettimeofday");
-    return 0;
-  }
-  uint64_t device_time = static_cast<uint64_t>(tv.tv_sec) * 1000000000ull + static_cast<uint64_t>(tv.tv_usec) * 1000ull;
-  return device_time;
-}
-
 std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_dev_data(
   const std::vector<uint8_t> & data)
 {
@@ -667,33 +654,38 @@ std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_dev_data(
   imu_msg.orientation_covariance[4] = 0.1;
   imu_msg.orientation_covariance[8] = 0.1;
 
-  uint64_t device_time_ns = get_device_time();
-  rclcpp::Time device_time(device_time_ns, RCL_SYSTEM_TIME);
-  imu_msg.header.stamp = device_time;
- 
+  // Convert float(32) to int(32)
+  imu_msg.header.stamp.sec = data1[0];
+  imu_msg.header.stamp.nanosec = data1[1];
+  rclcpp::Time imu_time = rclcpp::Time(
+    imu_msg.header.stamp.sec, imu_msg.header.stamp.nanosec,
+    get_clock()->get_clock_type());
+
   // Check if the difference of time between the current time and the imu stamp is bigger than 1 sec
+  /*
   rclcpp::Time now = this->get_clock()->now();
   RCLCPP_INFO_THROTTLE(
     get_logger(), *get_clock(), 1000, "time diff = %ld",
-    std::abs((now - imu_msg.header.stamp).nanoseconds()));
-  if (std::abs((now - imu_msg.header.stamp).nanoseconds()) > 1e9) {
+    std::abs((now - imu_time).nanoseconds()));
+  if (std::abs((now - imu_time).nanoseconds()) > 1e9) {
     RCLCPP_ERROR(
       get_logger(), "IMU timestamp jumps more than 1 second, drop a message\n"
-      "imu time: %ld > current time: %ld", imu_msg.header.stamp.nanosec, now.nanoseconds());
+      "imu time: %ld > current time: %ld", imu_time.nanoseconds(), now.nanoseconds());
     return nullptr;
   }
   if (imu_last_topic_time != nullptr) {
-    if (*imu_last_topic_time > imu_msg.header.stamp) {
+    if (*imu_last_topic_time > imu_time) {
       RCLCPP_ERROR_THROTTLE(
         get_logger(), *get_clock(), 1000,
         "IMU timestamp is not consistent, drop a message\n"
         "last imu time: %ld > current imu time: %ld",
-        imu_last_topic_time->nanoseconds(), imu_msg.header.stamp.nanosec);
+        imu_last_topic_time->nanoseconds(), imu_time.nanoseconds());
       return nullptr;
     }
   }
+  */
   imu_msg.header.frame_id = imu_frame_;
-  imu_last_topic_time = std::make_shared<rclcpp::Time>(imu_msg.header.stamp);
+  imu_last_topic_time = std::make_shared<rclcpp::Time>(imu_time);
   imu_msg.orientation.x = data2[0];
   imu_msg.orientation.y = data2[1];
   imu_msg.orientation.z = data2[2];

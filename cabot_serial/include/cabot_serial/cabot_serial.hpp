@@ -54,7 +54,6 @@
 #include <std_srvs/srv/set_bool.hpp>
 #include <diagnostic_updater/publisher.hpp>
 #include <diagnostic_updater/update_functions.hpp>
-#include <sys/time.h>
 
 #include "arduino_serial.hpp"
 
@@ -150,8 +149,6 @@ private:
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_data(const std::vector<uint8_t> & data);
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_dev_data(const std::vector<uint8_t> & data);
   std::shared_ptr<sensor_msgs::msg::Imu> adjust_imu_message(const std::shared_ptr<sensor_msgs::msg::Imu>& msg);
-
-  uint64_t get_device_time();
 
   std::shared_ptr<CaBotArduinoSerial> client_;
   std::shared_ptr<Serial> port_;
