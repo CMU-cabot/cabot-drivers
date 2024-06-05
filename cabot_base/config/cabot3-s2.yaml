@@ -8,10 +8,10 @@ pointcloud_to_laserscan_node:
 # substitute these parameters to hesai/hesai_lidar.yaml
 hesai_lidar:
   ros__parameters:
-    lidar_type: "PandarXT-16"
+    lidar_type: "PandarXT-32"
     frame_id: "velodyne" # use velodyne for compatibility
     timestamp_type: "realtime"
-    lidar_correction_file: "$(find-pkg-share hesai_lidar)/config/PandarXT-16.csv"
+    lidar_correction_file: "$(find-pkg-share hesai_lidar)/config/PandarXT-32.csv"
 
 cabot:
   cabot_handle_v2_node:
