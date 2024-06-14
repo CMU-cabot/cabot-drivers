@@ -1,7 +1,14 @@
 services:
   driver-base:
+    image: cmucal/cabot-driver
     build:
       context: ./docker/driver
+      additional_contexts:
+        - src=./
+      x-bake:
+        platforms:
+          - linux/amd64
+          - linux/arm64
     environment:
       - ROS_LOG_DIR
       - CABOT_MODEL
@@ -28,6 +35,19 @@ services:
       - /var/run/dbus:/var/run/dbus
 # bridge - if DDS use shared memory
       - /dev/shm:/dev/shm
+    privileged: true
+    devices:
+      - /dev/dri
+    network_mode: host
+    command:
+      - "/launch.sh"
+      - "-c"
+      - "driver"
+
+  driver-dev-base:
+    extends:
+      service: driver-base
+    volumes:
 # code from dependencies
       - ./cabot-common/cabot_common:/home/developer/driver_ws/src/cabot_common
       - ./cabot-common/cabot_msgs:/home/developer/driver_ws/src/cabot_msgs
@@ -41,25 +61,35 @@ services:
       - ./power_controller:/home/developer/driver_ws/src/power_controller
       - ./wireless_scanner_ros:/home/developer/driver_ws/src/wireless_scanner_ros
       - ./script:/home/developer/driver_ws/script
-    privileged: true
-    devices:
-      - /dev/dri
-    network_mode: host
-    command:
-      - "/launch.sh"
-      - "-c"
-      - "driver"
-
-  wifi_scan-base:
+  
+  driver-prod-base:
     extends:
       service: driver-base
+
+  wifi_scan-dev-base:
+    extends:
+      service: driver-dev-base
     command:
       - "/launch.sh"
       - "wifi-scan"
 
-  ble_scan-base:
+  wifi_scan-prod-base:
     extends:
-      service: driver-base
+      service: driver-prod-base
+    command:
+      - "/launch.sh"
+      - "wifi-scan"
+
+  ble_scan-dev-base:
+    extends:
+      service: driver-dev-base
+    command:
+      - "/launch.sh"
+      - "ble-scan"
+
+  ble_scan-prod-base:
+    extends:
+      service: driver-prod-base
     command:
       - "/launch.sh"
       - "ble-scan"

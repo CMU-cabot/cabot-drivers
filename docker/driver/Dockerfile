@@ -20,7 +20,7 @@
 
 ARG ROS_DISTRO
 ARG PREFIX=cabot
-ARG FROM_IMAGE=${PREFIX}__jammy-humble-custom-mesa
+ARG FROM_IMAGE=cmucal/cabot-base:humble-base-custom-mesa
 
 # build underlay
 FROM ${FROM_IMAGE} as cache
@@ -54,7 +54,7 @@ RUN . /opt/custom_ws/install/setup.sh && \
 	colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
 
 
-FROM ${FROM_IMAGE}
+FROM ${FROM_IMAGE} as build
 ENV ROS_DISTRO=humble
 
 ARG TZ=UTC
@@ -122,3 +122,22 @@ USER $USERNAME
 ENV HOME /home/$USERNAME
 
 WORKDIR $HOME/driver_ws
+
+FROM build as cache_ws
+
+COPY --from=src ./cabot-common/cabot_common $HOME/driver_ws/src/cabot_common
+COPY --from=src ./cabot-common/cabot_msgs $HOME/driver_ws/src/cabot_msgs
+COPY --from=src ./cabot-common/docker/humble-custom/people $HOME/driver_ws/src/people
+COPY --from=src ./cabot-description/cabot_description $HOME/driver_ws/src/cabot_description
+COPY --from=src ./cabot_base $HOME/driver_ws/src/cabot_base
+COPY --from=src ./cabot_serial $HOME/driver_ws/src/cabot_serial
+COPY --from=src ./motor_controller $HOME/driver_ws/src/motor_controller
+COPY --from=src ./wireless_scanner_ros $HOME/driver_ws/src/wireless_scanner_ros
+COPY --from=src ./script $HOME/driver_ws/script
+
+RUN /ros_entrypoint.sh /launch.sh build
+
+FROM build as final
+
+COPY --from=cache_ws $HOME/driver_ws/install $HOME/driver_ws/install
+COPY --from=cache_ws $HOME/driver_ws/script $HOME/driver_ws/script

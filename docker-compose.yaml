@@ -2,20 +2,20 @@ services:
   driver:
     extends:
       file: docker-compose-base.yaml
-      service: driver-base
+      service: driver-dev-base
     volumes:
       - ./docker/home:/home/developer/
 
   wifi_scan:
     extends:
       file: docker-compose-base.yaml
-      service: wifi_scan-base
+      service: wifi_scan-dev-base
     volumes:
       - ./docker/home:/home/developer/
 
   ble_scan:
     extends:
       file: docker-compose-base.yaml
-      service: ble_scan-base
+      service: ble_scan-dev-base
     volumes:
       - ./docker/home:/home/developer/
