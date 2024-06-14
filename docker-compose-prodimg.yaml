@@ -1,0 +1,21 @@
+services:
+  driver:
+    extends:
+      file: docker-compose-base.yaml
+      service: driver-prod-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros
+
+  wifi_scan:
+    extends:
+      file: docker-compose-base.yaml
+      service: wifi_scan-prod-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros
+
+  ble_scan:
+    extends:
+      file: docker-compose-base.yaml
+      service: ble_scan-prod-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros
