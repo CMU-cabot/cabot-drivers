@@ -1,14 +1,17 @@
 services:
   driver-base:
-    image: cmucal/cabot-driver
     build:
       context: ./docker/driver
       additional_contexts:
         - src=./
       x-bake:
+        tags:
+          - ${REGISTRY:-cmucal}/cabot-driver
         platforms:
           - linux/amd64
           - linux/arm64
+        output:
+          - type=registry
     environment:
       - ROS_LOG_DIR
       - CABOT_MODEL
@@ -57,6 +60,7 @@ services:
       - ./script:/home/developer/driver_ws/script
   
   driver-prod-base:
+    image: cmucal/cabot-driver      # only for prodimg configuration
     extends:
       service: driver-base
 
