@@ -19,8 +19,8 @@
 # SOFTWARE.
 
 ARG ROS_DISTRO
-ARG PREFIX=cabot
-ARG FROM_IMAGE=cmucal/cabot-base:humble-base-custom-mesa
+ARG BASE_IMAGE=cabot-base
+ARG FROM_IMAGE=cmucal/${BASE_IMAGE}:humble-base-custom-mesa
 
 FROM ${FROM_IMAGE} as build
 ENV ROS_DISTRO=humble
