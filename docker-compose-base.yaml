@@ -4,6 +4,8 @@ services:
       context: ./docker/driver
       additional_contexts:
         - src=./
+      args:
+        - BASE_IMAGE=${BASE_IMAGE}
       x-bake:
         tags:
           - ${REGISTRY:-cmucal}/cabot-driver
