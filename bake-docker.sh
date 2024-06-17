@@ -36,13 +36,16 @@ function help {
     echo "-l                    build using local registry"
     echo "-P <platform>         specify platform"
     echo "                      build linux/arm64 and linux/amd64 if not specified"
+    echo "-t <tags>             additional tags"
 }
 
 platform=
 base_name=cabot-base
+image_name=cabot-driver
 local=0
+tags=
 
-while getopts "hb:ilP:" arg; do
+while getopts "hb:ilP:t:" arg; do
     case $arg in
     h)
         help
@@ -65,6 +68,9 @@ while getopts "hb:ilP:" arg; do
     P)
         platform=${OPTARG}
         ;;
+    t)
+        tags=${OPTARG}
+	;;
     esac
 done
 shift $((OPTIND-1))
@@ -88,6 +94,8 @@ if [[ $local -eq 1 ]]; then
             -p 127.0.0.1:9092:5000 \
             registry:2.7
     fi
+else
+    export REGISTRY=cmucal
 fi
 
 # setup multiplatform builder
@@ -105,14 +113,24 @@ if [[ -z $(docker buildx ls | grep "mybuilder\*") ]]; then
     fi
 fi
 
-# bake
-export BASE_IMAGE=$base_name
+# tag option
+tag_option=""
+IFS=',' read -r -a tag_array <<< "$tags"
+tag_option="--set driver.tags='["
+for tag in "${tag_array[@]}"; do
+    tag_option+="\"${REGISTRY}/${image_name}:${tag}\","
+done
+tag_option="${tag_option%,}]'"
+
+# platform option
+platform_option=
 if [[ -n $platform ]]; then
-    com="docker buildx bake -f docker-compose.yaml --set *.platform=\"$platform\" driver $@"
-else
-    com="docker buildx bake -f docker-compose.yaml driver $@"
+    platform_option="--set *.platform=\"$platform\""
 fi
 
+# bake
+com="docker buildx bake -f docker-compose.yaml $platform_option $tag_option driver $@"
+export BASE_IMAGE=$base_name
 echo $com
 eval $com
 
