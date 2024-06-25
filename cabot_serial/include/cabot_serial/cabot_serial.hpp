@@ -147,6 +147,7 @@ private:
     const std_srvs::srv::SetBool::Request::SharedPtr req,
     std_srvs::srv::SetBool::Response::SharedPtr res);
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_data(const std::vector<uint8_t> & data);
+  std::shared_ptr<sensor_msgs::msg::Imu> process_imu_dev_data(const std::vector<uint8_t> & data);
   std::shared_ptr<sensor_msgs::msg::Imu> adjust_imu_message(const std::shared_ptr<sensor_msgs::msg::Imu>& msg);
 
   std::shared_ptr<CaBotArduinoSerial> client_;
@@ -174,6 +175,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr button_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_dev_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_raw_pub_;
   rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr calibration_pub_;
   rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
@@ -190,6 +192,7 @@ private:
 
   std::chrono::time_point<std::chrono::system_clock> last_topic_alive_time_{};
   std::shared_ptr<rclcpp::Time> imu_last_topic_time;
+  std::shared_ptr<rclcpp::Time> imu_dev_last_topic_time;
 
   // Diagnostic Updater
   std::shared_ptr<TopicCheckTask> imu_check_task_;
