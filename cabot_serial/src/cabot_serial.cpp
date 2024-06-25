@@ -572,8 +572,6 @@ std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_data(
   imu_msg.orientation_covariance[8] = 0.1;
 
   // Convert float(32) to int(32)
-  //imu_msg.header.stamp.sec = data1[0];
-  //imu_msg.header.stamp.nanosec = data1[1];
   imu_msg.header.stamp = get_clock()->now();
   rclcpp::Time imu_time = rclcpp::Time(
     imu_msg.header.stamp.sec, imu_msg.header.stamp.nanosec,
