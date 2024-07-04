@@ -13,19 +13,33 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 
-add_library(cabot_handle_v3_lib SHARED
-  src/cabot/cabot_handle_v3_node.cpp
-  src/cabot/handle_v3.cpp
-  src/cabot/event.cpp
-)
-
-ament_target_dependencies(cabot_handle_v3_lib
+set(dependencies
   rclcpp
   rclcpp_components
   std_msgs
   sensor_msgs
   geometry_msgs
   tf2
+)
+
+add_library(cabot_handle_v2_lib SHARED
+  src/cabot/cabot_handle_v2_node.cpp
+  src/cabot/handle_v2.cpp
+  src/cabot/event.cpp
+)
+
+add_library(cabot_handle_v3_lib SHARED
+  src/cabot/cabot_handle_v3_node.cpp
+  src/cabot/handle_v3.cpp
+  src/cabot/event.cpp
+)
+
+ament_target_dependencies(cabot_handle_v2_lib
+  ${dependencies}
+)
+
+ament_target_dependencies(cabot_handle_v3_lib
+  ${dependencies}
 )
 
 if(BUILD_TESTING)
@@ -47,12 +61,17 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+rclcpp_components_register_node(cabot_handle_v2_lib
+  PLUGIN "CaBotHandleV2Node"
+  EXECUTABLE cabot_handle_v2_node
+)
 rclcpp_components_register_node(cabot_handle_v3_lib
   PLUGIN "CaBotHandleV3Node"
   EXECUTABLE cabot_handle_v3_node
 )
 
 install(TARGETS
+  cabot_handle_v2_lib
   cabot_handle_v3_lib
   DESTINATION lib
 )
