@@ -231,6 +231,7 @@ if __name__ == "__main__":
     sub = node.create_subscription(String, "/wireless/beacon_scan_str", ble_scan_str_callback, 10)
 
     def timer_callback():
+        global beacon_num
         json_obj = accum.get_average()
         accum.clear()
 

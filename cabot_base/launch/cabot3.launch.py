@@ -75,9 +75,9 @@ def generate_launch_description():
     imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
 
     # switch lidar node based on model_name
-    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-s2", "cabot3-m1", "cabot3-m2"]'])
+    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
     use_velodyne = NotSubstitution(use_hesai)
-    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-s2", "cabot3-m1", "cabot3-m2"]'])
+    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
