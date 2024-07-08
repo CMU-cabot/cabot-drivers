@@ -102,7 +102,8 @@ public:
   };
   Handle(
     CaBotHandleV3Node * node, std::function<void(const std::map<std::string,
-    std::string> &)> eventListener, const std::vector<std::string> & buttonKeys);
+    std::string> &)> eventListener, const std::vector<std::string> & buttonKeys,
+    const int & vibratorType);
   void executeStimulus(int index);
   static const std::vector<std::string> stimuli_names;
 
@@ -159,6 +160,7 @@ private:
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr turn_type_sub_;
   rclcpp::Time last_up[9];
   rclcpp::Time last_dwn[9];
+  int vibratorType_;
   int up_count[9];
   bool btn_dwn[9];
   bool is_enabled_change_servo_pos_by_yaw_;

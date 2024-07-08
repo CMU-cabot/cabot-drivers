@@ -51,6 +51,7 @@ public:
   std::function<void(const std::map<std::string, std::string> &)> eventListener_callback = nullptr;
   std::function<void(const std_msgs::msg::Int8::UniquePtr)> notification_callback = nullptr;
   std::vector<std::string> button_keys_ = {};
+  int vibrator_type_;
   void eventListener(const std::map<std::string, std::string> & msg);
   void notificationCallback(const std_msgs::msg::Int8::UniquePtr & msg);
   void printStackTrace();

@@ -73,6 +73,7 @@ def generate_launch_description():
     imu_accel_bias = LaunchConfiguration('imu_accel_bias')
     imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
     use_directional_indicator = LaunchConfiguration('use_directional_indicator')
+    vibrator_type = LaunchConfiguration('vibrator_type')
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -162,6 +163,11 @@ def generate_launch_description():
             'use_directional_indicator',
             default_value=EnvironmentVariable('CABOT_USE_DIRECTIONAL_INDICATOR', default_value='false'),
             description='If true, the directional indicator on the handle is enabled'
+        ),
+        DeclareLaunchArgument(
+            'vibrator_type',
+            default_value=EnvironmentVariable('CABOT_VIBRATOR_TYPE', default_value='1'),
+            description='1: ERM (Eccentric Rotating Mass), 2: LRA (Linear Resonant Actuator)'
         ),
 
         # Kind error message
@@ -262,7 +268,13 @@ def generate_launch_description():
                         plugin='CaBotHandleV3Node',
                         namespace='/cabot',
                         name='cabot_handle_v3_node',
-                        parameters=[*param_files, {'use_sim_time': use_sim_time}],
+                        parameters=[
+                            *param_files,
+                            {
+                                'use_sim_time': use_sim_time,
+                                'vibrator_type': vibrator_type
+                            }
+                        ],
                     ),
                 ]
             ),

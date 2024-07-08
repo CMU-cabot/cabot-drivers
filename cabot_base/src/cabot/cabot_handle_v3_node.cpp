@@ -33,7 +33,7 @@ std::shared_ptr<CaBotHandleV3Node> node_;
 
 CaBotHandleV3Node::CaBotHandleV3Node(const rclcpp::NodeOptions & options)
 : rclcpp::Node("cabot_handle_v3_node", rclcpp::NodeOptions(options).use_intra_process_comms(true)),
-  handle_(nullptr), button_keys_({}), event_pub_(nullptr)
+  handle_(nullptr), button_keys_({}), event_pub_(nullptr), vibrator_type_(1)
 {
   event_pub_ = create_publisher<std_msgs::msg::String>("/cabot/event", rclcpp::QoS(10));
   button_keys_ = declare_parameter("buttons", std::vector<std::string>{""});
@@ -45,7 +45,10 @@ CaBotHandleV3Node::CaBotHandleV3Node(const rclcpp::NodeOptions & options)
   eventListener_callback = [this](const std::map<std::string, std::string> & msg) {
       this->eventListener(msg);
     };
-  handle_ = std::make_unique<Handle>(this, eventListener_callback, button_keys_);
+  declare_parameter("vibrator_type", vibrator_type_);
+  vibrator_type_ = get_parameter("vibrator_type").as_int();
+  RCLCPP_INFO(get_logger(), "vibrator_type: %d", vibrator_type_);
+  handle_ = std::make_unique<Handle>(this, eventListener_callback, button_keys_, vibrator_type_);
   RCLCPP_INFO(get_logger(), "buttons: %s", button_keys_str.c_str());
   bool no_vibration = declare_parameter("no_vibration", false);
   RCLCPP_INFO(get_logger(), "no_vibration = %s", no_vibration ? "true" : "false");

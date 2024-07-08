@@ -50,9 +50,9 @@ std::string Handle::get_name(int stimulus)
 Handle::Handle(
   CaBotHandleV3Node * node,
   std::function<void(const std::map<std::string, std::string> &)> eventListener,
-  const std::vector<std::string> & buttonKeys)
+  const std::vector<std::string> & buttonKeys, const int & vibratorType)
 : node_(node), eventListener_(std::move(eventListener)), buttonKeys_(buttonKeys),
-  logger_(rclcpp::get_logger("Handle_v3"))
+  vibratorType_(vibratorType), logger_(rclcpp::get_logger("Handle_v3"))
 {
   vibrator1_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("vibrator1", 100);
   vibrator2_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("vibrator2", 100);
