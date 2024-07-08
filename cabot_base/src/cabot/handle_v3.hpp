@@ -48,37 +48,59 @@ class CaBotHandleV3Node;
 
 namespace VibConst
 {
-  static constexpr uint16_t FREQ = 160;
-  namespace Power {
-    static constexpr uint8_t DEFAULT = 48;
-    static constexpr uint8_t CAUTION = 60;
-    static constexpr uint8_t WAITING = 36;
+  namespace ERM {
+    namespace Duration {
+      static constexpr unsigned int TURN = 150;
+      static constexpr unsigned int ABOUT_TURN = 400;
+      static constexpr unsigned int DEVIATION = 50;
+      static constexpr unsigned int SINGLE_VIBRATION = 400;
+      static constexpr unsigned int BUTTON_CLICK = 200;
+      static constexpr unsigned int BUTTON_HOLDDOWN = 200;
+      static constexpr unsigned int CAUTION = 1000;
+      static constexpr unsigned int WAITING = 200;
+    }
+    namespace Sleep {
+      static constexpr unsigned int DEFAULT = 150;
+      static constexpr unsigned int CAUTION = 0;
+      static constexpr unsigned int WAITING = 800;
+    }
+    namespace NumVibrations {
+      static constexpr unsigned int TURN = 3;
+      static constexpr unsigned int ABOUT_TURN = 2;
+      static constexpr unsigned int DEVIATION = 2;
+      static constexpr unsigned int CONFIRMATION = 1;
+      static constexpr unsigned int BUTTON_CLICK = 1;
+      static constexpr unsigned int BUTTON_HOLDDOWN = 1;
+      static constexpr unsigned int CAUTION = 1;
+      static constexpr unsigned int WAITING = 1;
+    }
   }
-  namespace Duration {
-    static constexpr unsigned int TURN = 150;
-    static constexpr unsigned int ABOUT_TURN = 400;
-    static constexpr unsigned int DEVIATION = 50;
-    static constexpr unsigned int SINGLE_VIBRATION = 400;
-    static constexpr unsigned int BUTTON_CLICK = 200;
-    static constexpr unsigned int BUTTON_HOLDDOWN = 200;
-    static constexpr unsigned int CAUTION = 1000;
-    static constexpr unsigned int WAITING = 200;
-  }
-  namespace Sleep
-  {
-    static constexpr unsigned int DEFAULT = 150;
-    static constexpr unsigned int CAUTION = 0;
-    static constexpr unsigned int WAITING = 800;
-  }
-  namespace NumVibrations {
-    static constexpr unsigned int TURN = 3;
-    static constexpr unsigned int ABOUT_TURN = 2;
-    static constexpr unsigned int DEVIATION = 2;
-    static constexpr unsigned int CONFIRMATION = 1;
-    static constexpr unsigned int BUTTON_CLICK = 1;
-    static constexpr unsigned int BUTTON_HOLDDOWN = 1;
-    static constexpr unsigned int CAUTION = 1;
-    static constexpr unsigned int WAITING = 1;
+  namespace LRA {
+    namespace Duration {
+      static constexpr unsigned int TURN = 150;
+      static constexpr unsigned int ABOUT_TURN = 400;
+      static constexpr unsigned int DEVIATION = 50;
+      static constexpr unsigned int SINGLE_VIBRATION = 400;
+      static constexpr unsigned int BUTTON_CLICK = 50;
+      static constexpr unsigned int BUTTON_HOLDDOWN = 100;
+      static constexpr unsigned int CAUTION = 1000;
+      static constexpr unsigned int WAITING = 20;
+    }
+    namespace Sleep {
+      static constexpr unsigned int DEFAULT = 150;
+      static constexpr unsigned int CAUTION = 0;
+      static constexpr unsigned int WAITING = 980;
+    }
+    namespace NumVibrations {
+      static constexpr unsigned int TURN = 3;
+      static constexpr unsigned int ABOUT_TURN = 2;
+      static constexpr unsigned int DEVIATION = 2;
+      static constexpr unsigned int CONFIRMATION = 1;
+      static constexpr unsigned int BUTTON_CLICK = 1;
+      static constexpr unsigned int BUTTON_HOLDDOWN = 1;
+      static constexpr unsigned int CAUTION = 1;
+      static constexpr unsigned int WAITING = 1;
+    }
   }
 }
 
@@ -111,6 +133,10 @@ private:
   enum turn_type_
   {
     NORMAL = 1, AVOIDING = 2
+  };
+  enum vibrator_type_
+  {
+    ERM = 1, LRA = 2
   };
   void timer_callback();
   void vib_waiting_timer_callback();

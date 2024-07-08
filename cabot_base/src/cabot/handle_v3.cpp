@@ -396,65 +396,115 @@ void Handle::resetServoPosition()
 
 void Handle::vibrateLeftTurn()
 {
-  vibratePattern(vibrator3_pub_, VibConst::NumVibrations::TURN, VibConst::Duration::TURN, VibConst::Sleep::DEFAULT);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator3_pub_, VibConst::ERM::NumVibrations::TURN, VibConst::ERM::Duration::TURN, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator3_pub_, VibConst::LRA::NumVibrations::TURN, VibConst::LRA::Duration::TURN, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::vibrateRightTurn()
 {
-  vibratePattern(vibrator4_pub_, VibConst::NumVibrations::TURN, VibConst::Duration::TURN, VibConst::Sleep::DEFAULT);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator4_pub_, VibConst::ERM::NumVibrations::TURN, VibConst::ERM::Duration::TURN, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator4_pub_, VibConst::LRA::NumVibrations::TURN, VibConst::LRA::Duration::TURN, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::vibrateLeftDeviation()
 {
-  vibratePattern(vibrator3_pub_, VibConst::NumVibrations::DEVIATION, VibConst::Duration::DEVIATION, VibConst::Sleep::DEFAULT);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator3_pub_, VibConst::ERM::NumVibrations::DEVIATION, VibConst::ERM::Duration::DEVIATION, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator3_pub_, VibConst::LRA::NumVibrations::DEVIATION, VibConst::LRA::Duration::DEVIATION, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::vibrateRightDeviation()
 {
-  vibratePattern(vibrator4_pub_, VibConst::NumVibrations::DEVIATION, VibConst::Duration::DEVIATION, VibConst::Sleep::DEFAULT);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator4_pub_, VibConst::ERM::NumVibrations::DEVIATION, VibConst::ERM::Duration::DEVIATION, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator4_pub_, VibConst::LRA::NumVibrations::DEVIATION, VibConst::LRA::Duration::DEVIATION, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::vibrateFront()
 {
-  vibratePattern(vibrator1_pub_, VibConst::NumVibrations::CONFIRMATION, VibConst::Duration::SINGLE_VIBRATION, VibConst::Sleep::DEFAULT);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator1_pub_, VibConst::ERM::NumVibrations::CONFIRMATION, VibConst::ERM::Duration::SINGLE_VIBRATION, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator1_pub_, VibConst::LRA::NumVibrations::CONFIRMATION, VibConst::LRA::Duration::SINGLE_VIBRATION, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::vibrateAboutLeftTurn()
 {
-  vibratePattern(vibrator3_pub_, VibConst::NumVibrations::ABOUT_TURN, VibConst::Duration::ABOUT_TURN, VibConst::Sleep::DEFAULT);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator3_pub_, VibConst::ERM::NumVibrations::ABOUT_TURN, VibConst::ERM::Duration::ABOUT_TURN, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator3_pub_, VibConst::LRA::NumVibrations::ABOUT_TURN, VibConst::LRA::Duration::ABOUT_TURN, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::vibrateAboutRightTurn()
 {
-  vibratePattern(vibrator4_pub_, VibConst::NumVibrations::ABOUT_TURN, VibConst::Duration::ABOUT_TURN, VibConst::Sleep::DEFAULT);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator4_pub_, VibConst::ERM::NumVibrations::ABOUT_TURN, VibConst::ERM::Duration::ABOUT_TURN, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator4_pub_, VibConst::LRA::NumVibrations::ABOUT_TURN, VibConst::LRA::Duration::ABOUT_TURN, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::vibrateBack()
 {
-  vibratePattern(vibrator2_pub_, VibConst::NumVibrations::CONFIRMATION, VibConst::Duration::SINGLE_VIBRATION, VibConst::Sleep::DEFAULT);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator2_pub_, VibConst::ERM::NumVibrations::CONFIRMATION, VibConst::ERM::Duration::SINGLE_VIBRATION, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator2_pub_, VibConst::LRA::NumVibrations::CONFIRMATION, VibConst::LRA::Duration::SINGLE_VIBRATION, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::vibrateButtonClick()
 {
-  vibratePattern(vibrator1_pub_, VibConst::NumVibrations::BUTTON_CLICK, VibConst::Duration::BUTTON_CLICK, VibConst::Sleep::DEFAULT);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator1_pub_, VibConst::ERM::NumVibrations::BUTTON_CLICK, VibConst::ERM::Duration::BUTTON_CLICK, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator1_pub_, VibConst::LRA::NumVibrations::BUTTON_CLICK, VibConst::LRA::Duration::BUTTON_CLICK, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::vibrateButtonHolddown()
 {
-  vibratePattern(vibrator1_pub_, VibConst::NumVibrations::BUTTON_HOLDDOWN, VibConst::Duration::BUTTON_HOLDDOWN, VibConst::Sleep::DEFAULT);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator1_pub_, VibConst::ERM::NumVibrations::BUTTON_HOLDDOWN, VibConst::ERM::Duration::BUTTON_HOLDDOWN, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator1_pub_, VibConst::LRA::NumVibrations::BUTTON_HOLDDOWN, VibConst::LRA::Duration::BUTTON_HOLDDOWN, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::vibrateCautionPattern()
 {
-  vibratePattern(vibrator1_pub_, VibConst::NumVibrations::CAUTION, VibConst::Duration::CAUTION, VibConst::Sleep::CAUTION);
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator1_pub_, VibConst::ERM::NumVibrations::CAUTION, VibConst::ERM::Duration::CAUTION, VibConst::ERM::Sleep::CAUTION);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator1_pub_, VibConst::LRA::NumVibrations::CAUTION, VibConst::LRA::Duration::CAUTION, VibConst::LRA::Sleep::CAUTION);
+  }
 }
 
 void Handle::vibrateWaitingPattern()
 {
   Vibration vibration;
-  vibration.numberVibrations = VibConst::NumVibrations::WAITING;
-  vibration.duration = VibConst::Duration::WAITING;
-  vibration.sleep = VibConst::Sleep::WAITING;
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibration.numberVibrations = VibConst::ERM::NumVibrations::WAITING;
+    vibration.duration = VibConst::ERM::Duration::WAITING;
+    vibration.sleep = VibConst::ERM::Sleep::WAITING;
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibration.numberVibrations = VibConst::LRA::NumVibrations::WAITING;
+    vibration.duration = VibConst::LRA::Duration::WAITING;
+    vibration.sleep = VibConst::LRA::Sleep::WAITING;
+  }
   vibration.vibratorPub = vibrator1_pub_;
   vibration_queue_.push_back(vibration);
 }
