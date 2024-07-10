@@ -23,6 +23,14 @@ cabot:
         - BUTTON_LEFT
         - BUTTON_RIGHT
 
+  cabot_handle_v3_node:
+    ros__parameters:
+      buttons:
+        - BUTTON_UP
+        - BUTTON_DOWN
+        - BUTTON_LEFT
+        - BUTTON_RIGHT
+
   cabot_serial:
     ros__parameters:
       port: /dev/ttyESP32
