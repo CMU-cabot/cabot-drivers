@@ -3,6 +3,8 @@
 - python/cpp implementation to communicate with CaBot's microcontroller
     - [cabot-arduino](https://github.com/CMU-cabot/cabot-arduino)
         - Single microcontroller configuration
+    - [cabot-arduino-ace](https://github.com/CMU-cabot/cabot-arduino-ace)
+        - Two microcontrollers configuration (Sensor + Handle)
     - [cabot-arduino-di](https://github.com/CMU-cabot/cabot-arduino-di)
         - Two microcontrollers configuration (Sensor + Handle)
 
@@ -51,17 +53,17 @@
 - **/touch_raw** (std_msgs/msg/Int16): touch sensor's raw value (for debug) - 50Hz
 - **/touch_speed_switched** (float): speed control by handle - see above - 50Hz
 - **/wifi** (std_msgs/msg/String): wifi scan string - depends on how often WiFi signal is scanned (only with ESP32 microcontroller)
-- **/servo_pos** (std_msgs/msg/Int16): current servo position - 50Hz
+- **/servo_pos** (std_msgs/msg/Int16): current position of directional indicator - 50Hz (only with cabot_handle_v3_node)
 
 ### Subscribers
 
-- **/servo_target** (std_msgs/msg/Int16): servo position (-90 ~ +90)
-- **/servo_free** (std_msgs/msg/Bool): `true` -> set free, `false` -> no operation
 - **/vibrator1** (std_msgs/msg/UInt8): front
 - **/vibrator2** (std_msgs/msg/UInt8): back (not used)
 - **/vibrator3** (std_msgs/msg/UInt8): left
 - **/vibrator4** (std_msgs/msg/UInt8): right
     - if you publish a `value`, it vibrates corresponding vibrator for `value` x 10 milliseconds (0 - 2550 milliseconds)
+- **/servo_target** (std_msgs/msg/Int16): if you publish a `value`, it rotates directional indicator (value: -90 ~ +90, only with cabot_handle_v3_node)
+- **/servo_free** (std_msgs/msg/Bool): `true` -> set free, `false` -> no operation (only with cabot_handle_v3_node)
 
 ## Test
 
@@ -82,7 +84,7 @@ ros2 topic pub -1 /vibrator3 std_msgs/msg/UInt8 "data: 10"
 ros2 topic pub -1 /vibrator4 std_msgs/msg/UInt8 "data: 10"
 ```
 
-- check if the servo (direction indicator) rotates
+- check if the directional indicator rotates
 ```
 ros2 topic pub -1 /servo_target std_msgs/msg/Int16 "data: 90"
 ros2 topic pub -1 /servo_target std_msgs/msg/Int16 "data: -90"
