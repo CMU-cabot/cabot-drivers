@@ -29,8 +29,8 @@ change from ROS1: each model had own launch file in ROS1, but ROS2 launch will h
   - cabot3-s1    (AIS-2023, Consortium)
   - cabot3-ace2  (AIS-2023, Miraikan)
   - cabot3-i1    (AIS-2024, Consortium)
-  - cabot3-m1    (AIS-2024, Consortium)
-  - cabot3-m2    (AIS-2024, Consortium)
+  - cabot3-m1    (AIS-2024, Miraikan)
+  - cabot3-m2    (AIS-2024, Miraikan)
 """
 from launch.logging import launch_config
 
