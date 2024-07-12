@@ -1,4 +1,5 @@
 # Copyright (c) 2022, 2023  Carnegie Mellon University
+# Copyright (c) 2024  ALPS ALPINE CO., LTD.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +28,9 @@ change from ROS1: each model had own launch file in ROS1, but ROS2 launch will h
 - Known Model
   - cabot3-s1    (AIS-2023, Consortium)
   - cabot3-ace2  (AIS-2023, Miraikan)
+  - cabot3-i1    (AIS-2024, Consortium)
+  - cabot3-m1    (AIS-2024, Miraikan)
+  - cabot3-m2    (AIS-2024, Miraikan)
 """
 from launch.logging import launch_config
 
@@ -73,11 +77,13 @@ def generate_launch_description():
     odrive_right_serial_number = LaunchConfiguration('odrive_right_serial_number')
     imu_accel_bias = LaunchConfiguration('imu_accel_bias')
     imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
+    use_directional_indicator = LaunchConfiguration('use_directional_indicator')
+    vibrator_type = LaunchConfiguration('vibrator_type')
 
     # switch lidar node based on model_name
-    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1"]'])
+    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
     use_velodyne = NotSubstitution(use_hesai)
-    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1"]'])
+    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -172,6 +178,16 @@ def generate_launch_description():
             'imu_gyro_bias',
             default_value=EnvironmentVariable('CABOT_IMU_GYRO_BIAS', default_value='[0.0, 0.0, 0.0]'),
             description='An array of three values for adjusting imu angular velocity'
+        ),
+        DeclareLaunchArgument(
+            'use_directional_indicator',
+            default_value=EnvironmentVariable('CABOT_USE_DIRECTIONAL_INDICATOR', default_value='false'),
+            description='If true, the directional indicator on the handle is enabled'
+        ),
+        DeclareLaunchArgument(
+            'vibrator_type',
+            default_value=EnvironmentVariable('CABOT_VIBRATOR_TYPE', default_value='1'),
+            description='1: ERM (Eccentric Rotating Mass), 2: LRA (Linear Resonant Actuator)'
         ),
 
         # Kind error message
@@ -288,11 +304,27 @@ def generate_launch_description():
             # CaBot related
             Node(
                 package='cabot_base',
+                executable='cabot_handle_v3_node',
+                namespace='/cabot',
+                name='cabot_handle_v3_node',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {
+                        'use_sim_time': use_sim_time,
+                        'vibrator_type': vibrator_type
+                    }
+                ],
+                condition=IfCondition(use_directional_indicator),
+            ),
+            Node(
+                package='cabot_base',
                 executable='cabot_handle_v2_node',
                 namespace='/cabot',
                 name='cabot_handle_v2_node',
                 output=output,
                 parameters=[*param_files, {'use_sim_time': use_sim_time}],
+                condition=UnlessCondition(use_directional_indicator),
             ),
 
             # Microcontroller (Arduino - gt1/gtm or ESP32 - ace)

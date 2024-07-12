@@ -1,5 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2023  Miraikan and Carnegie Mellon University
+ * Copyright (c) 2024  ALPS ALPINE CO., LTD.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -142,6 +143,9 @@ private:
   }
   void vib_loop();
   void vib_callback(const uint8_t cmd, const std_msgs::msg::UInt8::UniquePtr msg);
+  void handle_callback(const uint8_t cmd, const std_msgs::msg::UInt8::SharedPtr msg);
+  void handle_callback(const uint8_t cmd, const std_msgs::msg::Int16::SharedPtr msg);
+  void handle_callback(const uint8_t cmd, const std_msgs::msg::Bool::SharedPtr msg);
   void touch_callback(std_msgs::msg::Int16 & msg);
   void set_touch_speed_active_mode(
     const std_srvs::srv::SetBool::Request::SharedPtr req,
@@ -185,6 +189,9 @@ private:
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vib2_sub_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vib3_sub_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vib4_sub_;
+  rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr servo_pos_pub_;
+  rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr servo_target_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr servo_free_sub_;
 
   rclcpp::TimerBase::SharedPtr vib_timer_;
   rclcpp::TimerBase::SharedPtr run_timer_;

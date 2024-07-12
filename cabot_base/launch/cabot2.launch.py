@@ -1,4 +1,5 @@
 # Copyright (c) 2022, 2023  Carnegie Mellon University
+# Copyright (c) 2024  ALPS ALPINE CO., LTD.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -71,6 +72,8 @@ def generate_launch_description():
     use_standalone_wifi_scanner = LaunchConfiguration('use_standalone_wifi_scanner')
     imu_accel_bias = LaunchConfiguration('imu_accel_bias')
     imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
+    use_directional_indicator = LaunchConfiguration('use_directional_indicator')
+    vibrator_type = LaunchConfiguration('vibrator_type')
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -155,6 +158,16 @@ def generate_launch_description():
             'imu_gyro_bias',
             default_value=EnvironmentVariable('CABOT_IMU_GYRO_BIAS', default_value='[0.0, 0.0, 0.0]'),
             description='An array of three values for adjusting imu angular velocity'
+        ),
+        DeclareLaunchArgument(
+            'use_directional_indicator',
+            default_value=EnvironmentVariable('CABOT_USE_DIRECTIONAL_INDICATOR', default_value='false'),
+            description='If true, the directional indicator on the handle is enabled'
+        ),
+        DeclareLaunchArgument(
+            'vibrator_type',
+            default_value=EnvironmentVariable('CABOT_VIBRATOR_TYPE', default_value='1'),
+            description='1: ERM (Eccentric Rotating Mass), 2: LRA (Linear Resonant Actuator)'
         ),
 
         # Kind error message
@@ -247,7 +260,27 @@ def generate_launch_description():
             ),
 
             LoadComposableNodes(
-                target_container= '/cabot_nodes_container',
+                target_container='/cabot_nodes_container',
+                condition=IfCondition(use_directional_indicator),
+                composable_node_descriptions=[
+                    ComposableNode(
+                        package='cabot_base',
+                        plugin='CaBotHandleV3Node',
+                        namespace='/cabot',
+                        name='cabot_handle_v3_node',
+                        parameters=[
+                            *param_files,
+                            {
+                                'use_sim_time': use_sim_time,
+                                'vibrator_type': vibrator_type
+                            }
+                        ],
+                    ),
+                ]
+            ),
+            LoadComposableNodes(
+                target_container='/cabot_nodes_container',
+                condition=UnlessCondition(use_directional_indicator),
                 composable_node_descriptions=[
                     # CaBot related
                     ComposableNode(
