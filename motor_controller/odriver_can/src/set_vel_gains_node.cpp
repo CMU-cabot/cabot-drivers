@@ -40,31 +40,43 @@ void sendCanFrame(int can_socket, can_frame &frame) {
 
 class CanSenderNode : public rclcpp::Node {
 public:
-    CanSenderNode() : Node("can_sender_node"), vel_gain_data_(10.0), vel_integrator_gain_data_(40.0) {
+    CanSenderNode() : Node("can_sender_node") {
         can_socket_ = openCanSocket();
 
-        subscription_vel_gain_ = this->create_subscription<std_msgs::msg::Float32>(
-            "/vel_gain", 10,
-            std::bind(&CanSenderNode::velGainCallback, this, std::placeholders::_1));
+        std::string vel_gain_param_name = "vel_gain";
+        this->declare_parameter(vel_gain_param_name,10.0);
+        vel_gain_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
+        auto vel_gain_cb_ = [this](const rclcpp::Parameter & p) {
+            this->vel_gain_data_ = p.as_double();
+            vel_gain_received_ = true;
+            sendCanMessageIfReceived(0x1b); // vel_gainのCAN ID設定
+        };
+        vel_gain_cb_handle_ = 
+            vel_gain_subscriber_->add_parameter_callback(
+                vel_gain_param_name,
+                vel_gain_cb_
+        );
 
-        subscription_vel_integrator_gain_ = this->create_subscription<std_msgs::msg::Float32>(
-            "/vel_integrator_gain", 10,
-            std::bind(&CanSenderNode::velIntegratorGainCallback, this, std::placeholders::_1));
+        std::string vel_integrator_gain_param_name = "vel_integrator_gain";
+        this->declare_parameter(vel_integrator_gain_param_name,40.0);
+        vel_integrator_gain_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
+        auto vel_integrator_gain_cb_ = [this](const rclcpp::Parameter & p) {
+            this->vel_integrator_gain_data_ = p.as_double();
+            vel_integrator_gain_received_ = true;
+            sendCanMessageIfReceived(0x1b); //vel_integrator_gainのCAN ID設定
+        };
+        vel_integrator_gain_cb_handle_ =
+            vel_integrator_gain_subscriber_->add_parameter_callback(
+                vel_integrator_gain_param_name,
+                vel_integrator_gain_cb_
+        );
     }
 
 private:
-    void velGainCallback(const std_msgs::msg::Float32::SharedPtr msg) {
-        std::memcpy(&vel_gain_data_, &msg->data, sizeof(float));
-        vel_gain_received_ = true;
-        sendCanMessageIfReceived(0x1b); // vel_gainのCAN ID設定
-    }
-
-    void velIntegratorGainCallback(const std_msgs::msg::Float32::SharedPtr msg) {
-        std::memcpy(&vel_integrator_gain_data_, &msg->data, sizeof(float));
-        vel_integrator_gain_received_ = true;
-        sendCanMessageIfReceived(0x1b); //vel_integrator_gainのCAN ID設定
-    }
-
+    std::shared_ptr<rclcpp::ParameterEventHandler> vel_gain_subscriber_;
+    std::shared_ptr<rclcpp::ParameterCallbackHandle> vel_gain_cb_handle_;
+    std::shared_ptr<rclcpp::ParameterEventHandler> vel_integrator_gain_subscriber_;
+    std::shared_ptr<rclcpp::ParameterCallbackHandle> vel_integrator_gain_cb_handle_;
     void sendCanMessageIfReceived(uint8_t can_id) {
         can_frame frame;
         frame.can_id = can_id;
@@ -84,8 +96,6 @@ private:
     bool vel_integrator_gain_received_;
     float vel_gain_data_;
     float vel_integrator_gain_data_;
-    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr subscription_vel_gain_;
-    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr subscription_vel_integrator_gain_;
 };
 
 int main(int argc, char **argv) {
