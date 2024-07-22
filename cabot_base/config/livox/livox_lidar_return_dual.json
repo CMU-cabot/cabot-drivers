@@ -4,7 +4,7 @@
             "broadcast_code": "livox0000000001",
             "enable_connect": false,
             "enable_fan": true,
-            "return_mode": 0,
+            "return_mode": 2,
             "coordinate": 0,
             "imu_rate": 1,
             "extrinsic_parameter_source": 0
