@@ -296,9 +296,37 @@ def generate_launch_description():
                 launch_arguments={
                     'frame_id': 'livox_link',
                     'xfer_format': '0',
+                    'output_topic': '/livox/lidar_PointCloud2',
                     'output': output
                 }.items(),
                 condition=IfCondition(AndSubstitution(use_livox, NotSubstitution(use_sim_time)))
+            ),
+
+            Node(
+                package='pointcloud_to_laserscan',
+                executable='pointcloud_to_laserscan_node',
+                namespace='',
+                name='livox_pointcloud_to_laserscan_node',
+                parameters=[*param_files, {'use_sim_time': use_sim_time}],
+                remappings=[
+                    ('/cloud_in', '/livox/lidar_filtered'),
+                    ('/scan', '/livox_scan')
+                ],
+                condition=IfCondition(use_livox)
+            ),
+
+            Node(
+                package='cabot_navigation2',
+                executable='livox_pointcloud_filter_node',
+                namespace='',
+                name='livox_pointcloud_filter_node',
+                parameters=[{
+                    'use_sim_time': use_sim_time,
+                    'xfer_format': 0,
+                    'input_topic': '/livox/lidar',
+                    'output_topic': '/livox/lidar_filtered'
+                }],
+                condition=IfCondition(use_livox)
             ),
 
             # CaBot related
