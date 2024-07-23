@@ -10,14 +10,12 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 
-add_executable(set_vel_gains_node src/set_vel_gains_node.cpp)
-ament_target_dependencies(set_vel_gains_node rclcpp std_msgs)
-install(TARGETS
-  set_vel_gains_node
-  DESTINATION lib/${PROJECT_NAME})
-
-install(TARGETS set_vel_gains_node
-  DESTINATION lib/${PROJECT_NAME})
+set(NODES set_vel_gains_node;set_vel_gains_dummy_node)
+foreach(target IN LISTS NODES)
+  add_executable(${target} src/${target}.cpp)
+  ament_target_dependencies(${target} rclcpp std_msgs)
+  install(TARGETS ${target} DESTINATION lib/${PROJECT_NAME})
+endforeach()
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
