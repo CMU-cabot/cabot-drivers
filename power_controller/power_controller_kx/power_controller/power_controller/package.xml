@@ -4,8 +4,8 @@
   <name>power_controller</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="kufusha@todo.todo">kufusha</maintainer>
-  <license>TODO: License declaration</license>
+  <maintainer email="developer@todo.todo">developer</maintainer>
+  <license>miraikan</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
