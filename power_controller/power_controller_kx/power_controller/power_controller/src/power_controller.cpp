@@ -20,41 +20,40 @@ public:
   {
     using namespace std::chrono_literals;
     this->declare_parameter<int>("number_of_batterys", 4);
-    service_server_24v_Odrive =  this->create_service<std_srvs::srv::SetBool>("cabot_battery_control/set_24v_power_Odrive",
+    service_server_24v_Odrive =  this->create_service<std_srvs::srv::SetBool>("set_24v_power_Odrive",
       std::bind(&PowerController::Set24vPower,
       this, std::placeholders::_1,
       std::placeholders::_2));
-    service_server_12v_PC =  this->create_service<std_srvs::srv::SetBool>("cabot_battery_control/set_12v_power_PC",
+    service_server_12v_PC =  this->create_service<std_srvs::srv::SetBool>("set_12v_power_PC",
       std::bind(&PowerController::Set12vPowerPC,
       this, std::placeholders::_1,
       std::placeholders::_2));
-    service_server_12v_D455_1 =  this->create_service<std_srvs::srv::SetBool>("cabot_battery_control/set_12v_power_D455_1",
+    service_server_12v_D455_1 =  this->create_service<std_srvs::srv::SetBool>("set_12v_power_D455_1",
       std::bind(&PowerController::Set12vPowerD4551,
       this, std::placeholders::_1,
       std::placeholders::_2));
-    service_server_12v_D455_2 =  this->create_service<std_srvs::srv::SetBool>("cabot_battery_control/set_12v_power_D455_2",
+    service_server_12v_D455_2 =  this->create_service<std_srvs::srv::SetBool>("set_12v_power_D455_2",
       std::bind(&PowerController::Set12vPowerD4552,
       this, std::placeholders::_1,
       std::placeholders::_2));
-    service_server_12v_D455_3 =  this->create_service<std_srvs::srv::SetBool>("cabot_battery_control/set_12v_power_D455_3",
+    service_server_12v_D455_3 =  this->create_service<std_srvs::srv::SetBool>("set_12v_power_D455_3",
       std::bind(&PowerController::Set12vPowerD4553,
       this, std::placeholders::_1,
       std::placeholders::_2));
-    service_server_5v_MCU =  this->create_service<std_srvs::srv::SetBool>("cabot_battery_control/set_5v_power_MCU",
+    service_server_5v_MCU =  this->create_service<std_srvs::srv::SetBool>("set_5v_power_MCU",
       std::bind(&PowerController::Set5vPower,
       this, std::placeholders::_1,
       std::placeholders::_2));
-    service_server_shutdown =  this->create_service<std_srvs::srv::Empty>("cabot_battery_control/shutdown",
+    service_server_shutdown =  this->create_service<std_srvs::srv::Empty>("shutdown",
       std::bind(&PowerController::Shutdown,
       this, std::placeholders::_1,
       std::placeholders::_2));
-
-    service_server_fan_pwm =  this->create_service<power_controller_msgs::srv::FanController>("cabot/fan_control",
+    service_server_fan_pwm =  this->create_service<power_controller_msgs::srv::FanController>("fan_control",
       std::bind(&PowerController::FanControl,
       this, std::placeholders::_1,
       std::placeholders::_2));
     // publisher
-    publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("cabot/battery_state",10);
+    publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_state",10);
     timer_ = this->create_wall_timer(1s, std::bind(&PowerController::PublisherPowerStatus, this));
   }
 
@@ -181,7 +180,6 @@ private:
     // publsih msg
     publisher_->publish(msg);
   }
-
 
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_24v_Odrive;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_PC;
