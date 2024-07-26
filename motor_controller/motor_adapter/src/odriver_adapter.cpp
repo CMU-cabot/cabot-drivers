@@ -28,6 +28,7 @@
 
 #include <memory>
 
+#include <rclcpp/rclcpp.hpp>
 #include <motor_adapter/odriver_adapter.hpp>
 // #include <boost/thread/thread.hpp>
 
@@ -46,6 +47,7 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   encoderInput_("/encoder"),
   odomOutput_("/odom"),
   pauseControlInput_("/pause_control"),
+  PIControl_("/PI_control"),
 
   lastCmdVelTime_(0, 0, get_clock()->get_clock_type()),
   targetSpdLinear_(0),
@@ -71,6 +73,8 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   pause_control_counter_(0)
 {
   RCLCPP_INFO(get_logger(), "ODriverNode Constructor");
+  PIControl_ = declare_parameter("PI_topic", PIControl_);
+  PIPub = create_publisher<odriver_msgs::msg::PIControlData>(PIControl_, 10);
 
   bias_ = declare_parameter("bias", bias_);
   diffDrive_.set(bias_);
@@ -197,6 +201,22 @@ void ODriverNode::cmdVelLoop(int publishRate)
     }
 
     motorPub->publish(target);
+
+    double now = this->get_clock()->now().seconds();
+    double errorSpdLinear = currentSpdLinear_ - measuredSpdLinear_;
+    double errorSpdTurn = targetSpdTurn_ - measuredSpdTurn_;
+
+    odriver_msgs::msg::PIControlData control_data_msg;
+    control_data_msg.header.stamp = this->get_clock()->now();
+    control_data_msg.current_spd_linear = currentSpdLinear_;
+    control_data_msg.measured_spd_linear = measuredSpdLinear_;
+    control_data_msg.error_spd_linear = errorSpdLinear;
+    control_data_msg.integral_linear = integral_linear_;
+    control_data_msg.target_spd_turn = targetSpdTurn_;
+    control_data_msg.measured_spd_turn = measuredSpdTurn_;
+    control_data_msg.error_spd_turn = errorSpdTurn;
+    control_data_msg.integral_turn = integral_turn_;
+    PIPub->publish(control_data_msg);
 
     loopRate.sleep();
   }
