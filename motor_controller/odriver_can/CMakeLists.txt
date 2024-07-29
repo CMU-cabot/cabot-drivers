@@ -10,7 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 
-set(NODES set_vel_gains_node;set_vel_gains_dummy_node)
+set(NODES set_vel_gains_node)
 foreach(target IN LISTS NODES)
   add_executable(${target} src/${target}.cpp)
   ament_target_dependencies(${target} rclcpp std_msgs)

@@ -43,40 +43,27 @@ public:
     CanSenderNode() : Node("can_sender_node") {
         can_socket_ = openCanSocket();
 
-        std::string vel_gain_param_name = "vel_gain";
-        this->declare_parameter(vel_gain_param_name,10.0);
-        vel_gain_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
-        auto vel_gain_cb_ = [this](const rclcpp::Parameter & p) {
-            this->vel_gain_data_ = p.as_double();
+        std::string motor_pi_gain_param_name = "motor_pi_gain";
+        this->declare_parameter(motor_pi_gain_param_name, std::vector<double>(10.0,40.0));
+        motor_pi_gain_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
+        auto motor_pi_gain_cb_ = [this](const rclcpp::Parameter & p) {
+            std::vector<double> motor_pi_gain = p.as_double_array();
+            this->vel_gain_data_            = motor_pi_gain[0];
+            this->vel_integrator_gain_data_ = motor_pi_gain[1];
             vel_gain_received_ = true;
-            sendCanMessageIfReceived(0x1b); // vel_gainのCAN ID設定
-        };
-        vel_gain_cb_handle_ = 
-            vel_gain_subscriber_->add_parameter_callback(
-                vel_gain_param_name,
-                vel_gain_cb_
-        );
-
-        std::string vel_integrator_gain_param_name = "vel_integrator_gain";
-        this->declare_parameter(vel_integrator_gain_param_name,40.0);
-        vel_integrator_gain_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
-        auto vel_integrator_gain_cb_ = [this](const rclcpp::Parameter & p) {
-            this->vel_integrator_gain_data_ = p.as_double();
             vel_integrator_gain_received_ = true;
             sendCanMessageIfReceived(0x1b); //vel_integrator_gainのCAN ID設定
         };
-        vel_integrator_gain_cb_handle_ =
-            vel_integrator_gain_subscriber_->add_parameter_callback(
-                vel_integrator_gain_param_name,
-                vel_integrator_gain_cb_
+        motor_pi_gain_cb_handle_ =
+            motor_pi_gain_subscriber_->add_parameter_callback(
+                motor_pi_gain_param_name,
+                motor_pi_gain_cb_
         );
     }
 
 private:
-    std::shared_ptr<rclcpp::ParameterEventHandler> vel_gain_subscriber_;
-    std::shared_ptr<rclcpp::ParameterCallbackHandle> vel_gain_cb_handle_;
-    std::shared_ptr<rclcpp::ParameterEventHandler> vel_integrator_gain_subscriber_;
-    std::shared_ptr<rclcpp::ParameterCallbackHandle> vel_integrator_gain_cb_handle_;
+    std::shared_ptr<rclcpp::ParameterEventHandler> motor_pi_gain_subscriber_;
+    std::shared_ptr<rclcpp::ParameterCallbackHandle> motor_pi_gain_cb_handle_;
     void sendCanMessageIfReceived(uint8_t can_id) {
         can_frame frame;
         frame.can_id = can_id;
