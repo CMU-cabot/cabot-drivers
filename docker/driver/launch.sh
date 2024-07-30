@@ -43,6 +43,9 @@ elif [[ $1 == "wifi-scan" ]]; then
 elif [[ $1 == "ble-scan" ]]; then
     source install/setup.bash
     exec ros2 launch wireless_scanner_ros dbus_ibeacon_scanner.launch.xml
+elif [[ $1 == "odriver-can" ]]; then
+	source install/setup.bash
+	exec ros2 launch odriver_can odriver_can.launch.py
 elif [[ $1 == "build" ]]; then
     shift 1
     exec ./script/build_ws.sh $@

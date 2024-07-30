@@ -57,3 +57,10 @@ services:
     command:
       - "/launch.sh"
       - "ble-scan"
+
+  odriver_can-base:
+    extends:
+      service: driver-base
+    command:
+      - "/launch.sh"
+      - "odriver-can"

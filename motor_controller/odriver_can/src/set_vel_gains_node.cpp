@@ -46,7 +46,7 @@ public:
         std::string motor_pi_gain_param_name = "motor_pi_gain";
         this->declare_parameter(motor_pi_gain_param_name, std::vector<double>({10.0,40.0}));
         motor_pi_gain_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
-        auto motor_pi_gain_cb_ = [this](const rclcpp::Parameter & p) {
+        auto motor_pi_gain_cb = [this](const rclcpp::Parameter & p) {
             std::vector<double> motor_pi_gain = p.as_double_array();
             this->vel_gain_data_            = motor_pi_gain[0];
             this->vel_integrator_gain_data_ = motor_pi_gain[1];
@@ -55,7 +55,7 @@ public:
         motor_pi_gain_cb_handle_ =
             motor_pi_gain_subscriber_->add_parameter_callback(
                 motor_pi_gain_param_name,
-                motor_pi_gain_cb_
+                motor_pi_gain_cb
         );
     }
 

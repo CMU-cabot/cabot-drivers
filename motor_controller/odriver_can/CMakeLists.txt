@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(odrive_can)
+project(odriver_can)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -16,6 +16,8 @@ foreach(target IN LISTS NODES)
   ament_target_dependencies(${target} rclcpp std_msgs)
   install(TARGETS ${target} DESTINATION lib/${PROJECT_NAME})
 endforeach()
+
+install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

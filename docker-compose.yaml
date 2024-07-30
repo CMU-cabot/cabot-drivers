@@ -19,3 +19,10 @@ services:
       service: ble_scan-base
     volumes:
       - ./docker/home:/home/developer/
+
+  odriver_can:
+    extends:
+      file: docker-compose-base.yaml
+      service: odriver_can-base
+    volumes:
+      - ./docker/home:/home/developer/
