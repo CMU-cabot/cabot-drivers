@@ -401,7 +401,9 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
         imu_raw_pub_->publish(*msg);
       }
       imu_pub_->publish(*msg_adjusted);
-      imu_dev_pub_->publish(*msg_dev);
+      if(msg_dev){
+        imu_dev_pub_->publish(*msg_dev);
+      }
       imu_check_task_->tick();
     }
   }
