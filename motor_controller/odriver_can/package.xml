@@ -3,9 +3,9 @@
 <package format="3">
   <name>odriver_can</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="kufushatec@todo.todo">kufushatec</maintainer>
-  <license>TODO: License declaration</license>
+  <description>The odriver_can package</description>
+  <maintainer email="daisukes@cmu.edu">Daisuke Sato</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
