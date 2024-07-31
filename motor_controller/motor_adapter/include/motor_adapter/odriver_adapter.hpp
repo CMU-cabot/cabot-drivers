@@ -34,6 +34,7 @@
 #include <motor_adapter/diff_drive.hpp>
 #include <odriver_msgs/msg/motor_status.hpp>
 #include <odriver_msgs/msg/motor_target.hpp>
+#include <odriver_msgs/msg/pi_control_data.hpp>
 #include <rclcpp/node.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <sensor_msgs/msg/imu.hpp>
@@ -61,6 +62,7 @@ private:
   std::string encoderInput_;
   std::string odomOutput_;
   std::string pauseControlInput_;
+  std::string PIControl_;
 
   rclcpp::Time lastCmdVelTime_;
   double targetSpdLinear_;
@@ -95,6 +97,7 @@ private:
 
   rclcpp::Publisher<odriver_msgs::msg::MotorTarget>::SharedPtr motorPub;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPub;
+  rclcpp::Publisher<odriver_msgs::msg::PIControlData>::SharedPtr PIPub;
 
   rclcpp::Subscription<odriver_msgs::msg::MotorStatus>::SharedPtr encoderSub;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub;
