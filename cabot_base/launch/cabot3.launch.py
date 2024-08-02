@@ -79,11 +79,13 @@ def generate_launch_description():
     imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
     use_directional_indicator = LaunchConfiguration('use_directional_indicator')
     vibrator_type = LaunchConfiguration('vibrator_type')
+    low_obstacle_detect_version = LaunchConfiguration('low_obstacle_detect_version')
 
     # switch lidar node based on model_name
     use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
     use_velodyne = NotSubstitution(use_hesai)
     use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
+    use_low_obstacle_detect = PythonExpression([low_obstacle_detect_version, ' > 0'])
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -188,6 +190,11 @@ def generate_launch_description():
             'vibrator_type',
             default_value=EnvironmentVariable('CABOT_VIBRATOR_TYPE', default_value='1'),
             description='1: ERM (Eccentric Rotating Mass), 2: LRA (Linear Resonant Actuator)'
+        ),
+        DeclareLaunchArgument(
+            'low_obstacle_detect_version',
+            default_value=EnvironmentVariable('CABOT_LOW_OBSTABLE_DETECT_VERSION', default_value='0'),
+            description='0: do not detect, 1: remove ground by fixed height, 2: remove groud by RANSAC'
         ),
 
         # Kind error message
@@ -312,7 +319,7 @@ def generate_launch_description():
                     ('/cloud_in', '/livox/lidar_filtered'),
                     ('/scan', '/livox_scan')
                 ],
-                condition=IfCondition(use_livox)
+                condition=IfCondition(AndSubstitution(use_livox, use_low_obstacle_detect))
             ),
 
             Node(
@@ -322,11 +329,14 @@ def generate_launch_description():
                 name='livox_pointcloud_filter_node',
                 parameters=[{
                     'use_sim_time': use_sim_time,
+                    'low_obstacle_detect_version': low_obstacle_detect_version,
+                    'target_frame': 'livox_footprint',
                     'xfer_format': 0,
                     'input_topic': '/livox/lidar',
-                    'output_topic': '/livox/lidar_filtered'
+                    'output_topic': '/livox/lidar_filtered',
+                    'clip_height': 0.05
                 }],
-                condition=IfCondition(use_livox)
+                condition=IfCondition(AndSubstitution(use_livox, use_low_obstacle_detect))
             ),
 
             # CaBot related
