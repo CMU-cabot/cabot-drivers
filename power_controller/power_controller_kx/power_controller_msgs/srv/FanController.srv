@@ -1,5 +1,3 @@
-int64 data
-
+int8 data
 ---
-
 bool response
