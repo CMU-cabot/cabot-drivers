@@ -72,6 +72,11 @@ public:
     can_socket_ = openCanSocket();
   }
 
+  ~PowerController()
+  {
+    close(can_socket_);
+  }
+
 private:
   // can
   int openCanSocket()
@@ -114,11 +119,11 @@ private:
     uint8_t can_id = 0x14;
     if (req->data == 1)
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 24V_Odrive" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 24V_Odrive");
     }
     else
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 24V_Odrive" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 24V_Odrive");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     sendCanMessageIfReceived(can_id);
@@ -131,27 +136,28 @@ private:
     uint8_t can_id = 0x15;
     if (req->data == 1)
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on");
     }
     else
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     sendCanMessageIfReceived(can_id);
     res->success = true;
   }
+  
   void Set12vPowerD4551(const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
 		   const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
     uint8_t can_id = 0x16;
     if (req->data == 1)
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_1" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_1");
     }
     else
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 12V D455_1" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 12V D455_1");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     sendCanMessageIfReceived(can_id);
@@ -163,11 +169,11 @@ private:
     uint8_t can_id = 0x17;
     if (req->data == 1)
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_2" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_2");
     }
     else
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 12V D455_2" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 12V D455_2");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     sendCanMessageIfReceived(can_id);
@@ -179,11 +185,11 @@ private:
     uint8_t can_id = 0x18;
     if (req->data == 1)
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_3" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_3");
     }
     else
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 12V D455_3" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 12V D455_3");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     sendCanMessageIfReceived(can_id);
@@ -195,16 +201,17 @@ private:
     uint8_t can_id = 0x19;
     if (req->data == 1)
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 5V MCU" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 5V MCU");
     }
     else
     {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 5V MCU" );
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 5V MCU");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     sendCanMessageIfReceived(can_id);
     res->success = true;
   }
+  
   void Shutdown(const std::shared_ptr<std_srvs::srv::Empty::Request> req,
 		const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
@@ -214,7 +221,7 @@ private:
     sendCanMessageIfReceived(can_id);
     (void)req;
     (void)res;
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Shutdown" );
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Shutdown");
   }
   void Reboot(const std::shared_ptr<std_srvs::srv::Empty::Request> req,
 		const std::shared_ptr<std_srvs::srv::Empty::Response> res)
@@ -225,7 +232,7 @@ private:
     sendCanMessageIfReceived(can_id);
     (void)req;
     (void)res;
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "reboot" );
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "reboot");
   }
   void FanControl(const std::shared_ptr<power_controller_msgs::srv::FanController::Request> req,
 		  const std::shared_ptr<power_controller_msgs::srv::FanController::Response> res)
@@ -254,6 +261,27 @@ private:
     sendCanFrame(can_socket_, frame);
   }
 
+  void CombiningBit(unsigned char* frame_data, short unsigned int* data1,
+		    short unsigned int* data2, short unsigned int* data3, short unsigned int* data4)
+  {
+    *data1 = (frame_data[1] << 8) | frame_data[0];
+    *data2 = (frame_data[3] << 8) | frame_data[2];
+    *data3 = (frame_data[5] << 8) | frame_data[4];
+    *data4 = (frame_data[7] << 8) | frame_data[6];
+  }
+
+  void DefineMSG(power_controller_msgs::msg::BatteryArray& msg, int location_,
+		 short unsigned int* data1, short unsigned int* data2, short unsigned int* data3, short unsigned int* data4)
+  {
+    int array_num = location_ - 1;
+    msg.batteryarray[array_num].header.stamp = this->get_clock()->now();
+    msg.batteryarray[array_num].voltage = *data1;
+    msg.batteryarray[array_num].current = *data2;
+    msg.batteryarray[array_num].percentage = *data3;
+    msg.batteryarray[array_num].temperature = *data4;
+    msg.batteryarray[array_num].location = std::to_string(location_);
+  }
+
   void PublisherPowerStatus()
   {
     bool confirm_publish = false;
@@ -263,7 +291,9 @@ private:
     unsigned short data2;
     unsigned short data3;
     unsigned short data4;
+    int location_;
     int num_batterys = this->get_parameter("number_of_batterys").as_int();
+    msg.batteryarray.resize(num_batterys);
     struct can_frame frame;
     while (!confirm_publish)
     {
@@ -274,71 +304,32 @@ private:
 	{
           case 0x05:  //Battery 1 Info
 	    RCLCPP_INFO(this->get_logger(), "Get data of Battery 1");
-	    data1 = (frame.data[1] << 8) | frame.data[0];
-	    data2 = (frame.data[3] << 8) | frame.data[2];
-	    data3 = (frame.data[5] << 8) | frame.data[4];
-	    data4 = (frame.data[7] << 8) | frame.data[6];
+	    location_ = 1;
+	    CombiningBit(frame.data, &data1, &data2, &data3, &data4);
 	    // define msg's value
-	    msg.batteryarray.resize(num_batterys);
-	    msg.batteryarray[0].header.stamp = this->get_clock()->now();
-	    msg.batteryarray[0].voltage = data1;
-	    msg.batteryarray[0].current = data2;
-	    msg.batteryarray[0].percentage = data3;
-	    msg.batteryarray[0].temperature = data4;
-	    msg.batteryarray[0].location = std::to_string(1);
+	    DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
 	    break;
 	  case 0x06:  //Battery 2 Info
 	    RCLCPP_INFO(this->get_logger(), "Get data of Battery 2");
-	    data1 = (frame.data[0] << 8) | frame.data[1];
-	    data2 = (frame.data[2] << 8) | frame.data[3];
-	    data3 = (frame.data[4] << 8) | frame.data[5];
-	    data4 = (frame.data[6] << 8) | frame.data[7];
-	    // define msg's value
-	    msg.batteryarray.resize(num_batterys);
-	    msg.batteryarray[1].header.stamp = this->get_clock()->now();
-	    msg.batteryarray[1].voltage = data1;
-	    msg.batteryarray[1].current = data2;
-	    msg.batteryarray[1].percentage = data3;
-	    msg.batteryarray[1].temperature = data4;
-	    msg.batteryarray[1].location = std::to_string(2);
+	    location_ = 2;
+	    CombiningBit(frame.data, &data1, &data2, &data3, &data4);
+	    DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
 	    break;
 	  case 0x07:  //Battery 3 Info
+	    location_ = 3;
 	    RCLCPP_INFO(this->get_logger(), "Get data of Battery 3");
-	    data1 = (frame.data[0] << 8) | frame.data[1];
-	    data2 = (frame.data[2] << 8) | frame.data[3];
-	    data3 = (frame.data[4] << 8) | frame.data[5];
-	    data4 = (frame.data[6] << 8) | frame.data[7];
-	    // define msg's value
-	    msg.batteryarray.resize(num_batterys);
-	    msg.batteryarray[2].header.stamp = this->get_clock()->now();
-	    msg.batteryarray[2].voltage = data1;
-	    msg.batteryarray[2].current = data2;
-	    msg.batteryarray[2].percentage = data3;
-	    msg.batteryarray[2].temperature = data4;
-	    msg.batteryarray[2].location = std::to_string(3);
+	    CombiningBit(frame.data, &data1, &data2, &data3, &data4);
+	    DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
 	    break;
 	  case 0x08:  //Battery 4 Info
 	    RCLCPP_INFO(this->get_logger(), "Get data of Battery 4");
-	    data1 = (frame.data[0] << 8) | frame.data[1];
-	    data2 = (frame.data[2] << 8) | frame.data[3];
-	    data3 = (frame.data[4] << 8) | frame.data[5];
-	    data4 = (frame.data[6] << 8) | frame.data[7];
-	    // define msg's value
-	    msg.batteryarray.resize(num_batterys);
-	    msg.batteryarray[3].header.stamp = this->get_clock()->now();
-	    msg.batteryarray[3].voltage = data1;
-	    msg.batteryarray[3].current = data2;
-	    msg.batteryarray[3].percentage = data3;
-	    msg.batteryarray[3].temperature = data4;
-	    msg.batteryarray[3].location = std::to_string(4);
+	    location_ = 4;
+	    CombiningBit(frame.data, &data1, &data2, &data3, &data4);
+	    DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
 	    break;
 	  case 0x1c: //0x1d
 	    RCLCPP_INFO(this->get_logger(), "Battery serial number");
-	    data1 = (frame.data[0] << 8) | frame.data[1];
-	    data2 = (frame.data[2] << 8) | frame.data[3];
-	    data3 = (frame.data[4] << 8) | frame.data[5];
-	    data4 = (frame.data[6] << 8) | frame.data[7];
-	    // define msg's value
+	    CombiningBit(frame.data, &data1, &data2, &data3, &data4);
 	    msg.batteryarray[0].serial_number = std::to_string(data1);
 	    msg.batteryarray[1].serial_number = std::to_string(data2);
 	    msg.batteryarray[2].serial_number = std::to_string(data3);
