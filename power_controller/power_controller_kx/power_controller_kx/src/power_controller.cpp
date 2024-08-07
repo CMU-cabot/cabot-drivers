@@ -118,7 +118,7 @@ public:
   {
     close(can_socket_);
   }
-
+  
 private:
   // can
   int openCanSocket()
@@ -132,11 +132,9 @@ private:
     struct ifreq ifr;
     strcpy(ifr.ifr_name, "can0");
     ioctl(s, SIOCGIFINDEX, &ifr);
-
     struct sockaddr_can addr;
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
-
     if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0)
       {
 	perror("Bind");
@@ -145,7 +143,6 @@ private:
       }
     return s;
   }
-
   void sendCanFrame(int can_socket, can_frame &frame)
   {
     int nbytes = write(can_socket, &frame, sizeof(struct can_frame));
@@ -154,7 +151,6 @@ private:
 	perror("Send");
       }
   }
-  
   void Set24vPower(const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
 		   const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -171,7 +167,6 @@ private:
     sendCanMessageIfReceived(can_id);
     res->success = true;
   }
-  
   void Set12vPowerPC(const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
 		   const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -188,7 +183,6 @@ private:
     sendCanMessageIfReceived(can_id);
     res->success = true;
   }
-  
   void Set12vPowerD4551(const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
 		   const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -253,7 +247,6 @@ private:
     sendCanMessageIfReceived(can_id);
     res->success = true;
   }
-  
   void Shutdown(const std::shared_ptr<std_srvs::srv::Empty::Request> req,
 		const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
@@ -302,7 +295,6 @@ private:
     std::memcpy(&frame.data[0], &check_power_, 1);
     sendCanFrame(can_socket_, frame);
   }
-
   void CombiningBit(unsigned char* frame_data, short unsigned int* data1,
 		    short unsigned int* data2, short unsigned int* data3, short unsigned int* data4)
   {
@@ -311,7 +303,6 @@ private:
     *data3 = (frame_data[5] << 8) | frame_data[4];
     *data4 = (frame_data[7] << 8) | frame_data[6];
   }
-
   void DefineMSG(power_controller_msgs::msg::BatteryArray& msg, int location_,
 		 short unsigned int* data1, short unsigned int* data2, short unsigned int* data3, short unsigned int* data4)
   {
@@ -323,7 +314,6 @@ private:
     msg.batteryarray[array_num].temperature = *data4;
     msg.batteryarray[array_num].location = std::to_string(location_);
   }
-
   void PublisherPowerStatus()
   {
     bool confirm_publish = false;
@@ -388,10 +378,8 @@ private:
   // can socket
   int can_socket_;
   bool check_power_;
-  
   // define publish msg
   power_controller_msgs::msg::BatteryArray msg;
-
   // service
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_24v_Odrive;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_PC;
