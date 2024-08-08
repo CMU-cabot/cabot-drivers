@@ -58,12 +58,6 @@ public:
         &PowerController::Set24vPower,
         this, std::placeholders::_1,
         std::placeholders::_2));
-    service_server_12v_PC = this->create_service<std_srvs::srv::SetBool>(
-      "set_12v_power_PC",
-      std::bind(
-        &PowerController::Set12vPowerPC,
-        this, std::placeholders::_1,
-        std::placeholders::_2));
     service_server_12v_D455_1 = this->create_service<std_srvs::srv::SetBool>(
       "set_12v_power_D455_1",
       std::bind(
@@ -156,20 +150,6 @@ private:
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 24V_Odrive");
     } else {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 24V_Odrive");
-    }
-    std::memcpy(&check_power_, &req->data, sizeof(bool));
-    sendCanMessageIfReceived(can_id);
-    res->success = true;
-  }
-  void Set12vPowerPC(
-    const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
-    const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
-  {
-    uint8_t can_id = 0x15;
-    if (req->data == 1) {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on");
-    } else {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     sendCanMessageIfReceived(can_id);
@@ -362,7 +342,6 @@ private:
   power_controller_msgs::msg::BatteryArray msg;
   // service
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_24v_Odrive;
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_PC;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_1;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_2;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_3;
