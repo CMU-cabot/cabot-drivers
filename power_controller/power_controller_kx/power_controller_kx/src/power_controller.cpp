@@ -302,8 +302,6 @@ private:
   void PublisherPowerStatus()
   {
     bool confirm_publish = false;
-    // setting loop rate
-    rclcpp::WallRate loop(1);
     unsigned short data1;
     unsigned short data2;
     unsigned short data3;
