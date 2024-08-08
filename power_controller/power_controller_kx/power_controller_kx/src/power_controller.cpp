@@ -286,7 +286,6 @@ private:
     }
     res->response = true;
   }
-
   void sendCanMessageIfReceived(uint8_t can_id)
   {
     can_frame frame;
