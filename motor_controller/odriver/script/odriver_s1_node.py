@@ -62,7 +62,7 @@ from diagnostic_msgs.msg import DiagnosticStatus
 from std_srvs.srv import SetBool
 
 # for update params
-# from rcl_interfaces.msg import SetParametersResult
+from rcl_interfaces.msg import SetParametersResult
 from rclpy.parameter import Parameter
 
 
@@ -100,6 +100,8 @@ count_motorTarget = None
 previous_count_motorTarget = None
 fw_version_str = ""
 fw_version = None
+vel_gain = 1.0
+vel_integrator_gain = 10.0
 
 
 def is_firmware_equal(odrv, od_version):
@@ -330,6 +332,7 @@ def _error_recovery(relaunch = True):
             _relaunch_odrive()
 
 def parameters_callback(params):
+    global vel_gain, vel_integrator_gain
     success = False
     for param in params:
         if param.name == "vel_gain":
@@ -347,7 +350,7 @@ def parameters_callback(params):
                     success = True
                     vel_integrator_gain = param.value
     print(vars(param))
-    return rcl_interfaces.msg.SetParametersResult(successful=success)
+    return SetParametersResult(successful=success)
 
 
 '''Main()'''
@@ -374,6 +377,7 @@ def main():
         signLeft = 1.0
         signRight = -1.0
 
+    global vel_gain, vel_integrator_gain
     vel_gain = node.declare_parameter("vel_gain", 1.0).value
     vel_integrator_gain = node.declare_parameter("vel_integrator_gain", 10.0).value
 
