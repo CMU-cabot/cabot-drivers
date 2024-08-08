@@ -61,6 +61,11 @@ from diagnostic_msgs.msg import DiagnosticStatus
 
 from std_srvs.srv import SetBool
 
+# for update params
+# from rcl_interfaces.msg import SetParametersResult
+from rclpy.parameter import Parameter
+
+
 PRINTDEBUG=False
 
 ODRIVE_VERSIONS=[[0,6,5],[0,6,6],[0,6,8],[0,6,9]]
@@ -324,6 +329,26 @@ def _error_recovery(relaunch = True):
         if (_odrv_has_error(odrvs[0]) and relaunch) or (_odrv_has_error(odrvs[1]) and relaunch) :
             _relaunch_odrive()
 
+def parameters_callback(params):
+    success = False
+    for param in params:
+        if param.name == "vel_gain":
+            if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
+                if param.value >= 0.0 and param.value < 100.0:
+                    odrvs[0].axis0.controller.config.vel_gain = vel_gain
+                    odrvs[1].axis0.controller.config.vel_gain = vel_gain
+                    success = True
+                    vel_gain = param.value
+        if param.name == "vel_integrator_gain":
+            if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
+                if param.value >= 0.0 and param.value < 100.0:
+                    odrvs[0].axis0.controller.config.vel_integrator_gain = vel_integrator_gain
+                    odrvs[1].axis0.controller.config.vel_integrator_gain = vel_integrator_gain
+                    success = True
+                    vel_integrator_gain = param.value
+    print(vars(param))
+    return rcl_interfaces.msg.SetParametersResult(successful=success)
+
 
 '''Main()'''
 def main():
@@ -374,6 +399,8 @@ def main():
     if odrive_left_serial_str == "" or odrive_right_serial_str == "":
         logger.error("CABOT_ODRIVER_SERIAL_0 and 1 should be specified in .env file!!")
         return
+
+    node.add_on_set_parameters_callback(parameters_callback)
 
     ## Diagnostic Updater
     updater = Updater(node)
