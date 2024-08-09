@@ -404,8 +404,6 @@ def main():
         logger.error("CABOT_ODRIVER_SERIAL_0 and 1 should be specified in .env file!!")
         return
 
-    node.add_on_set_parameters_callback(parameters_callback)
-
     ## Diagnostic Updater
     updater = Updater(node)
     updater.add(TopicCheckTask("Motor Target", "/cabot/motorTarget", MotorTarget, MotorTargetRoutine))
@@ -441,6 +439,9 @@ def main():
         od_setWatchdogTimer(0,0)
         od_setWatchdogTimer(0,1)
         od_writeMode(0)
+
+    # check param of vel_gain and vel_integratior_gain
+    node.add_on_set_parameters_callback(parameters_callback)
 
     # variables to manage connection error
     odrv_is_active = True
