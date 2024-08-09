@@ -61,6 +61,11 @@ from diagnostic_msgs.msg import DiagnosticStatus
 
 from std_srvs.srv import SetBool
 
+# for update params
+from rcl_interfaces.msg import SetParametersResult
+from rclpy.parameter import Parameter
+
+
 PRINTDEBUG=False
 
 ODRIVE_VERSIONS=[[0,6,5],[0,6,6],[0,6,8],[0,6,9]]
@@ -95,6 +100,8 @@ count_motorTarget = None
 previous_count_motorTarget = None
 fw_version_str = ""
 fw_version = None
+vel_gain = 1.0
+vel_integrator_gain = 10.0
 
 
 def is_firmware_equal(odrv, od_version):
@@ -324,6 +331,35 @@ def _error_recovery(relaunch = True):
         if (_odrv_has_error(odrvs[0]) and relaunch) or (_odrv_has_error(odrvs[1]) and relaunch) :
             _relaunch_odrive()
 
+# Refer to https://roboticsbackend.com/ros2-rclpy-parameter-callback/
+def parameters_callback(params):
+    global vel_gain, vel_integrator_gain
+    success = False
+    for param in params:
+        if param.name == "vel_gain":
+            if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
+                if param.value >= 0.0 and param.value < 100.0:
+                    try:
+                        odrvs[0].axis0.controller.config.vel_gain = param.value
+                        odrvs[1].axis0.controller.config.vel_gain = param.value
+                        vel_gain = param.value
+                        logger.info(f"Set vel_gain: {vel_gain}")
+                        success = True
+                    except:
+                        logger.error("Can not set vel_gain!!")
+        if param.name == "vel_integrator_gain":
+            if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
+                if param.value >= 0.0 and param.value < 100.0:
+                    try:
+                        odrvs[0].axis0.controller.config.vel_integrator_gain = param.value
+                        odrvs[1].axis0.controller.config.vel_integrator_gain = param.value
+                        vel_integrator_gain = param.value
+                        logger.info(f"Set vel_integrator_gain: {vel_integrator_gain}")
+                        success = True
+                    except:
+                        logger.error("Can not set vel_integrator_gain!!")
+    return SetParametersResult(successful=success)
+
 
 '''Main()'''
 def main():
@@ -349,6 +385,7 @@ def main():
         signLeft = 1.0
         signRight = -1.0
 
+    global vel_gain, vel_integrator_gain
     vel_gain = node.declare_parameter("vel_gain", 1.0).value
     vel_integrator_gain = node.declare_parameter("vel_integrator_gain", 10.0).value
 
@@ -410,6 +447,9 @@ def main():
         od_setWatchdogTimer(0,0)
         od_setWatchdogTimer(0,1)
         od_writeMode(0)
+
+    # check param of vel_gain and vel_integratior_gain
+    node.add_on_set_parameters_callback(parameters_callback)
 
     # variables to manage connection error
     odrv_is_active = True
