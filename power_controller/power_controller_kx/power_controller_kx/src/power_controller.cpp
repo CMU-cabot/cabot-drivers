@@ -118,7 +118,7 @@ private:
   {
     int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (s < 0) {
-      perror("Socket");
+      RCLCPP_ERROR(this->get_logger(), "Socket");
       return -1;
     }
     struct ifreq ifr;
@@ -128,7 +128,7 @@ private:
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
     if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-      perror("Bind");
+      RCLCPP_ERROR(this->get_logger(), "Bind");
       close(s);
       return -1;
     }
@@ -138,7 +138,7 @@ private:
   {
     int nbytes = write(can_socket, &frame, sizeof(struct can_frame));
     if (nbytes != sizeof(struct can_frame)) {
-      perror("Send");
+      RCLCPP_ERROR(this->get_logger(), "Send");
     }
   }
   void Set24vPower(
