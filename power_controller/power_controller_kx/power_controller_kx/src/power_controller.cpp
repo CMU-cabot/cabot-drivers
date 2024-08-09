@@ -46,7 +46,7 @@ class PowerController : public rclcpp::Node
 {
 public:
   PowerController()
-  : Node("power_controller_node"), check_power_(true)
+  : Node("power_controller_node"), check_power_(true), check_send_can_(false)
   {
     using namespace std::chrono_literals;
     // number of batterys
@@ -102,7 +102,8 @@ public:
         std::placeholders::_2));
     // publisher
     publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_state", 10);
-    timer_ = this->create_wall_timer(0.05s, std::bind(&PowerController::PublisherPowerStatus, this));
+    pub_timer_ = this->create_wall_timer(0.05s, std::bind(&PowerController::PublisherPowerStatus, this));
+    send_can_timer_ = this->create_wall_timer(0.5s, std::bind(&PowerController::SendCanMessageIfReceived, this));
     // open can socket
     can_socket_ = openCanSocket();
   }
@@ -138,125 +139,129 @@ private:
   {
     int nbytes = write(can_socket, &frame, sizeof(struct can_frame));
     if (nbytes != sizeof(struct can_frame)) {
-      RCLCPP_ERROR(this->get_logger(), "Send");
+      RCLCPP_ERROR(this->get_logger(), "The number of bytes is not equal to the number of bytes");
     }
   }
   void Set24vPower(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
-    uint8_t can_id = 0x14;
+    can_id = 0x14;
     if (req->data == 1) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 24V_Odrive");
     } else {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 24V_Odrive");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
-    sendCanMessageIfReceived(can_id);
     res->success = true;
+    check_send_can_ = true;
   }
   void Set12vPowerD4551(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
-    uint8_t can_id = 0x16;
+    can_id = 0x16;
     if (req->data == 1) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_1");
     } else {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 12V D455_1");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
-    sendCanMessageIfReceived(can_id);
     res->success = true;
+    check_send_can_ = true;
   }
   void Set12vPowerD4552(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
-    uint8_t can_id = 0x17;
+    can_id = 0x17;
     if (req->data == 1) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_2");
     } else {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 12V D455_2");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
-    sendCanMessageIfReceived(can_id);
     res->success = true;
+    check_send_can_ = true;
   }
   void Set12vPowerD4553(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
-    uint8_t can_id = 0x18;
+    can_id = 0x18;
     if (req->data == 1) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_3");
     } else {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 12V D455_3");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
-    sendCanMessageIfReceived(can_id);
     res->success = true;
+    check_send_can_ = true;
   }
   void Set5vPower(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
-    uint8_t can_id = 0x19;
+    can_id = 0x19;
     if (req->data == 1) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 5V MCU");
     } else {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 5V MCU");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
-    sendCanMessageIfReceived(can_id);
     res->success = true;
+    check_send_can_ = true;
   }
   void Shutdown(
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
-    uint8_t can_id = 0x15;
+    can_id = 0x15;
     bool shutdown_ = false;
     std::memcpy(&check_power_, &shutdown_, sizeof(bool));
-    sendCanMessageIfReceived(can_id);
     (void)req;
     (void)res;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Shutdown");
+    check_send_can_ = true;
   }
   void Reboot(
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
-    uint8_t can_id = 0x15;
+    can_id = 0x15;
     int reboot_ = 255;
     std::memcpy(&check_power_, &reboot_, sizeof(int));
-    sendCanMessageIfReceived(can_id);
     (void)req;
     (void)res;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "reboot");
+    check_send_can_ = true;
   }
   void FanControl(
     const std::shared_ptr<power_controller_msgs::srv::FanController::Request> req,
     const std::shared_ptr<power_controller_msgs::srv::FanController::Response> res)
   {
     int pwm = req->data;
-    uint8_t can_id = 0x1d;
+    can_id = 0x1d;
     if (-1 < pwm && pwm < 101) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "pwm is %d", pwm);
       std::memcpy(&check_power_, &req->data, sizeof(bool));
-      sendCanMessageIfReceived(can_id);
     } else {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Only values from 0 to 100 can be entered");
     }
     res->response = true;
+    check_send_can_ = true;
   }
-  void sendCanMessageIfReceived(uint8_t can_id)
+  void SendCanMessageIfReceived()
   {
-    can_frame frame;
-    frame.can_id = can_id;
-    frame.can_dlc = 1;
-    std::memcpy(&frame.data[0], &check_power_, 1);
-    sendCanFrame(can_socket_, frame);
+    if (check_send_can_){
+      can_frame frame;
+      frame.can_id = can_id;
+      frame.can_dlc = 1;
+      std::memcpy(&frame.data[0], &check_power_, 1);
+      sendCanFrame(can_socket_, frame);
+      check_send_can_ = false;
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Send data");
+    }
   }
   void CombiningBit(
     unsigned char * frame_data, short unsigned int * data1,
@@ -336,6 +341,8 @@ private:
   // can socket
   int can_socket_;
   bool check_power_;
+  bool check_send_can_;
+  uint8_t can_id;
   // define publish msg
   power_controller_msgs::msg::BatteryArray msg;
   // service
@@ -349,7 +356,8 @@ private:
   rclcpp::Service<power_controller_msgs::srv::FanController>::SharedPtr service_server_fan_pwm;
   // publisher
   rclcpp::Publisher<power_controller_msgs::msg::BatteryArray>::SharedPtr publisher_;
-  rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::TimerBase::SharedPtr pub_timer_;
+  rclcpp::TimerBase::SharedPtr send_can_timer_;
 };
 
 int main(int argc, char * argv[])
