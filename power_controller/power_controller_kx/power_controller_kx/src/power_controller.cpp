@@ -241,7 +241,7 @@ private:
   {
     int pwm = req->data;
     uint8_t can_id = 0x1d;
-    if (pwm < 101) {
+    if (-1 < pwm && pwm < 101) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "pwm is %d", pwm);
       std::memcpy(&check_power_, &req->data, sizeof(bool));
       sendCanMessageIfReceived(can_id);
