@@ -340,25 +340,24 @@ def parameters_callback(params):
             if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
                 if param.value >= 0.0 and param.value < 100.0:
                     try:
-                        odrvs[0].axis0.controller.config.vel_gain = vel_gain
-                        odrvs[1].axis0.controller.config.vel_gain = vel_gain
+                        odrvs[0].axis0.controller.config.vel_gain = param.value
+                        odrvs[1].axis0.controller.config.vel_gain = param.value
+                        vel_gain = param.value
+                        logger.info(f"Set vel_gain: {vel_gain}")
                     except:
-                        logger.error("Can not set motor configuration!!")
-                        # raise
+                        logger.error("Can not set vel_gain!!")
                     success = True
-                    vel_gain = param.value
         if param.name == "vel_integrator_gain":
             if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
                 if param.value >= 0.0 and param.value < 100.0:
                     try:
-                        odrvs[0].axis0.controller.config.vel_integrator_gain = vel_integrator_gain
-                        odrvs[1].axis0.controller.config.vel_integrator_gain = vel_integrator_gain
+                        odrvs[0].axis0.controller.config.vel_integrator_gain = param.value
+                        odrvs[1].axis0.controller.config.vel_integrator_gain = param.value
+                        vel_integrator_gain = param.value
+                        logger.info(f"Set vel_integrator_gain: {vel_integrator_gain}")
                     except:
-                        logger.error("Can not set motor configuration!!")
-                        # raise
+                        logger.error("Can not set vel_integrator_gain!!")
                     success = True
-                    vel_integrator_gain = param.value
-    # print(vars(param)) # for debug
     return SetParametersResult(successful=success)
 
 
