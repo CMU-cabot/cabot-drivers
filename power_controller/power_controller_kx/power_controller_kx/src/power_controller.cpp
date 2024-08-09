@@ -102,7 +102,7 @@ public:
         std::placeholders::_2));
     // publisher
     publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_state", 10);
-    timer_ = this->create_wall_timer(1s, std::bind(&PowerController::PublisherPowerStatus, this));
+    timer_ = this->create_wall_timer(0.05s, std::bind(&PowerController::PublisherPowerStatus, this));
     // open can socket
     can_socket_ = openCanSocket();
   }
@@ -281,7 +281,6 @@ private:
   }
   void PublisherPowerStatus()
   {
-    bool confirm_publish = false;
     unsigned short data1;
     unsigned short data2;
     unsigned short data3;
@@ -290,47 +289,46 @@ private:
     int num_batterys = this->get_parameter("number_of_batterys").as_int();
     msg.batteryarray.resize(num_batterys);
     struct can_frame frame;
-    while (!confirm_publish) {
-      int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
-      if (nbytes > 0) {
-        switch (frame.can_id) {
-          case 0x05:  //Battery 1 Info
-            RCLCPP_INFO(this->get_logger(), "Get data of Battery 1");
-            location_ = 1;
-            CombiningBit(frame.data, &data1, &data2, &data3, &data4);
-            // define msg's value
-            DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
-            break;
-          case 0x06:  //Battery 2 Info
-            RCLCPP_INFO(this->get_logger(), "Get data of Battery 2");
-            location_ = 2;
-            CombiningBit(frame.data, &data1, &data2, &data3, &data4);
-            DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
-            break;
-          case 0x07:  //Battery 3 Info
-            location_ = 3;
-            RCLCPP_INFO(this->get_logger(), "Get data of Battery 3");
-            CombiningBit(frame.data, &data1, &data2, &data3, &data4);
-            DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
-            break;
-          case 0x08:  //Battery 4 Info
-            RCLCPP_INFO(this->get_logger(), "Get data of Battery 4");
-            location_ = 4;
-            CombiningBit(frame.data, &data1, &data2, &data3, &data4);
-            DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
-            break;
-          case 0x1c: //0x1d
-            RCLCPP_INFO(this->get_logger(), "Battery serial number");
-            CombiningBit(frame.data, &data1, &data2, &data3, &data4);
-            msg.batteryarray[0].serial_number = std::to_string(data1);
-            msg.batteryarray[1].serial_number = std::to_string(data2);
-            msg.batteryarray[2].serial_number = std::to_string(data3);
-            msg.batteryarray[3].serial_number = std::to_string(data4);
-            // publsih msg
-            publisher_->publish(msg);
-            confirm_publish = true;
-            break;
-        }
+    int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
+    if (nbytes > 0) {
+      switch (frame.can_id) {
+        case 0x05:  //Battery 1 Info
+	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 1");
+	  location_ = 1;
+	  CombiningBit(frame.data, &data1, &data2, &data3, &data4);
+	  // define msg's value
+	  DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
+	  break;
+        case 0x06:  //Battery 2 Info
+	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 2");
+	  location_ = 2;
+	  CombiningBit(frame.data, &data1, &data2, &data3, &data4);
+	  DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
+	  break;
+        case 0x07:  //Battery 3 Info
+	  location_ = 3;
+	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 3");
+	  CombiningBit(frame.data, &data1, &data2, &data3, &data4);
+	  DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
+	  break;
+        case 0x08:  //Battery 4 Info
+	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 4");
+	  location_ = 4;
+	  CombiningBit(frame.data, &data1, &data2, &data3, &data4);
+	  DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
+	  break;
+        case 0x1c: //0x1d
+	  RCLCPP_INFO(this->get_logger(), "Battery serial number");
+	  CombiningBit(frame.data, &data1, &data2, &data3, &data4);
+	  msg.batteryarray[0].serial_number = std::to_string(data1);
+	  msg.batteryarray[1].serial_number = std::to_string(data2);
+	  msg.batteryarray[2].serial_number = std::to_string(data3);
+	  msg.batteryarray[3].serial_number = std::to_string(data4);
+	  // publsih msg
+	  publisher_->publish(msg);
+	  break;
+        default:
+	  break;
       }
     }
   }
