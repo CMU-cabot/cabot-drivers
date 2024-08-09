@@ -331,6 +331,7 @@ def _error_recovery(relaunch = True):
         if (_odrv_has_error(odrvs[0]) and relaunch) or (_odrv_has_error(odrvs[1]) and relaunch) :
             _relaunch_odrive()
 
+# Refer to https://roboticsbackend.com/ros2-rclpy-parameter-callback/
 def parameters_callback(params):
     global vel_gain, vel_integrator_gain
     success = False
@@ -338,18 +339,26 @@ def parameters_callback(params):
         if param.name == "vel_gain":
             if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
                 if param.value >= 0.0 and param.value < 100.0:
-                    odrvs[0].axis0.controller.config.vel_gain = vel_gain
-                    odrvs[1].axis0.controller.config.vel_gain = vel_gain
+                    try:
+                        odrvs[0].axis0.controller.config.vel_gain = vel_gain
+                        odrvs[1].axis0.controller.config.vel_gain = vel_gain
+                    except:
+                        logger.error("Can not set motor configuration!!")
+                        # raise
                     success = True
                     vel_gain = param.value
         if param.name == "vel_integrator_gain":
             if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
                 if param.value >= 0.0 and param.value < 100.0:
-                    odrvs[0].axis0.controller.config.vel_integrator_gain = vel_integrator_gain
-                    odrvs[1].axis0.controller.config.vel_integrator_gain = vel_integrator_gain
+                    try:
+                        odrvs[0].axis0.controller.config.vel_integrator_gain = vel_integrator_gain
+                        odrvs[1].axis0.controller.config.vel_integrator_gain = vel_integrator_gain
+                    except:
+                        logger.error("Can not set motor configuration!!")
+                        # raise
                     success = True
                     vel_integrator_gain = param.value
-    print(vars(param))
+    # print(vars(param)) # for debug
     return SetParametersResult(successful=success)
 
 
