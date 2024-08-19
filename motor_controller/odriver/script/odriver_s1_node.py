@@ -334,15 +334,16 @@ def _error_recovery(relaunch = True):
 # Refer to https://roboticsbackend.com/ros2-rclpy-parameter-callback/
 def parameters_callback(params):
     global vel_gain, vel_integrator_gain
+    global lock
     success = False
     for param in params:
         if param.name == "vel_gain":
             if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
                 if param.value >= 0.0 and param.value < 100.0:
                     try:
-                        odrvs[0].axis0.controller.config.vel_gain = param.value
-                        odrvs[1].axis0.controller.config.vel_gain = param.value
+                        lock.acquire()
                         vel_gain = param.value
+                        lock.release()
                         logger.info(f"Set vel_gain: {vel_gain}")
                         success = True
                     except:
@@ -351,9 +352,9 @@ def parameters_callback(params):
             if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
                 if param.value >= 0.0 and param.value < 100.0:
                     try:
-                        odrvs[0].axis0.controller.config.vel_integrator_gain = param.value
-                        odrvs[1].axis0.controller.config.vel_integrator_gain = param.value
+                        lock.acquire()
                         vel_integrator_gain = param.value
+                        lock.release()
                         logger.info(f"Set vel_integrator_gain: {vel_integrator_gain}")
                         success = True
                     except:
@@ -427,9 +428,10 @@ def main():
             odrvs[odrv_index].axis0.controller.config.vel_integrator_gain = vel_integrator_gain
             odrvs[odrv_index].axis0.config.encoder_bandwidth = encoder_bandwidth
             odrvs[odrv_index].axis0.config.motor.current_control_bandwidth = motor_bandwidth
+            return 1
         except:
             logger.error("Can not set motor configuration!!")
-            return
+            return 0
     set_config(0)
     set_config(1)
 
@@ -440,6 +442,7 @@ def main():
 
     mode_written=None
     spd0_c_written,spd1_c_written=None,None
+    vel_gain_written,spd1_cvel_integrator_gain_written=None,None
 
     def stop_control():
         od_writeSpd(0,0)
@@ -552,6 +555,10 @@ def main():
                 if PRINTDEBUG: print('w 1 {:0.2f}'.format(spd1_c))
                 if od_writeSpd(1,spd1_c):
                     spd1_c_written=spd1_c
+            if(vel_gain_written!=vel_gain or vel_integrator_gain_written!=vel_integrator_gain):
+                if set_config(0) and set_config(1):
+                    vel_gain_written=vel_gain
+                    vel_integrator_gain_written=vel_integratior_gain
             lock.release()
         except:
             lock.release()
