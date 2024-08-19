@@ -55,55 +55,55 @@ public:
     service_server_24v_odrive = this->create_service<std_srvs::srv::SetBool>(
       "set_24v_power_odrive",
       std::bind(
-        &PowerController::Set24vPower,
+        &PowerController::set24vPower,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_12v_D455_1 = this->create_service<std_srvs::srv::SetBool>(
       "set_12v_power_D455_1",
       std::bind(
-        &PowerController::Set12vPowerD4551,
+        &PowerController::set12vPowerD4551,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_12v_D455_2 = this->create_service<std_srvs::srv::SetBool>(
       "set_12v_power_D455_2",
       std::bind(
-        &PowerController::Set12vPowerD4552,
+        &PowerController::set12vPowerD4552,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_12v_D455_3 = this->create_service<std_srvs::srv::SetBool>(
       "set_12v_power_D455_3",
       std::bind(
-        &PowerController::Set12vPowerD4553,
+        &PowerController::set12vPowerD4553,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_5v_MCU = this->create_service<std_srvs::srv::SetBool>(
       "set_5v_power_MCU",
       std::bind(
-        &PowerController::Set5vPower,
+        &PowerController::set5vPowerMCU,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_shutdown = this->create_service<std_srvs::srv::Empty>(
       "shutdown",
       std::bind(
-        &PowerController::Shutdown,
+        &PowerController::shutdown,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_reboot = this->create_service<std_srvs::srv::Empty>(
       "reboot",
       std::bind(
-        &PowerController::Reboot,
+        &PowerController::reboot,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_fan_pwm = this->create_service<power_controller_msgs::srv::FanController>(
       "fan_control",
       std::bind(
-        &PowerController::FanControl,
+        &PowerController::fanControl,
         this, std::placeholders::_1,
         std::placeholders::_2));
     // publisher
     publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_state", 10);
-    pub_timer_ = this->create_wall_timer(0.05s, std::bind(&PowerController::PublisherPowerStatus, this));
-    send_can_timer_ = this->create_wall_timer(0.5s, std::bind(&PowerController::SendCanMessageIfReceived, this));
+    pub_timer_ = this->create_wall_timer(0.05s, std::bind(&PowerController::publisherPowerStatus, this));
+    send_can_timer_ = this->create_wall_timer(0.5s, std::bind(&PowerController::sendCanMessageIfReceived, this));
     // open can socket
     can_socket_ = openCanSocket();
   }
@@ -142,7 +142,7 @@ private:
       RCLCPP_ERROR(this->get_logger(), "The number of bytes is not equal to the number of bytes");
     }
   }
-  void Set24vPower(
+  void set24vPower(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -156,7 +156,7 @@ private:
     res->success = true;
     check_send_can_ = true;
   }
-  void Set12vPowerD4551(
+  void set12vPowerD4551(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -170,7 +170,7 @@ private:
     res->success = true;
     check_send_can_ = true;
   }
-  void Set12vPowerD4552(
+  void set12vPowerD4552(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -184,7 +184,7 @@ private:
     res->success = true;
     check_send_can_ = true;
   }
-  void Set12vPowerD4553(
+  void set12vPowerD4553(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -198,7 +198,7 @@ private:
     res->success = true;
     check_send_can_ = true;
   }
-  void Set5vPower(
+  void set5vPowerMCU(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -212,7 +212,7 @@ private:
     res->success = true;
     check_send_can_ = true;
   }
-  void Shutdown(
+  void shutdown(
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
@@ -224,7 +224,7 @@ private:
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Shutdown");
     check_send_can_ = true;
   }
-  void Reboot(
+  void reboot(
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
@@ -236,7 +236,7 @@ private:
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "reboot");
     check_send_can_ = true;
   }
-  void FanControl(
+  void fanControl(
     const std::shared_ptr<power_controller_msgs::srv::FanController::Request> req,
     const std::shared_ptr<power_controller_msgs::srv::FanController::Response> res)
   {
@@ -251,7 +251,7 @@ private:
     res->response = true;
     check_send_can_ = true;
   }
-  void SendCanMessageIfReceived()
+  void sendCanMessageIfReceived()
   {
     if (check_send_can_){
       can_frame frame;
@@ -263,7 +263,7 @@ private:
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Send data");
     }
   }
-  void CombiningBit(
+  void combiningBit(
     unsigned char * frame_data, short unsigned int * data1,
     short unsigned int * data2, short unsigned int * data3, short unsigned int * data4)
   {
@@ -272,7 +272,7 @@ private:
     *data3 = (frame_data[5] << 8) | frame_data[4];
     *data4 = (frame_data[7] << 8) | frame_data[6];
   }
-  void DefineMSG(
+  void defineMSG(
     power_controller_msgs::msg::BatteryArray & msg, int location_,
     short unsigned int * data1, short unsigned int * data2, short unsigned int * data3, short unsigned int * data4)
   {
@@ -284,7 +284,7 @@ private:
     msg.batteryarray[array_num].temperature = *data4;
     msg.batteryarray[array_num].location = std::to_string(location_);
   }
-  void PublisherPowerStatus()
+  void publisherPowerStatus()
   {
     unsigned short data1;
     unsigned short data2;
@@ -300,31 +300,31 @@ private:
         case 0x05:  //Battery 1 Info
 	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 1");
 	  location_ = 1;
-	  CombiningBit(frame.data, &data1, &data2, &data3, &data4);
+	  combiningBit(frame.data, &data1, &data2, &data3, &data4);
 	  // define msg's value
-	  DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
+	  defineMSG(msg, location_, &data1, &data2, &data3, &data4);
 	  break;
         case 0x06:  //Battery 2 Info
 	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 2");
 	  location_ = 2;
-	  CombiningBit(frame.data, &data1, &data2, &data3, &data4);
-	  DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
+	  combiningBit(frame.data, &data1, &data2, &data3, &data4);
+	  defineMSG(msg, location_, &data1, &data2, &data3, &data4);
 	  break;
         case 0x07:  //Battery 3 Info
 	  location_ = 3;
 	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 3");
-	  CombiningBit(frame.data, &data1, &data2, &data3, &data4);
-	  DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
+	  combiningBit(frame.data, &data1, &data2, &data3, &data4);
+	  defineMSG(msg, location_, &data1, &data2, &data3, &data4);
 	  break;
         case 0x08:  //Battery 4 Info
 	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 4");
 	  location_ = 4;
-	  CombiningBit(frame.data, &data1, &data2, &data3, &data4);
-	  DefineMSG(msg, location_, &data1, &data2, &data3, &data4);
+	  combiningBit(frame.data, &data1, &data2, &data3, &data4);
+	  defineMSG(msg, location_, &data1, &data2, &data3, &data4);
 	  break;
         case 0x1c: //0x1d
 	  RCLCPP_INFO(this->get_logger(), "Battery serial number");
-	  CombiningBit(frame.data, &data1, &data2, &data3, &data4);
+	  combiningBit(frame.data, &data1, &data2, &data3, &data4);
 	  msg.batteryarray[0].serial_number = std::to_string(data1);
 	  msg.batteryarray[1].serial_number = std::to_string(data2);
 	  msg.batteryarray[2].serial_number = std::to_string(data3);
