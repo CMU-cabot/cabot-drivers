@@ -49,8 +49,8 @@ public:
   : Node("power_controller_node"), check_power_(true), check_send_can_(false)
   {
     using namespace std::chrono_literals;
-    // number of batterys
-    this->declare_parameter<int>("number_of_batterys", 4);
+    // number of batteries
+    this->declare_parameter<int>("number_of_batteries", 4);
     // service
     service_server_24v_Odrive = this->create_service<std_srvs::srv::SetBool>(
       "set_24v_power_Odrive",
@@ -291,8 +291,8 @@ private:
     unsigned short data3;
     unsigned short data4;
     int location_;
-    int num_batterys = this->get_parameter("number_of_batterys").as_int();
-    msg.batteryarray.resize(num_batterys);
+    int num_batteries = this->get_parameter("number_of_batteries").as_int();
+    msg.batteryarray.resize(num_batteries);
     struct can_frame frame;
     int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
     if (nbytes > 0) {
