@@ -59,25 +59,25 @@ public:
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_12v_D455_1 = this->create_service<std_srvs::srv::SetBool>(
-      "set_12v_power_D455_1",
+      "set_12v_power_d455_1",
       std::bind(
         &PowerController::set12vPowerD4551,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_12v_D455_2 = this->create_service<std_srvs::srv::SetBool>(
-      "set_12v_power_D455_2",
+      "set_12v_power_d455_2",
       std::bind(
         &PowerController::set12vPowerD4552,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_12v_D455_3 = this->create_service<std_srvs::srv::SetBool>(
-      "set_12v_power_D455_3",
+      "set_12v_power_d455_3",
       std::bind(
         &PowerController::set12vPowerD4553,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_5v_MCU = this->create_service<std_srvs::srv::SetBool>(
-      "set_5v_power_MCU",
+      "set_5v_power_mcu",
       std::bind(
         &PowerController::set5vPowerMCU,
         this, std::placeholders::_1,
