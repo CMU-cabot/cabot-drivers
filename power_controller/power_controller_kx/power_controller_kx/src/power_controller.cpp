@@ -52,8 +52,8 @@ public:
     // number of batteries
     this->declare_parameter<int>("number_of_batteries", 4);
     // service
-    service_server_24v_Odrive = this->create_service<std_srvs::srv::SetBool>(
-      "set_24v_power_Odrive",
+    service_server_24v_odrive = this->create_service<std_srvs::srv::SetBool>(
+      "set_24v_power_odrive",
       std::bind(
         &PowerController::Set24vPower,
         this, std::placeholders::_1,
@@ -148,9 +148,9 @@ private:
   {
     can_id = 0x14;
     if (req->data == 1) {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 24V_Odrive");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 24V_odrive");
     } else {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 24V_Odrive");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 24V_odrive");
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     res->success = true;
@@ -346,7 +346,7 @@ private:
   // define publish msg
   power_controller_msgs::msg::BatteryArray msg;
   // service
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_24v_Odrive;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_24v_odrive;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_1;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_2;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_3;
