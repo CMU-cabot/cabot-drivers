@@ -1,15 +1,9 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/temperature.hpp"
 #include <linux/can.h>
-#include <linux/can/raw.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <cstring>
-#include <iostream>
 
-const char* CAN_NUMBER = "can1";
 const int TEMPERATURE_CAN_ID_1 = 0x21;
 const int TEMPERATURE_CAN_ID_2 = 0x22;
 const int TEMPERATURE_CAN_ID_3 = 0x23;
@@ -49,7 +43,7 @@ class CanTemperaturePublisher : public rclcpp::Node {
 public:
     CanTemperaturePublisher()
         : Node("can_temperature_publisher"),
-          can_sock_(open_can_socket("CAN_NUMBER"))    {
+          can_sock_(open_can_socket("can1"))    {
         temperature_pub_1_ = this->create_publisher<sensor_msgs::msg::Temperature>("/temperature1", 2);
         temperature_pub_2_ = this->create_publisher<sensor_msgs::msg::Temperature>("/temperature2", 2);
         temperature_pub_3_ = this->create_publisher<sensor_msgs::msg::Temperature>("/temperature3", 2);
