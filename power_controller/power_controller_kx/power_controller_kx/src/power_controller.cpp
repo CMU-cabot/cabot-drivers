@@ -41,6 +41,7 @@
 
 // font color
 #define ANSI_COLOR_CYAN   "\x1b[36m"
+#define PERIOD 0.001s
 
 class PowerController : public rclcpp::Node
 {
@@ -103,7 +104,7 @@ public:
         std::placeholders::_2));
     // publisher
     publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_state", 10);
-    pub_timer_ = this->create_wall_timer(0.05s, std::bind(&PowerController::publisherPowerStatus, this));
+    pub_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::publisherPowerStatus, this));
     send_can_timer_ = this->create_wall_timer(0.5s, std::bind(&PowerController::sendCanMessageIfReceived, this));
     // open can socket
     can_socket_ = openCanSocket();
