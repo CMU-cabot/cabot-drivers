@@ -268,8 +268,8 @@ private:
     }
   }
   void combiningBit(
-    unsigned char * frame_data, short unsigned int * data1,
-    short unsigned int * data2, short unsigned int * data3, short unsigned int * data4)
+    unsigned char * frame_data, unsigned short* data1,
+    unsigned short* data2, unsigned short* data3, unsigned short* data4)
   {
     *data1 = (frame_data[1] << 8) | frame_data[0];
     *data2 = (frame_data[3] << 8) | frame_data[2];
@@ -278,7 +278,7 @@ private:
   }
   void defineMSG(
     power_controller_msgs::msg::BatteryArray & msg, int location_,
-    short unsigned int * data1, short unsigned int * data2, short unsigned int * data3, short unsigned int * data4)
+    unsigned short* data1, unsigned short* data2, unsigned short* data3, unsigned short* data4)
   {
     int array_num = location_ - 1;
     msg.batteryarray[array_num].header.stamp = this->get_clock()->now();
