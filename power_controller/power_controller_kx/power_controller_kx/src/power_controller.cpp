@@ -234,7 +234,7 @@ private:
   {
     id = 0x15;
     int reboot_ = 255;
-    std::memcpy(&check_power_, &reboot_, sizeof(int));
+    std::memcpy(&check_power_, &reboot_, sizeof(bool));
     (void)req;
     (void)res;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "reboot");
