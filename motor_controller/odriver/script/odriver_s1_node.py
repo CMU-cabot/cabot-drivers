@@ -77,6 +77,8 @@ serialReading_timeout=0.01 #sec
 serialWriting_timeout=0.01 #sec
 lock=threading.Lock()
 use_checksum=False
+max_vel_gain = 100.0
+max_vel_integrator_gain = 100.0
 
 '''Configuarable parameter'''
 meter_per_count = None
@@ -340,13 +342,13 @@ def parameters_callback(params):
     for param in params:
         if param.name == "vel_gain":
             if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
-                if param.value >= 0.0 and param.value < 100.0:
+                if param.value >= 0.0 and param.value < max_vel_gain:
                         vel_gain = param.value
                         logger.info(f"Set vel_gain: {vel_gain}")
                         success = True
         if param.name == "vel_integrator_gain":
             if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
-                if param.value >= 0.0 and param.value < 100.0:
+                if param.value >= 0.0 and param.value < max_vel_integrator_gain:
                         vel_integrator_gain = param.value
                         logger.info(f"Set vel_integrator_gain: {vel_integrator_gain}")
                         success = True
