@@ -336,29 +336,21 @@ def parameters_callback(params):
     global vel_gain, vel_integrator_gain
     global lock
     success = False
+    lock.acquire()
     for param in params:
         if param.name == "vel_gain":
             if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
                 if param.value >= 0.0 and param.value < 100.0:
-                    try:
-                        lock.acquire()
                         vel_gain = param.value
-                        lock.release()
                         logger.info(f"Set vel_gain: {vel_gain}")
                         success = True
-                    except:
-                        logger.error("Can not set vel_gain!!")
         if param.name == "vel_integrator_gain":
             if param.type_ in [Parameter.Type.DOUBLE, Parameter.Type.INTEGER]:
                 if param.value >= 0.0 and param.value < 100.0:
-                    try:
-                        lock.acquire()
                         vel_integrator_gain = param.value
-                        lock.release()
                         logger.info(f"Set vel_integrator_gain: {vel_integrator_gain}")
                         success = True
-                    except:
-                        logger.error("Can not set vel_integrator_gain!!")
+    lock.release()
     return SetParametersResult(successful=success)
 
 
