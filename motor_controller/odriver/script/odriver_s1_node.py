@@ -442,7 +442,7 @@ def main():
 
     mode_written=None
     spd0_c_written,spd1_c_written=None,None
-    vel_gain_written,spd1_cvel_integrator_gain_written=None,None
+    vel_gain_written,vel_integrator_gain_written=None,None
 
     def stop_control():
         od_writeSpd(0,0)
@@ -558,7 +558,7 @@ def main():
             if(vel_gain_written!=vel_gain or vel_integrator_gain_written!=vel_integrator_gain):
                 if set_config(0) and set_config(1):
                     vel_gain_written=vel_gain
-                    vel_integrator_gain_written=vel_integratior_gain
+                    vel_integrator_gain_written=vel_integrator_gain
             lock.release()
         except:
             lock.release()
