@@ -150,7 +150,7 @@ private:
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
-    can_id = 0x14;
+    id = 0x14;
     if (req->data == 1) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 24V_odrive");
     } else {
@@ -164,7 +164,7 @@ private:
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
-    can_id = 0x16;
+    id = 0x16;
     if (req->data == 1) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_1");
     } else {
@@ -178,7 +178,7 @@ private:
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
-    can_id = 0x17;
+    id = 0x17;
     if (req->data == 1) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_2");
     } else {
@@ -192,7 +192,7 @@ private:
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
-    can_id = 0x18;
+    id = 0x18;
     if (req->data == 1) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_3");
     } else {
@@ -206,7 +206,7 @@ private:
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
-    can_id = 0x19;
+    id = 0x19;
     if (req->data == 1) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 5V MCU");
     } else {
@@ -220,7 +220,7 @@ private:
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
-    can_id = 0x15;
+    id = 0x15;
     bool shutdown_ = false;
     std::memcpy(&check_power_, &shutdown_, sizeof(bool));
     (void)req;
@@ -232,7 +232,7 @@ private:
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
-    can_id = 0x15;
+    id = 0x15;
     int reboot_ = 255;
     std::memcpy(&check_power_, &reboot_, sizeof(int));
     (void)req;
@@ -245,7 +245,7 @@ private:
     const std::shared_ptr<power_controller_msgs::srv::FanController::Response> res)
   {
     int pwm = req->data;
-    can_id = 0x1d;
+    id = 0x1d;
     if (-1 < pwm && pwm < 101) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "pwm is %d", pwm);
       std::memcpy(&check_power_, &req->data, sizeof(bool));
@@ -259,7 +259,7 @@ private:
   {
     if (check_send_can_){
       can_frame frame;
-      frame.can_id = can_id;
+      frame.can_id = id;
       frame.can_dlc = 1;
       std::memcpy(&frame.data[0], &check_power_, 1);
       sendCanFrame(can_socket_, frame);
@@ -346,7 +346,7 @@ private:
   int can_socket_;
   bool check_power_;
   bool check_send_can_;
-  uint8_t can_id;
+  uint8_t id;
   // define publish msg
   power_controller_msgs::msg::BatteryArray msg;
   // service
