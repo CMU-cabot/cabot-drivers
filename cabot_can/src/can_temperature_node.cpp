@@ -10,10 +10,10 @@ const int TEMPERATURE_CAN_ID_3 = 0x23;
 const int TEMPERATURE_CAN_ID_4 = 0x24;
 const int TEMPERATURE_CAN_ID_5 = 0x25;
 
-int open_can_socket(const std::string &can_interface) {
+int openCanSocket(const std::string &can_interface) {
     int sock = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (sock < 0) {
-        std::cerr << "Error while opening socket" << std::endl;
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Error while opening socket");
         return -1;
     }
 
@@ -27,14 +27,14 @@ int open_can_socket(const std::string &can_interface) {
     addr.can_ifindex = ifr.ifr_ifindex;
 
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        std::cerr << "Error in socket bind" << std::endl;
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Error in socket bind");
         return -2;
     }
 
     return sock;
 }
 
-bool receive_can_data(int sock, struct can_frame &frame) {
+bool receiveCanData(int sock, struct can_frame &frame) {
     int nbytes = read(sock, &frame, sizeof(struct can_frame));
     return nbytes > 0;
 }
@@ -43,7 +43,7 @@ class CanTemperaturePublisher : public rclcpp::Node {
 public:
     CanTemperaturePublisher()
         : Node("can_temperature_publisher"),
-          can_sock_(open_can_socket("can1"))    {
+          can_sock_(openCanSocket("can1"))    {
         temperature_pub_1_ = this->create_publisher<sensor_msgs::msg::Temperature>("/temperature1", 2);
         temperature_pub_2_ = this->create_publisher<sensor_msgs::msg::Temperature>("/temperature2", 2);
         temperature_pub_3_ = this->create_publisher<sensor_msgs::msg::Temperature>("/temperature3", 2);
@@ -51,14 +51,14 @@ public:
         temperature_pub_5_ = this->create_publisher<sensor_msgs::msg::Temperature>("/temperature5", 2);
 
         timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(100),
-            std::bind(&CanTemperaturePublisher::timer_callback, this));
+            std::chrono::milliseconds(1),
+            std::bind(&CanTemperaturePublisher::timerCallback, this));
     }
 
 private:
-    void timer_callback() {
+    void timerCallback() {
         struct can_frame frame;
-        if (receive_can_data(can_sock_, frame)) {
+        if (receiveCanData(can_sock_, frame)) {
             int16_t temperature_raw = (frame.data[1] << 8) | frame.data[0];
             float temperature = static_cast<float>(temperature_raw) / 16.0;
 
