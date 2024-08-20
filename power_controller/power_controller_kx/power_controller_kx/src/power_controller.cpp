@@ -51,6 +51,7 @@ public:
     using namespace std::chrono_literals;
     // number of batteries
     this->declare_parameter<int>("number_of_batteries", 4);
+    this->declare_parameter<std::string>("can_interface", "can0");
     // service
     service_server_24v_odrive = this->create_service<std_srvs::srv::SetBool>(
       "set_24v_power_odrive",
@@ -117,13 +118,16 @@ private:
   // can
   int openCanSocket()
   {
+    std::string can_interface_ = this->get_parameter("can_interface").as_string();
+    RCLCPP_ERROR(this->get_logger(), "%s", can_interface_.c_str());
     int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (s < 0) {
       RCLCPP_ERROR(this->get_logger(), "Socket");
       return -1;
     }
     struct ifreq ifr;
-    strcpy(ifr.ifr_name, "can0");
+    // strcpy(ifr.ifr_name, "can0");
+    strcpy(ifr.ifr_name, can_interface_.c_str());
     ioctl(s, SIOCGIFINDEX, &ifr);
     struct sockaddr_can addr;
     addr.can_family = AF_CAN;
