@@ -86,13 +86,13 @@ public:
     service_server_shutdown = this->create_service<std_srvs::srv::Empty>(
       "shutdown",
       std::bind(
-        &PowerController::shutdown,
+        &PowerController::shutdownALL,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_reboot = this->create_service<std_srvs::srv::Empty>(
       "reboot",
       std::bind(
-        &PowerController::reboot,
+        &PowerController::rebootALL,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_fan_pwm = this->create_service<power_controller_msgs::srv::FanController>(
@@ -216,7 +216,7 @@ private:
     res->success = true;
     check_send_can_ = true;
   }
-  void shutdown(
+  void shutdownALL(
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
@@ -228,7 +228,7 @@ private:
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Shutdown");
     check_send_can_ = true;
   }
-  void reboot(
+  void rebootALL(
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
