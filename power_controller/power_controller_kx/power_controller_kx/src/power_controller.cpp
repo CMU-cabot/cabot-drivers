@@ -32,6 +32,7 @@
 // include ROS2
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/battery_state.hpp>
+#include <std_msgs/msg/int8.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 #include <std_srvs/srv/empty.hpp>
 
@@ -47,7 +48,7 @@ class PowerController : public rclcpp::Node
 {
 public:
   PowerController()
-  : Node("power_controller_node"), check_power_(true), check_send_can_(false)
+  : Node("power_controller_node"), check_power_(true), check_send_can_srv(false),check_send_can_sub(false)
   {
     using namespace std::chrono_literals;
     // number of batteries
@@ -96,18 +97,21 @@ public:
         &PowerController::rebootALL,
         this, std::placeholders::_1,
         std::placeholders::_2));
-    service_server_fan_pwm = this->create_service<power_controller_msgs::srv::FanController>(
-      "fan_control",
+    // fan subscriber
+    subscriber_fan_ = this->create_subscription<std_msgs::msg::Int8>(
+      "fan_controller",
+      10,
       std::bind(
-        &PowerController::fanControl,
-        this, std::placeholders::_1,
-        std::placeholders::_2));
+        &PowerController::fanControllerCallBack,
+        this,
+        std::placeholders::_1));
     // publisher
     publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_state", 10);
     pub_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::publisherPowerStatus, this));
     send_can_timer_ = this->create_wall_timer(0.5s, std::bind(&PowerController::sendCanMessageIfReceived, this));
     // open can socket
     can_socket_ = openCanSocket();
+
   }
 
   ~PowerController()
@@ -127,7 +131,6 @@ private:
       return -1;
     }
     struct ifreq ifr;
-    // strcpy(ifr.ifr_name, "can0");
     strcpy(ifr.ifr_name, can_interface_.c_str());
     ioctl(s, SIOCGIFINDEX, &ifr);
     struct sockaddr_can addr;
@@ -159,7 +162,7 @@ private:
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     res->success = true;
-    check_send_can_ = true;
+    check_send_can_srv = true;
   }
   void set12vPowerD4551(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
@@ -173,7 +176,7 @@ private:
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     res->success = true;
-    check_send_can_ = true;
+    check_send_can_srv = true;
   }
   void set12vPowerD4552(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
@@ -187,7 +190,7 @@ private:
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     res->success = true;
-    check_send_can_ = true;
+    check_send_can_srv = true;
   }
   void set12vPowerD4553(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
@@ -201,7 +204,7 @@ private:
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     res->success = true;
-    check_send_can_ = true;
+    check_send_can_srv = true;
   }
   void set5vPowerMCU(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
@@ -215,7 +218,7 @@ private:
     }
     std::memcpy(&check_power_, &req->data, sizeof(bool));
     res->success = true;
-    check_send_can_ = true;
+    check_send_can_srv = true;
   }
   void shutdownALL(
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
@@ -227,7 +230,7 @@ private:
     (void)req;
     (void)res;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Shutdown");
-    check_send_can_ = true;
+    check_send_can_srv = true;
   }
   void rebootALL(
     const std::shared_ptr<std_srvs::srv::Empty::Request> req,
@@ -239,32 +242,38 @@ private:
     (void)req;
     (void)res;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "reboot");
-    check_send_can_ = true;
+    check_send_can_srv = true;
   }
-  void fanControl(
-    const std::shared_ptr<power_controller_msgs::srv::FanController::Request> req,
-    const std::shared_ptr<power_controller_msgs::srv::FanController::Response> res)
+  void fanControllerCallBack(std_msgs::msg::Int8 msg)
   {
-    int pwm = req->data;
+    int pwm = msg.data;
     id = 0x1d;
     if (-1 < pwm && pwm < 101) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "pwm is %d", pwm);
-      std::memcpy(&check_power_, &req->data, sizeof(bool));
+      std::memcpy(&fan_param, &pwm, sizeof(bool));
     } else {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Only values from 0 to 100 can be entered");
     }
-    res->response = true;
-    check_send_can_ = true;
+    check_send_can_sub = true;
   }
   void sendCanMessageIfReceived()
   {
-    if (check_send_can_){
+    if (check_send_can_sub){
       can_frame frame;
       frame.can_id = id;
       frame.can_dlc = 1;
-      std::memcpy(&frame.data[0], &check_power_, 1);
+      std::memcpy(&frame.data[0], &fan_param, sizeof(bool));
       sendCanFrame(can_socket_, frame);
-      check_send_can_ = false;
+      check_send_can_sub = false;
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Send data");
+    }
+    else if (check_send_can_srv){
+      can_frame frame;
+      frame.can_id = id;
+      frame.can_dlc = 1;
+      std::memcpy(&frame.data[0], &check_power_, sizeof(bool));
+      sendCanFrame(can_socket_, frame);
+      check_send_can_srv = false;
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Send data");
     }
   }
@@ -346,7 +355,9 @@ private:
   // can socket
   int can_socket_;
   bool check_power_;
-  bool check_send_can_;
+  int fan_param;
+  bool check_send_can_srv;
+  bool check_send_can_sub;
   uint8_t id;
   // define publish msg
   power_controller_msgs::msg::BatteryArray msg;
@@ -358,7 +369,8 @@ private:
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_5v_MCU;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_server_shutdown;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_server_reboot;
-  rclcpp::Service<power_controller_msgs::srv::FanController>::SharedPtr service_server_fan_pwm;
+  // subscriber
+  rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr subscriber_fan_;
   // publisher
   rclcpp::Publisher<power_controller_msgs::msg::BatteryArray>::SharedPtr publisher_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
