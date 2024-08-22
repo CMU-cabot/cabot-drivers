@@ -245,9 +245,10 @@ private:
   }
   void fanControllerCallBack(std_msgs::msg::Int8 msg)
   {
-    int pwm = msg.data;
+    int duty = msg.data;
     id = 0x1e;
-    if (-1 < pwm && pwm < 101) {
+    if (-1 < duty && duty < 101) {
+      int pwm = duty * 2.55;
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "pwm is %d", pwm);
       std::memcpy(&send_can_value, &pwm, sizeof(bool));
     } else {
