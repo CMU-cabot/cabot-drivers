@@ -325,10 +325,16 @@ private:
   {
     int array_num = location_ - 1;
     msg.batteryarray[array_num].header.stamp = this->get_clock()->now();
-    msg.batteryarray[array_num].voltage = *data1;
-    msg.batteryarray[array_num].current = *data2;
+    // Converts voltage units from mV to V
+    float voltage = *data1 / 1000;
+    msg.batteryarray[array_num].voltage = voltage;
+    // Converts current units from mA to A
+    float current = *data2 / 1000;
+    msg.batteryarray[array_num].current = current;
     msg.batteryarray[array_num].percentage = *data3;
-    msg.batteryarray[array_num].temperature = *data4;
+    // Convert absolute temperature to Celsius
+    float temperature = (*data4 - 2731) / 10;
+    msg.batteryarray[array_num].temperature = temperature;
     msg.batteryarray[array_num].location = std::to_string(location_);
   }
   void publisherPowerStatus()
