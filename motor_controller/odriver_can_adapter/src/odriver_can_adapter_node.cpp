@@ -68,12 +68,10 @@ public:
 private:
   void controllerStatusLeftCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg)
   {
-    (void*)msg;
   }
 
   void controllerStatusRightCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg)
   {
-    (void*)msg;
   }
 
   void motorTargetCallback(const odriver_msgs::msg::MotorTarget::SharedPtr msg)
