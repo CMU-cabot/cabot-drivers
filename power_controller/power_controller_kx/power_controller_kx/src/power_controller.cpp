@@ -66,22 +66,22 @@ public:
         &PowerController::set24vPower,
         this, std::placeholders::_1,
         std::placeholders::_2));
-    service_server_12v_D455_1 = this->create_service<std_srvs::srv::SetBool>(
-      "set_12v_power_d455_1",
+    service_server_12v_D455_front = this->create_service<std_srvs::srv::SetBool>(
+      "set_12v_power_d455_front",
       std::bind(
-        &PowerController::set12vPowerD4551,
+        &PowerController::set12vPowerD455Front,
         this, std::placeholders::_1,
         std::placeholders::_2));
-    service_server_12v_D455_2 = this->create_service<std_srvs::srv::SetBool>(
-      "set_12v_power_d455_2",
+    service_server_12v_D455_left = this->create_service<std_srvs::srv::SetBool>(
+      "set_12v_power_d455_left",
       std::bind(
-        &PowerController::set12vPowerD4552,
+        &PowerController::set12vPowerD455Left,
         this, std::placeholders::_1,
         std::placeholders::_2));
-    service_server_12v_D455_3 = this->create_service<std_srvs::srv::SetBool>(
-      "set_12v_power_d455_3",
+    service_server_12v_D455_right = this->create_service<std_srvs::srv::SetBool>(
+      "set_12v_power_d455_right",
       std::bind(
-        &PowerController::set12vPowerD4553,
+        &PowerController::set12vPowerD455Right,
         this, std::placeholders::_1,
         std::placeholders::_2));
     service_server_5v_MCU = this->create_service<std_srvs::srv::SetBool>(
@@ -175,7 +175,7 @@ private:
     mtx.unlock();
     res->success = true;
   }
-  void set12vPowerD4551(
+  void set12vPowerD455Front(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -193,7 +193,7 @@ private:
     mtx.unlock();
     res->success = true;
   }
-  void set12vPowerD4552(
+  void set12vPowerD455Left(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -211,7 +211,7 @@ private:
     mtx.unlock();
     res->success = true;
   }
-  void set12vPowerD4553(
+  void set12vPowerD455Right(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
     const std::shared_ptr<std_srvs::srv::SetBool::Response> res)
   {
@@ -410,9 +410,9 @@ private:
   power_controller_msgs::msg::BatteryArray msg;
   // service
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_24v_odrive;
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_1;
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_2;
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_3;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_front;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_left;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_right;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_5v_MCU;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_server_shutdown;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_server_reboot;
