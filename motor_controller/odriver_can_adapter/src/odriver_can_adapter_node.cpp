@@ -40,6 +40,7 @@ public:
 
     this->declare_parameter("wheel_diameter_m", 0.17);
     wheel_diameter_m_ = this->get_parameter("wheel_diameter_m").as_double();
+    meter_per_round_ = wheel_diameter_m_ * M_PI;
 
     rclcpp::QoS control_message_left_qos(rclcpp::KeepAll{});
     control_message_left_pub_ = create_publisher<odrive_can::msg::ControlMessage>("/control_message_left", control_message_left_qos);
@@ -68,10 +69,18 @@ public:
 private:
   void controllerStatusLeftCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg)
   {
+    spd_left_c_ = msg->vel_estimate;
+    dist_left_c_ = msg->pos_estimate;
+    current_setpoint_left_ = msg->iq_setpoint;
+    current_measured_left_ = msg->iq_measured;
   }
 
   void controllerStatusRightCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg)
   {
+    spd_right_c_ = msg->vel_estimate;
+    dist_right_c_ = msg->pos_estimate;
+    current_setpoint_right_ = msg->iq_setpoint;
+    current_measured_right_ = msg->iq_measured;
   }
 
   void motorTargetCallback(const odriver_msgs::msg::MotorTarget::SharedPtr msg)
@@ -87,11 +96,9 @@ private:
     left_message.input_mode = kPassthroughInputMode;
     right_message.input_mode = kPassthroughInputMode;
 
-    double meter_per_round = wheel_diameter_m_ * M_PI;
-
     // meter/sec -> rotation/sec
-    left_message.input_vel = msg->spd_left / meter_per_round;
-    right_message.input_vel = msg->spd_right / meter_per_round;
+    left_message.input_vel = msg->spd_left / meter_per_round_;
+    right_message.input_vel = msg->spd_right / meter_per_round_;
 
     control_message_left_pub_->publish(left_message);
     control_message_right_pub_->publish(right_message);
@@ -103,6 +110,24 @@ private:
 
     status.header.stamp = this->get_clock()->now();
 
+    status.dist_left_c = dist_left_c_;
+    status.dist_right_c = dist_right_c_;
+
+    status.spd_left_c = spd_left_c_;
+    status.spd_right_c = spd_right_c_;
+
+    status.dist_left = dist_left_c_ * meter_per_round_;
+    status.dist_right = dist_right_c_ * meter_per_round_;
+
+    status.spd_left = spd_left_c_ * meter_per_round_;
+    status.spd_right = spd_right_c_ * meter_per_round_;
+
+    status.current_setpoint_left = current_setpoint_left_;
+    status.current_setpoint_right = current_setpoint_right_;
+
+    status.current_measured_left = current_measured_left_;
+    status.current_measured_right = current_measured_right_;
+
     motor_status_pub_->publish(status);
   }
 
@@ -113,6 +138,19 @@ private:
   const int kPassthroughInputMode = 1;
 
   double wheel_diameter_m_;
+  double meter_per_round_;
+
+  double spd_left_c_;
+  double spd_right_c_;
+
+  double dist_left_c_;
+  double dist_right_c_;
+
+  double current_setpoint_left_;
+  double current_setpoint_right_;
+
+  double current_measured_left_;
+  double current_measured_right_;
 
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_left_pub_;
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_right_pub_;
