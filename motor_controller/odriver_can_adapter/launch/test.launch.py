@@ -97,7 +97,7 @@ def generate_launch_description():
             remappings=[
                 ('/cabot/control_message', '/cabot/control_message_right'),
                 ('/cabot/controller_status', '/cabot/controller_status_right'),
-                ('/cabot/request_axis_state', '/cabot/request_axis_state_right')
+                ('/cabot/request_axis_state', '/cabot/request_axis_state_right'),
             ],
         ),
         ExecuteProcess(
