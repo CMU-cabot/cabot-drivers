@@ -82,14 +82,12 @@ private:
     odrive_can::msg::ControlMessage left_message;
     odrive_can::msg::ControlMessage right_message;
     
-    // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.ControlMode
     // set velocity mode
-    left_message.control_mode = 2;
-    right_message.control_mode = 2;
+    left_message.control_mode = kVelocityControlMode;
+    right_message.control_mode = kVelocityControlMode;
 
-    // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.InputMode
-    left_message.input_mode = 1;
-    right_message.input_mode = 1;
+    left_message.input_mode = kPassthroughInputMode;
+    right_message.input_mode = kPassthroughInputMode;
 
     double meter_per_sec_left = msg->spd_left;
     double meter_per_sec_right = msg->spd_right;
@@ -112,6 +110,12 @@ private:
 
     motor_status_pub_->publish(status);
   }
+
+  // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.ControlMode
+  const int kVelocityControlMode = 2;
+
+  // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.InputMode
+  const int kPassthroughInputMode = 1;
 
   double wheel_diameter_m_;
 
