@@ -38,6 +38,9 @@ public:
     using std::placeholders::_1;
     using namespace std::chrono_literals;
 
+    this->declare_parameter("wheel_diameter_m", 0.17);
+    wheel_diameter_m_ = this->get_parameter("wheel_diameter_m").as_double();
+
     rclcpp::QoS control_message_left_qos(rclcpp::KeepAll{});
     control_message_left_pub_ = create_publisher<odrive_can::msg::ControlMessage>("/control_message_left", control_message_left_qos);
 
@@ -65,12 +68,12 @@ public:
 private:
   void controllerStatusLeftCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg)
   {
-
+    (void*)msg;
   }
 
   void controllerStatusRightCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg)
   {
-
+    (void*)msg;
   }
 
   void motorTargetCallback(const odriver_msgs::msg::MotorTarget::SharedPtr msg)
@@ -79,19 +82,19 @@ private:
     odrive_can::msg::ControlMessage left_message;
     odrive_can::msg::ControlMessage right_message;
     
+    // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.ControlMode
     // set velocity mode
     left_message.control_mode = 2;
     right_message.control_mode = 2;
-    // WIP: search this param
+
+    // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.InputMode
     left_message.input_mode = 1;
     right_message.input_mode = 1;
 
     double meter_per_sec_left = msg->spd_left;
     double meter_per_sec_right = msg->spd_right;
 
-    // TEMP
-    double wheel_diameter = 0.170;
-    double meter_per_round = wheel_diameter * M_PI;
+    double meter_per_round = wheel_diameter_m_ * M_PI;
 
     // meter/sec -> rotation/sec
     left_message.input_vel = msg->spd_left / meter_per_round;
@@ -109,6 +112,8 @@ private:
 
     motor_status_pub_->publish(status);
   }
+
+  double wheel_diameter_m_;
 
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_left_pub_;
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_right_pub_;
