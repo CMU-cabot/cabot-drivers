@@ -87,9 +87,6 @@ private:
     left_message.input_mode = kPassthroughInputMode;
     right_message.input_mode = kPassthroughInputMode;
 
-    double meter_per_sec_left = msg->spd_left;
-    double meter_per_sec_right = msg->spd_right;
-
     double meter_per_round = wheel_diameter_m_ * M_PI;
 
     // meter/sec -> rotation/sec
