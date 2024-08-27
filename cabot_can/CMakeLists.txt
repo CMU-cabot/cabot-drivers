@@ -12,6 +12,9 @@ find_package(sensor_msgs REQUIRED)
 add_executable(can_temperature_node src/can_temperature_node.cpp)
 ament_target_dependencies(can_temperature_node rclcpp std_msgs sensor_msgs)
 
+add_executable(can_all_node src/can_all_node.cpp)
+ament_target_dependencies(can_all_node rclcpp std_msgs sensor_msgs)
+
 install(TARGETS can_temperature_node
   DESTINATION lib/${PROJECT_NAME})
 
