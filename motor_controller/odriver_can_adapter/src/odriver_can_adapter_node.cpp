@@ -45,6 +45,9 @@ public:
     this->declare_parameter("is_clockwise", true);
     is_clockwise_ = this->get_parameter("is_clockwise").as_bool();
 
+    this->declare_parameter("hz", 20.0);
+    hz_ = this->get_parameter("hz").as_double();
+
     if(is_clockwise_) {
       sign_left_ = -1.0;
       sign_right_ = 1.0;
@@ -71,7 +74,7 @@ public:
     rclcpp::QoS motor_target_qos(rclcpp::KeepAll{});
     motor_target_sub_ = create_subscription<odriver_msgs::msg::MotorTarget>("/motor_target", motor_target_qos, std::bind(&ODriverCanAdapterNode::motorTargetCallback, this, _1));
 
-    timer_ = create_wall_timer(500ms, std::bind(&ODriverCanAdapterNode::timerCallback, this));
+    timer_ = create_wall_timer(1s / hz_, std::bind(&ODriverCanAdapterNode::timerCallback, this));
   }
 
   ~ODriverCanAdapterNode()
@@ -149,6 +152,9 @@ private:
   const int kPassthroughInputMode = 1;
 
   double wheel_diameter_m_;
+  bool is_clockwise_;
+  double hz_;
+
   double meter_per_round_;
 
   double spd_left_c_;
@@ -165,8 +171,6 @@ private:
 
   double sign_left_;
   double sign_right_;
-
-  bool is_clockwise_;
 
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_left_pub_;
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_right_pub_;
