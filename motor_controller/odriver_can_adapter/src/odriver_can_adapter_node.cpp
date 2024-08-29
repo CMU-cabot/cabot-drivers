@@ -42,11 +42,16 @@ public:
     wheel_diameter_m_ = this->get_parameter("wheel_diameter_m").as_double();
     meter_per_round_ = wheel_diameter_m_ * M_PI;
 
-    this->declare_parameter("sign_left", -1.0);
-    sign_left_ = this->get_parameter("sign_left").as_double();
+    this->declare_parameter("is_clockwise", true);
+    is_clockwise_ = this->get_parameter("is_clockwise").as_bool();
 
-    this->declare_parameter("sign_right", 1.0);
-    sign_right_ = this->get_parameter("sign_right").as_double();
+    if(is_clockwise_) {
+      sign_left_ = -1.0;
+      sign_right_ = 1.0;
+    } else {
+      sign_left_ = 1.0;
+      sign_right_ = -1.0;
+    }
 
     rclcpp::QoS control_message_left_qos(rclcpp::KeepAll{});
     control_message_left_pub_ = create_publisher<odrive_can::msg::ControlMessage>("/control_message_left", control_message_left_qos);
@@ -160,6 +165,8 @@ private:
 
   double sign_left_;
   double sign_right_;
+
+  bool is_clockwise_;
 
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_left_pub_;
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_right_pub_;

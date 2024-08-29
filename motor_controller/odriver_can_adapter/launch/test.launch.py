@@ -57,6 +57,11 @@ def generate_launch_description():
             namespace='/cabot',
             name='odriver_can_adapter_node',
             output='screen',
+            parameters=[
+                {
+                    'is_clockwise' : True,
+                }
+            ],
             remappings=[
                 ('/control_message_left', '/cabot/control_message_left'),
                 ('/control_message_right', '/cabot/control_message_right'),
