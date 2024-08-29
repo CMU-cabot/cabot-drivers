@@ -42,6 +42,12 @@ public:
     wheel_diameter_m_ = this->get_parameter("wheel_diameter_m").as_double();
     meter_per_round_ = wheel_diameter_m_ * M_PI;
 
+    this->declare_parameter("sign_left", -1.0);
+    sign_left_ = this->get_parameter("sign_left").as_double();
+
+    this->declare_parameter("sign_right", 1.0);
+    sign_right_ = this->get_parameter("sign_right").as_double();
+
     rclcpp::QoS control_message_left_qos(rclcpp::KeepAll{});
     control_message_left_pub_ = create_publisher<odrive_can::msg::ControlMessage>("/control_message_left", control_message_left_qos);
 
@@ -97,8 +103,8 @@ private:
     right_message.input_mode = kPassthroughInputMode;
 
     // meter/sec -> rotation/sec
-    left_message.input_vel = msg->spd_left / meter_per_round_;
-    right_message.input_vel = msg->spd_right / meter_per_round_;
+    left_message.input_vel = sign_left_ * msg->spd_left / meter_per_round_;
+    right_message.input_vel = sign_right_ * msg->spd_right / meter_per_round_;
 
     control_message_left_pub_->publish(left_message);
     control_message_right_pub_->publish(right_message);
@@ -110,23 +116,23 @@ private:
 
     status.header.stamp = this->get_clock()->now();
 
-    status.dist_left_c = dist_left_c_;
-    status.dist_right_c = dist_right_c_;
+    status.dist_left_c = sign_left_ * dist_left_c_;
+    status.dist_right_c = sign_right_ * dist_right_c_;
 
-    status.spd_left_c = spd_left_c_;
-    status.spd_right_c = spd_right_c_;
+    status.spd_left_c = sign_left_ * spd_left_c_;
+    status.spd_right_c = sign_right_ * spd_right_c_;
 
-    status.dist_left = dist_left_c_ * meter_per_round_;
-    status.dist_right = dist_right_c_ * meter_per_round_;
+    status.dist_left = sign_left_ * dist_left_c_ * meter_per_round_;
+    status.dist_right = sign_right_ * dist_right_c_ * meter_per_round_;
 
-    status.spd_left = spd_left_c_ * meter_per_round_;
-    status.spd_right = spd_right_c_ * meter_per_round_;
+    status.spd_left = sign_left_ * spd_left_c_ * meter_per_round_;
+    status.spd_right = sign_right_ * spd_right_c_ * meter_per_round_;
 
-    status.current_setpoint_left = current_setpoint_left_;
-    status.current_setpoint_right = current_setpoint_right_;
+    status.current_setpoint_left = sign_left_ * current_setpoint_left_;
+    status.current_setpoint_right = sign_right_ * current_setpoint_right_;
 
-    status.current_measured_left = current_measured_left_;
-    status.current_measured_right = current_measured_right_;
+    status.current_measured_left = sign_left_ * current_measured_left_;
+    status.current_measured_right = sign_right_ * current_measured_right_;
 
     motor_status_pub_->publish(status);
   }
@@ -151,6 +157,9 @@ private:
 
   double current_measured_left_;
   double current_measured_right_;
+
+  double sign_left_;
+  double sign_right_;
 
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_left_pub_;
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_right_pub_;
