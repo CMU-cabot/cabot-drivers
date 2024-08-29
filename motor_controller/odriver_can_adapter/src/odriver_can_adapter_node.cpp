@@ -99,7 +99,7 @@ private:
 
   void motorTargetCallback(const odriver_msgs::msg::MotorTarget::SharedPtr msg)
   {
-    // WIP: what's loop control
+    // WIP: change to idol mode from closed loop mode when loop_ctrl is false
     odrive_can::msg::ControlMessage left_message;
     odrive_can::msg::ControlMessage right_message;
     
