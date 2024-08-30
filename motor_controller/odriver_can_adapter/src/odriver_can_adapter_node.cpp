@@ -26,6 +26,7 @@
 
 #include <odrive_can/msg/control_message.hpp>
 #include <odrive_can/msg/controller_status.hpp>
+#include <odrive_can/srv/axis_state.hpp>
 #include <odriver_msgs/msg/motor_status.hpp>
 #include <odriver_msgs/msg/motor_target.hpp>
 
@@ -74,6 +75,9 @@ public:
     rclcpp::QoS motor_target_qos(rclcpp::KeepAll{});
     motor_target_sub_ = create_subscription<odriver_msgs::msg::MotorTarget>("/motor_target", motor_target_qos, std::bind(&ODriverCanAdapterNode::motorTargetCallback, this, _1));
 
+    axis_state_left_client_ = create_client<odrive_can::srv::AxisState>("/request_axis_state_left");
+    axis_state_right_client_ = create_client<odrive_can::srv::AxisState>("/request_axis_state_right");
+
     timer_ = create_wall_timer(1s / hz_, std::bind(&ODriverCanAdapterNode::timerCallback, this));
   }
 
@@ -87,6 +91,7 @@ private:
     dist_left_c_ = msg->pos_estimate;
     current_setpoint_left_ = msg->iq_setpoint;
     current_measured_left_ = msg->iq_measured;
+    axis_state_left_ = msg->axis_state;
   }
 
   void controllerStatusRightCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg)
@@ -95,11 +100,61 @@ private:
     dist_right_c_ = msg->pos_estimate;
     current_setpoint_right_ = msg->iq_setpoint;
     current_measured_right_ = msg->iq_measured;
+    axis_state_right_ = msg->axis_state;
+  }
+
+  void callAxisStateService(unsigned int axis_state)
+  {
+    using namespace std::chrono_literals;
+
+    RCLCPP_INFO(get_logger(), "call axis state service...");
+    odrive_can::srv::AxisState::Request::SharedPtr request = std::make_shared<odrive_can::srv::AxisState::Request>();
+    request->axis_requested_state = axis_state;
+
+    RCLCPP_INFO(get_logger(), "axis_state_left to %d from %d", axis_state_left_, axis_state);
+    while(!axis_state_left_client_->wait_for_service(1s) && rclcpp::ok()) {
+      RCLCPP_INFO(get_logger(), "request_axis_state_left service not available, waiting again...");
+    }
+
+    auto result_left = axis_state_left_client_->async_send_request(request);
+    //refer from: https://answers.ros.org/question/354132/how-to-call-spin_some-or-spin_until_future_complete-in-member-functions/
+    //if(rclcpp::spin_until_future_complete(this->get_node_base_interface(), result_left) ==
+    //      rclcpp::FutureReturnCode::SUCCESS) {
+    //  axis_state_left_ = result_left.get()->axis_state;
+    //}
+
+    RCLCPP_INFO(get_logger(), "axis_state_right to %d from %d", axis_state_right_, axis_state);
+    while(!axis_state_right_client_->wait_for_service(1s) && rclcpp::ok()) {
+      RCLCPP_INFO(get_logger(), "request_axis_state_right service not available, waiting again...");
+    }
+
+    auto result_right = axis_state_right_client_->async_send_request(request);
+    //if(rclcpp::spin_until_future_complete(this->get_node_base_interface(), result_right) ==
+    //      rclcpp::FutureReturnCode::SUCCESS) {
+    //  axis_state_right_ = result_right.get()->axis_state;
+    //}
+  }
+
+  // change odrive axis.controller.config.control_mode
+  // closed_loop: true -> CLOSED_LOOP_CONTROL, false -> IDOL
+  void changeAxisState(bool closed_loop)
+  {
+    if(closed_loop &&
+          (axis_state_left_ == kAxisStateIdol || axis_state_right_ == kAxisStateIdol)) {
+      callAxisStateService(kAxisStateClosedLoopControl);
+    } else if(!closed_loop &&
+          (axis_state_left_ == kAxisStateClosedLoopControl || axis_state_right_ == kAxisStateClosedLoopControl)) {
+      callAxisStateService(kAxisStateIdol);
+    }
   }
 
   void motorTargetCallback(const odriver_msgs::msg::MotorTarget::SharedPtr msg)
   {
-    // WIP: change to idol mode from closed loop mode when loop_ctrl is false
+    changeAxisState(msg->loop_ctrl);
+
+    // !msg->loop_ctrl is IDOL mode
+    if(!msg->loop_ctrl) { return; }
+
     odrive_can::msg::ControlMessage left_message;
     odrive_can::msg::ControlMessage right_message;
     
@@ -145,6 +200,10 @@ private:
     motor_status_pub_->publish(status);
   }
 
+  // refer from: https://github.com/odriverobotics/ros_odrive/blob/5e4dfe9df8e5ef4fb6c692c210eafb713cb41985/odrive_base/include/odrive_enums.h#L43-L58
+  const unsigned int kAxisStateIdol = 1;
+  const unsigned int kAxisStateClosedLoopControl = 8;
+
   // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.ControlMode
   const int kVelocityControlMode = 2;
 
@@ -172,6 +231,9 @@ private:
   double sign_left_;
   double sign_right_;
 
+  unsigned int axis_state_left_;
+  unsigned int axis_state_right_;
+
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_left_pub_;
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_right_pub_;
   rclcpp::Publisher<odriver_msgs::msg::MotorStatus>::SharedPtr motor_status_pub_;
@@ -179,6 +241,9 @@ private:
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr controller_status_left_sub_;
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr controller_status_right_sub_;
   rclcpp::Subscription<odriver_msgs::msg::MotorTarget>::SharedPtr motor_target_sub_;
+
+  rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr axis_state_left_client_;
+  rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr axis_state_right_client_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 };
