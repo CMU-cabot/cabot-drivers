@@ -107,12 +107,4 @@ def generate_launch_description():
                 ('/cabot/request_axis_state', '/cabot/request_axis_state_right'),
             ],
         ),
-        #ExecuteProcess(
-        #    cmd=['ros2', 'service', 'call', '/cabot/request_axis_state_left', 'odrive_can/srv/AxisState', 'axis_requested_state: 8'],
-        #    output='screen'
-        #),
-        #ExecuteProcess(
-        #    cmd=['ros2', 'service', 'call', '/cabot/request_axis_state_right', 'odrive_can/srv/AxisState', 'axis_requested_state: 8'],
-        #    output='screen'
-        #),
     ])
