@@ -39,7 +39,6 @@ public:
       is_ready_axis_state_right_service_(true)
   {
     using std::placeholders::_1;
-    using namespace std::chrono_literals;
 
     this->declare_parameter("wheel_diameter_m", 0.17);
     wheel_diameter_m_ = this->get_parameter("wheel_diameter_m").as_double();
@@ -60,27 +59,57 @@ public:
     }
 
     rclcpp::QoS control_message_left_qos(rclcpp::KeepAll{});
-    control_message_left_pub_ = create_publisher<odrive_can::msg::ControlMessage>("/control_message_left", control_message_left_qos);
+    control_message_left_pub_ = create_publisher<odrive_can::msg::ControlMessage>(
+                                  "/control_message_left",
+                                  control_message_left_qos);
 
     rclcpp::QoS control_message_right_qos(rclcpp::KeepAll{});
-    control_message_right_pub_ = create_publisher<odrive_can::msg::ControlMessage>("/control_message_right", control_message_right_qos);
+    control_message_right_pub_ = create_publisher<odrive_can::msg::ControlMessage>(
+                                  "/control_message_right",
+                                  control_message_right_qos);
 
     rclcpp::QoS motor_status_qos(rclcpp::KeepAll{});
-    motor_status_pub_ = create_publisher<odriver_msgs::msg::MotorStatus>("/motor_status", motor_status_qos);
+    motor_status_pub_ = create_publisher<odriver_msgs::msg::MotorStatus>(
+                                  "/motor_status",
+                                  motor_status_qos);
 
     rclcpp::QoS controller_status_left_qos(rclcpp::KeepAll{});
-    controller_status_left_sub_ = create_subscription<odrive_can::msg::ControllerStatus>("/controller_status_left", controller_status_left_qos, std::bind(&ODriverCanAdapterNode::controllerStatusLeftCallback, this, _1));
+    controller_status_left_sub_ = create_subscription<odrive_can::msg::ControllerStatus>(
+                                    "/controller_status_left",
+                                    controller_status_left_qos,
+                                    std::bind(
+                                      &ODriverCanAdapterNode::controllerStatusLeftCallback,
+                                      this,
+                                      _1));
 
     rclcpp::QoS controller_status_right_qos(rclcpp::KeepAll{});
-    controller_status_right_sub_ = create_subscription<odrive_can::msg::ControllerStatus>("/controller_status_right", controller_status_right_qos, std::bind(&ODriverCanAdapterNode::controllerStatusRightCallback, this, _1));
+    controller_status_right_sub_ = create_subscription<odrive_can::msg::ControllerStatus>(
+                                    "/controller_status_right",
+                                    controller_status_right_qos,
+                                    std::bind(
+                                      &ODriverCanAdapterNode::controllerStatusRightCallback,
+                                      this,
+                                      _1));
 
     rclcpp::QoS motor_target_qos(rclcpp::KeepAll{});
-    motor_target_sub_ = create_subscription<odriver_msgs::msg::MotorTarget>("/motor_target", motor_target_qos, std::bind(&ODriverCanAdapterNode::motorTargetCallback, this, _1));
+    motor_target_sub_ = create_subscription<odriver_msgs::msg::MotorTarget>(
+                          "/motor_target",
+                          motor_target_qos,
+                          std::bind(
+                            &ODriverCanAdapterNode::motorTargetCallback,
+                            this,
+                            _1));
 
-    axis_state_left_client_ = create_client<odrive_can::srv::AxisState>("/request_axis_state_left");
-    axis_state_right_client_ = create_client<odrive_can::srv::AxisState>("/request_axis_state_right");
+    axis_state_left_client_ =
+      create_client<odrive_can::srv::AxisState>("/request_axis_state_left");
+    axis_state_right_client_ =
+      create_client<odrive_can::srv::AxisState>("/request_axis_state_right");
 
-    timer_ = create_wall_timer(1s / hz_, std::bind(&ODriverCanAdapterNode::timerCallback, this));
+    timer_ = create_wall_timer(
+              std::chrono::seconds(1) / hz_,
+              std::bind(
+                &ODriverCanAdapterNode::timerCallback,
+                this));
   }
 
   ~ODriverCanAdapterNode()
@@ -107,44 +136,63 @@ private:
 
   void callAxisStateService(unsigned int axis_state)
   {
+    using AxisState = odrive_can::srv::AxisState;
+    using AxisStateClient = rclcpp::Client<AxisState>;
+    using std::chrono::system_clock;
     RCLCPP_INFO(get_logger(), "call axis state service...");
-    odrive_can::srv::AxisState::Request::SharedPtr request = std::make_shared<odrive_can::srv::AxisState::Request>();
+    AxisState::Request::SharedPtr request = std::make_shared<AxisState::Request>();
     request->axis_requested_state = axis_state;
 
     if(is_ready_axis_state_left_service_) {
-      RCLCPP_INFO(get_logger(), "axis_state_left to %d from %d", axis_state_left_, axis_state);
-      while(!axis_state_left_client_->wait_for_service(std::chrono::seconds(1)) && rclcpp::ok()) {
-        RCLCPP_INFO(get_logger(), "request_axis_state_left service not available, waiting again...");
+      RCLCPP_INFO(
+        get_logger(),
+        "axis_state_left to %d from %d",
+        axis_state_left_,
+        axis_state);
+      while(!axis_state_left_client_->wait_for_service(std::chrono::seconds(1)) &&
+              rclcpp::ok()) {
+        RCLCPP_INFO(
+          get_logger(),
+          "request_axis_state_left service not available, waiting again...");
       }
 
       is_ready_axis_state_left_service_ = false;
-      left_service_call_time_ = std::chrono::system_clock::now();
-      rclcpp::Client<odrive_can::srv::AxisState>::SharedFutureWithRequestAndRequestId axis_state_left_future_ = axis_state_left_client_->async_send_request(request,
-        [&](rclcpp::Client<odrive_can::srv::AxisState>::SharedFutureWithRequest future) {
-          // WIP: check value
-          (void) future;
-          is_ready_axis_state_left_service_ = true;
-          left_service_call_time_ = std::chrono::system_clock::now();
-        }
-      );
+      left_service_call_time_ = system_clock::now();
+      AxisStateClient::SharedFutureWithRequestAndRequestId axis_state_left_future_ =
+        axis_state_left_client_->async_send_request(
+          request,
+          [&](AxisStateClient::SharedFutureWithRequest future) {
+            // WIP: check value
+            (void) future;
+            is_ready_axis_state_left_service_ = true;
+            left_service_call_time_ = system_clock::now();
+          });
     }
 
     if(is_ready_axis_state_right_service_) {
-      RCLCPP_INFO(get_logger(), "axis_state_right to %d from %d", axis_state_right_, axis_state);
-      while(!axis_state_right_client_->wait_for_service(std::chrono::seconds(1)) && rclcpp::ok()) {
-        RCLCPP_INFO(get_logger(), "request_axis_state_right service not available, waiting again...");
+      RCLCPP_INFO(
+        get_logger(),
+        "axis_state_right to %d from %d",
+        axis_state_right_,
+        axis_state);
+      while(!axis_state_right_client_->wait_for_service(std::chrono::seconds(1)) &&
+              rclcpp::ok()) {
+        RCLCPP_INFO(
+          get_logger(),
+          "request_axis_state_right service not available, waiting again...");
       }
 
       is_ready_axis_state_right_service_ = false;
-      right_service_call_time_ = std::chrono::system_clock::now();
-      rclcpp::Client<odrive_can::srv::AxisState>::SharedFutureWithRequestAndRequestId axis_state_right_future_ = axis_state_right_client_->async_send_request(request,
-        [&](rclcpp::Client<odrive_can::srv::AxisState>::SharedFutureWithRequest future) {
-          // WIP: check value
-          (void) future;
-          is_ready_axis_state_right_service_ = true;
-          right_service_call_time_ = std::chrono::system_clock::now();
-        }
-      );
+      right_service_call_time_ = system_clock::now();
+      AxisStateClient::SharedFutureWithRequestAndRequestId axis_state_right_future_ =
+        axis_state_right_client_->async_send_request(
+          request,
+          [&](AxisStateClient::SharedFutureWithRequest future) {
+            // WIP: check value
+            (void) future;
+            is_ready_axis_state_right_service_ = true;
+            right_service_call_time_ = system_clock::now();
+          });
     }
   }
 
@@ -156,7 +204,7 @@ private:
           (axis_state_left_ == kAxisStateIdol || axis_state_right_ == kAxisStateIdol)) {
       callAxisStateService(kAxisStateClosedLoopControl);
     } else if(!closed_loop &&
-          (axis_state_left_ == kAxisStateClosedLoopControl || axis_state_right_ == kAxisStateClosedLoopControl)) {
+                (axis_state_left_ == kAxisStateClosedLoopControl || axis_state_right_ == kAxisStateClosedLoopControl)) {
       callAxisStateService(kAxisStateIdol);
     }
   }
