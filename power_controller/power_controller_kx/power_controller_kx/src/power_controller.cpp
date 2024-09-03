@@ -112,7 +112,7 @@ public:
         std::placeholders::_1));
     // publisher
     publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_state", 10);
-    pub_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::publisherPowerStatus, this));
+    pub_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::publishPowerStatus, this));
     send_can_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::sendCanMessageIfReceived, this));
     // open can socket
     can_socket_ = openCanSocket();
@@ -275,8 +275,7 @@ private:
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "reboot");
     mtx.unlock();
   }
-  void fanControllerCallBack(std_msgs::msg::UInt8 msg)
-  {
+  void fanControllerCallBack(std_msgs::msg::UInt8 msg){
     uint8_t duty = msg.data;
     if (duty > 100) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Only values from 0 to 100 can be entered");
@@ -298,7 +297,6 @@ private:
     }
     mtx.lock();
     sendCanValueInfo send_can_value_temp = send_can_value_list.front();
-    mtx.unlock();
     frame.can_id = send_can_value_temp.id;
     frame.can_dlc = 1;
     frame.data[0] = send_can_value_temp.data;
@@ -308,88 +306,89 @@ private:
       return;
     }
     send_can_value_list.pop_front();
+    mtx.unlock();
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Send data");
   }
-  void combiningBit(
-    unsigned char * frame_data, unsigned short* data1,
-    unsigned short* data2, unsigned short* data3, unsigned short* data4)
-  {
-    *data1 = (frame_data[1] << 8) | frame_data[0];
-    *data2 = (frame_data[3] << 8) | frame_data[2];
-    *data3 = (frame_data[5] << 8) | frame_data[4];
-    *data4 = (frame_data[7] << 8) | frame_data[6];
-  }
-  void defineMSG(
+  //message & combine bits
+  void conbineBitAndUpdateMessage(
     power_controller_msgs::msg::BatteryArray & msg, int location_,
-    unsigned short* data1, unsigned short* data2, unsigned short* data3, unsigned short* data4)
-  {
+    uint8_t* frame_data, uint16_t data[4], bool battery_serial_number_flag = false){    
+    data[0] = (frame_data[1] << 8) | frame_data[0];
+    data[1] = (frame_data[3] << 8) | frame_data[2];
+    data[2] = (frame_data[5] << 8) | frame_data[4];
+    data[3] = (frame_data[7] << 8) | frame_data[6];
+    if (battery_serial_number_flag){
+      msg.batteryarray[0].serial_number = std::to_string(data[0]);
+      msg.batteryarray[1].serial_number = std::to_string(data[1]);
+      msg.batteryarray[2].serial_number = std::to_string(data[2]);
+      msg.batteryarray[3].serial_number = std::to_string(data[3]);
+      // publsih msg
+      publisher_->publish(msg);
+      return;
+    }
     int array_num = location_ - 1;
     msg.batteryarray[array_num].header.stamp = this->get_clock()->now();
     // Converts voltage units from mV to V
-    float voltage = *data1 / 1000;
+    float voltage = static_cast<float>(data[0]) / 1000.0;
     msg.batteryarray[array_num].voltage = voltage;
     // Converts current units from mA to A
-    float current = *data2 / 1000;
+    float current = static_cast<float>(data[1]) / 1000.0;
     msg.batteryarray[array_num].current = current;
-    msg.batteryarray[array_num].percentage = *data3;
+    msg.batteryarray[array_num].percentage = data[2];
     // Convert absolute temperature to Celsius
-    float temperature = (*data4 - 2731) / 10;
+    float temperature = (static_cast<float>(data[3]) - 2731.0) / 10.0;
     msg.batteryarray[array_num].temperature = temperature;
     msg.batteryarray[array_num].location = std::to_string(location_);
   }
-  void publisherPowerStatus()
+  void publishPowerStatus()
   {
-    unsigned short data1;
-    unsigned short data2;
-    unsigned short data3;
-    unsigned short data4;
+    uint16_t data[4];
     int location_;
     int num_batteries = this->get_parameter("number_of_batteries").as_int();
     msg.batteryarray.resize(num_batteries);
+    bool battery_serial_number_flag = true;
     struct can_frame frame;
     int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
-    if (nbytes > 0) {
-      switch (frame.can_id) {
-        case 0x05:  //Battery 1 Info
-	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 1");
-	  location_ = 1;
-	  combiningBit(frame.data, &data1, &data2, &data3, &data4);
-	  // define msg's value
-	  defineMSG(msg, location_, &data1, &data2, &data3, &data4);
-	  break;
-        case 0x06:  //Battery 2 Info
-	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 2");
-	  location_ = 2;
-	  combiningBit(frame.data, &data1, &data2, &data3, &data4);
-	  defineMSG(msg, location_, &data1, &data2, &data3, &data4);
-	  break;
-        case 0x07:  //Battery 3 Info
-	  location_ = 3;
-	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 3");
-	  combiningBit(frame.data, &data1, &data2, &data3, &data4);
-	  defineMSG(msg, location_, &data1, &data2, &data3, &data4);
-	  break;
-        case 0x08:  //Battery 4 Info
-	  RCLCPP_INFO(this->get_logger(), "Get data of Battery 4");
-	  location_ = 4;
-	  combiningBit(frame.data, &data1, &data2, &data3, &data4);
-	  defineMSG(msg, location_, &data1, &data2, &data3, &data4);
-	  break;
-        case 0x1d:
-	  RCLCPP_INFO(this->get_logger(), "Battery serial number");
-	  combiningBit(frame.data, &data1, &data2, &data3, &data4);
-	  msg.batteryarray[0].serial_number = std::to_string(data1);
-	  msg.batteryarray[1].serial_number = std::to_string(data2);
-	  msg.batteryarray[2].serial_number = std::to_string(data3);
-	  msg.batteryarray[3].serial_number = std::to_string(data4);
-	  // publsih msg
-	  publisher_->publish(msg);
-	  break;
-        default:
-	  break;
-      }
+    if (nbytes <= 0) {
+      return;
     }
+    switch (frame.can_id) {
+       case CanId::battery_id_1:  // Battery 1 Info
+	 location_ = 1;
+	 conbineBitAndUpdateMessage(msg, location_, frame.data, data);
+	 break;
+       case CanId::battery_id_2:  // Battery 2 Info
+	 RCLCPP_INFO(this->get_logger(), "Get data of Battery 2");
+	 location_ = 2;
+	 conbineBitAndUpdateMessage(msg, location_, frame.data, data);
+	 break;
+       case CanId::battery_id_3:  // Battery 3 Info
+	 location_ = 3;
+	 RCLCPP_INFO(this->get_logger(), "Get data of Battery 3");
+	 conbineBitAndUpdateMessage(msg, location_, frame.data, data);
+	 break;
+       case CanId::battery_id_4:  // Battery 4 Info
+	 RCLCPP_INFO(this->get_logger(), "Get data of Battery 4");
+	 location_ = 4;
+	 conbineBitAndUpdateMessage(msg, location_, frame.data, data);
+	 break;
+       case CanId::battery_serial_number: // Serial Number
+	 location_ = 0;
+	 conbineBitAndUpdateMessage(msg, location_, frame.data, data, battery_serial_number_flag);
+	 break;
+       default:
+	 break;
+      }
   }
+
+  //enum
+  enum CanId : uint8_t{
+    battery_id_1 = 0x05,
+    battery_id_2 = 0x06,
+    battery_id_3 = 0x07,
+    battery_id_4 = 0x08,
+    battery_serial_number = 0x1d
+  };
 
   // struct
   struct sendCanValueInfo {
