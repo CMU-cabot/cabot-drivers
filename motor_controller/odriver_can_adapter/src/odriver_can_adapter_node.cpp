@@ -32,6 +32,13 @@
 
 class ODriverCanAdapterNode: public rclcpp::Node
 {
+  struct AxisStateClientInfo {
+    rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr client;
+    std::chrono::system_clock::time_point last_call_time;
+    bool is_ready_axis_state_service;
+    std::string name;
+    unsigned int axis_state;
+  };
 public:
   ODriverCanAdapterNode()
     : Node("odriver_can_adapter_node")
@@ -128,7 +135,7 @@ private:
     dist_left_c_ = msg->pos_estimate;
     current_setpoint_left_ = msg->iq_setpoint;
     current_measured_left_ = msg->iq_measured;
-    axis_state_left_ = msg->axis_state;
+    axis_state_left_info_.axis_state = msg->axis_state;
   }
 
   void controllerStatusRightCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg)
@@ -137,66 +144,41 @@ private:
     dist_right_c_ = msg->pos_estimate;
     current_setpoint_right_ = msg->iq_setpoint;
     current_measured_right_ = msg->iq_measured;
-    axis_state_right_ = msg->axis_state;
+    axis_state_right_info_.axis_state = msg->axis_state;
   }
 
-  void callAxisStateService(unsigned int axis_state)
+  void callAxisStateService(unsigned int axis_state, AxisStateClientInfo *info)
   {
     using AxisState = odrive_can::srv::AxisState;
     using AxisStateClient = rclcpp::Client<AxisState>;
     using std::chrono::system_clock;
 
-    // request is shared left service and right service
     AxisState::Request::SharedPtr request = std::make_shared<AxisState::Request>();
     request->axis_requested_state = axis_state;
 
-    if(axis_state_left_info_.is_ready_axis_state_service) {
+    if(info->is_ready_axis_state_service) {
       RCLCPP_INFO(
         get_logger(),
-        "call axis_state_left service to %d mode from %d mode",
-        axis_state_left_,
+        "call axis_state_%s service to %d mode from %d mode",
+        info->name.c_str(),
+        info->axis_state,
         axis_state);
-      while(!axis_state_left_info_.client->wait_for_service(std::chrono::seconds(1)) &&
+      while(!info->client->wait_for_service(std::chrono::seconds(1)) &&
               rclcpp::ok()) {
         RCLCPP_INFO(
           get_logger(),
-          "request_axis_state_left service not available, waiting again...");
+          "request_axis_state_%s service not available, waiting again...",
+          info->name.c_str());
       }
 
-      axis_state_left_info_.is_ready_axis_state_service = false;
-      axis_state_left_info_.last_call_time = system_clock::now();
-      AxisStateClient::SharedFutureWithRequestAndRequestId axis_state_left_future_ =
-        axis_state_left_info_.client->async_send_request(
+      info->is_ready_axis_state_service = false;
+      info->last_call_time = system_clock::now();
+      AxisStateClient::SharedFutureWithRequestAndRequestId axis_state_client_future_ =
+        info->client->async_send_request(
           request,
-          [&](AxisStateClient::SharedFutureWithRequest future) {
+          [info](AxisStateClient::SharedFutureWithRequest future) {
             (void) future;
-            axis_state_left_info_.is_ready_axis_state_service = true;
-            axis_state_left_info_.last_call_time = system_clock::now();
-          });
-    }
-
-    if(axis_state_right_info_.is_ready_axis_state_service) {
-      RCLCPP_INFO(
-        get_logger(),
-        "call axis_state_right service to %d mode from %d mode",
-        axis_state_right_,
-        axis_state);
-      while(!axis_state_right_info_.client->wait_for_service(std::chrono::seconds(1)) &&
-              rclcpp::ok()) {
-        RCLCPP_INFO(
-          get_logger(),
-          "request_axis_state_right service not available, waiting again...");
-      }
-
-      axis_state_right_info_.is_ready_axis_state_service = false;
-      axis_state_right_info_.last_call_time = system_clock::now();
-      AxisStateClient::SharedFutureWithRequestAndRequestId axis_state_right_future_ =
-        axis_state_right_info_.client->async_send_request(
-          request,
-          [&](AxisStateClient::SharedFutureWithRequest future) {
-            (void) future;
-            axis_state_right_info_.is_ready_axis_state_service = true;
-            axis_state_right_info_.last_call_time = system_clock::now();
+            info->is_ready_axis_state_service = true;
           });
     }
   }
@@ -206,11 +188,13 @@ private:
   void changeAxisState(bool closed_loop)
   {
     if(closed_loop &&
-          (axis_state_left_ == kAxisStateIdol || axis_state_right_ == kAxisStateIdol)) {
-      callAxisStateService(kAxisStateClosedLoopControl);
+          (axis_state_left_info_.axis_state == kAxisStateIdol || axis_state_right_info_.axis_state == kAxisStateIdol)) {
+      callAxisStateService(kAxisStateClosedLoopControl, &axis_state_left_info_);
+      callAxisStateService(kAxisStateClosedLoopControl, &axis_state_right_info_);
     } else if(!closed_loop &&
-                (axis_state_left_ == kAxisStateClosedLoopControl || axis_state_right_ == kAxisStateClosedLoopControl)) {
-      callAxisStateService(kAxisStateIdol);
+                (axis_state_left_info_.axis_state == kAxisStateClosedLoopControl || axis_state_right_info_.axis_state == kAxisStateClosedLoopControl)) {
+      callAxisStateService(kAxisStateIdol, &axis_state_left_info_);
+      callAxisStateService(kAxisStateIdol, &axis_state_right_info_);
     }
   }
 
@@ -302,13 +286,6 @@ private:
   // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.InputMode
   const int kPassthroughInputMode = 1;
 
-  struct AxisStateClientInfo {
-    rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr client;
-    std::chrono::system_clock::time_point last_call_time;
-    bool is_ready_axis_state_service;
-    std::string name;
-  };
-
   double wheel_diameter_m_;
   bool is_clockwise_;
   double hz_;
@@ -330,9 +307,6 @@ private:
 
   double sign_left_;
   double sign_right_;
-
-  unsigned int axis_state_left_;
-  unsigned int axis_state_right_;
 
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_left_pub_;
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_right_pub_;
