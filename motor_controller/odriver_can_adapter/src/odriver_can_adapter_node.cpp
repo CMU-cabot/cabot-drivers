@@ -34,11 +34,14 @@ class ODriverCanAdapterNode: public rclcpp::Node
 {
 public:
   ODriverCanAdapterNode()
-    : Node("odriver_can_adapter_node"),
-      is_ready_axis_state_left_service_(true),
-      is_ready_axis_state_right_service_(true)
+    : Node("odriver_can_adapter_node")
   {
     using std::placeholders::_1;
+
+    axis_state_left_info_.is_ready_axis_state_service = true;
+    axis_state_left_info_.name = "left";
+    axis_state_right_info_.is_ready_axis_state_service = true;
+    axis_state_right_info_.name = "right";
 
     this->declare_parameter("wheel_diameter_m", 0.17);
     wheel_diameter_m_ = this->get_parameter("wheel_diameter_m").as_double();
@@ -103,9 +106,9 @@ public:
                             this,
                             _1));
 
-    axis_state_left_client_ =
+    axis_state_left_info_.client =
       create_client<odrive_can::srv::AxisState>("/request_axis_state_left");
-    axis_state_right_client_ =
+    axis_state_right_info_.client =
       create_client<odrive_can::srv::AxisState>("/request_axis_state_right");
 
     timer_ = create_wall_timer(
@@ -142,57 +145,58 @@ private:
     using AxisState = odrive_can::srv::AxisState;
     using AxisStateClient = rclcpp::Client<AxisState>;
     using std::chrono::system_clock;
-    RCLCPP_INFO(get_logger(), "call axis state service...");
+
+    // request is shared left service and right service
     AxisState::Request::SharedPtr request = std::make_shared<AxisState::Request>();
     request->axis_requested_state = axis_state;
 
-    if(is_ready_axis_state_left_service_) {
+    if(axis_state_left_info_.is_ready_axis_state_service) {
       RCLCPP_INFO(
         get_logger(),
-        "axis_state_left to %d from %d",
+        "call axis_state_left service to %d mode from %d mode",
         axis_state_left_,
         axis_state);
-      while(!axis_state_left_client_->wait_for_service(std::chrono::seconds(1)) &&
+      while(!axis_state_left_info_.client->wait_for_service(std::chrono::seconds(1)) &&
               rclcpp::ok()) {
         RCLCPP_INFO(
           get_logger(),
           "request_axis_state_left service not available, waiting again...");
       }
 
-      is_ready_axis_state_left_service_ = false;
-      left_service_call_time_ = system_clock::now();
+      axis_state_left_info_.is_ready_axis_state_service = false;
+      axis_state_left_info_.last_call_time = system_clock::now();
       AxisStateClient::SharedFutureWithRequestAndRequestId axis_state_left_future_ =
-        axis_state_left_client_->async_send_request(
+        axis_state_left_info_.client->async_send_request(
           request,
           [&](AxisStateClient::SharedFutureWithRequest future) {
             (void) future;
-            is_ready_axis_state_left_service_ = true;
-            left_service_call_time_ = system_clock::now();
+            axis_state_left_info_.is_ready_axis_state_service = true;
+            axis_state_left_info_.last_call_time = system_clock::now();
           });
     }
 
-    if(is_ready_axis_state_right_service_) {
+    if(axis_state_right_info_.is_ready_axis_state_service) {
       RCLCPP_INFO(
         get_logger(),
-        "axis_state_right to %d from %d",
+        "call axis_state_right service to %d mode from %d mode",
         axis_state_right_,
         axis_state);
-      while(!axis_state_right_client_->wait_for_service(std::chrono::seconds(1)) &&
+      while(!axis_state_right_info_.client->wait_for_service(std::chrono::seconds(1)) &&
               rclcpp::ok()) {
         RCLCPP_INFO(
           get_logger(),
           "request_axis_state_right service not available, waiting again...");
       }
 
-      is_ready_axis_state_right_service_ = false;
-      right_service_call_time_ = system_clock::now();
+      axis_state_right_info_.is_ready_axis_state_service = false;
+      axis_state_right_info_.last_call_time = system_clock::now();
       AxisStateClient::SharedFutureWithRequestAndRequestId axis_state_right_future_ =
-        axis_state_right_client_->async_send_request(
+        axis_state_right_info_.client->async_send_request(
           request,
           [&](AxisStateClient::SharedFutureWithRequest future) {
             (void) future;
-            is_ready_axis_state_right_service_ = true;
-            right_service_call_time_ = system_clock::now();
+            axis_state_right_info_.is_ready_axis_state_service = true;
+            axis_state_right_info_.last_call_time = system_clock::now();
           });
     }
   }
@@ -231,29 +235,36 @@ private:
     left_message.input_vel = sign_left_ * msg->spd_left / meter_per_round_;
     right_message.input_vel = sign_right_ * msg->spd_right / meter_per_round_;
 
-    if(is_ready_axis_state_left_service_) {
+    if(axis_state_left_info_.is_ready_axis_state_service) {
       control_message_left_pub_->publish(left_message);
     }
-    if(is_ready_axis_state_right_service_) {
+    if(axis_state_right_info_.is_ready_axis_state_service) {
       control_message_right_pub_->publish(right_message);
     }
   }
 
   void timerCallback()
   {
+    using Milliseconds = std::chrono::milliseconds;
+    using Seconds = std::chrono::seconds;
+    using std::chrono::system_clock;
     // check timeout ready flag that request_axis_state service
-    if(!axis_state_left_client_->wait_for_service(std::chrono::seconds(0)) &&
-        std::chrono::duration_cast<std::chrono::milliseconds>(left_service_call_time_ - std::chrono::system_clock::now()).count() >= service_timeout_ms_) {
+    double left_diff_time =
+      std::chrono::duration_cast<Milliseconds>(axis_state_left_info_.last_call_time - system_clock::now()).count();
+    if(!axis_state_left_info_.client->wait_for_service(Seconds(0)) &&
+        left_diff_time >= service_timeout_ms_) {
 
-      axis_state_left_client_->prune_pending_requests();
-      is_ready_axis_state_left_service_ = true;
+      axis_state_left_info_.client->prune_pending_requests();
+      axis_state_left_info_.is_ready_axis_state_service = true;
     }
 
-    if(!axis_state_right_client_->wait_for_service(std::chrono::seconds(0)) &&
-        std::chrono::duration_cast<std::chrono::milliseconds>(left_service_call_time_ - std::chrono::system_clock::now()).count() >= service_timeout_ms_) {
+    double right_diff_time =
+      std::chrono::duration_cast<Milliseconds>(axis_state_right_info_.last_call_time - system_clock::now()).count();
+    if(!axis_state_right_info_.client->wait_for_service(Seconds(0)) &&
+        right_diff_time >= service_timeout_ms_) {
 
-      axis_state_right_client_->prune_pending_requests();
-      is_ready_axis_state_right_service_ = true;
+      axis_state_right_info_.client->prune_pending_requests();
+      axis_state_right_info_.is_ready_axis_state_service = true;
     }
 
     odriver_msgs::msg::MotorStatus status;
@@ -291,6 +302,13 @@ private:
   // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.InputMode
   const int kPassthroughInputMode = 1;
 
+  struct AxisStateClientInfo {
+    rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr client;
+    std::chrono::system_clock::time_point last_call_time;
+    bool is_ready_axis_state_service;
+    std::string name;
+  };
+
   double wheel_diameter_m_;
   bool is_clockwise_;
   double hz_;
@@ -316,12 +334,6 @@ private:
   unsigned int axis_state_left_;
   unsigned int axis_state_right_;
 
-  bool is_ready_axis_state_left_service_;
-  bool is_ready_axis_state_right_service_;
-
-  std::chrono::system_clock::time_point left_service_call_time_;
-  std::chrono::system_clock::time_point right_service_call_time_;
-
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_left_pub_;
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_right_pub_;
   rclcpp::Publisher<odriver_msgs::msg::MotorStatus>::SharedPtr motor_status_pub_;
@@ -330,8 +342,8 @@ private:
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr controller_status_right_sub_;
   rclcpp::Subscription<odriver_msgs::msg::MotorTarget>::SharedPtr motor_target_sub_;
 
-  rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr axis_state_left_client_;
-  rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr axis_state_right_client_;
+  AxisStateClientInfo axis_state_left_info_;
+  AxisStateClientInfo axis_state_right_info_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 };
