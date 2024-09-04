@@ -96,6 +96,7 @@ public:
         vibrator_2_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator2", 10, std::bind(&CanToRos2Node::vibrator2Callback, this, std::placeholders::_1));
         vibrator_3_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator3", 10, std::bind(&CanToRos2Node::vibrator3Callback, this, std::placeholders::_1));
         servo_target_sub_ = this->create_subscription<std_msgs::msg::Int16>("servo_target", 10,std::bind(&CanToRos2Node::servoTargetCallback, this, std::placeholders::_1));
+        
         imu_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>(
             "run_imu_calibration",
             std::bind(&CanToRos2Node::readImuCalibration, this, std::placeholders::_1, std::placeholders::_2)
@@ -107,9 +108,9 @@ public:
             std::chrono::microseconds(100),
             std::bind(&CanToRos2Node::timerPubCallback, this));
 
-        sub_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(1),
-            std::bind(&CanToRos2Node::timerSubCallback, this));
+        // sub_timer_ = this->create_wall_timer(
+        //     std::chrono::milliseconds(1),
+        //     std::bind(&CanToRos2Node::timerSubCallback, this));
     }
 
 private:
@@ -166,30 +167,26 @@ private:
                  readImuCalibration2(frame);
             } else if (frame.can_id == TACT_CAN_ID) {
                 publishTactData(frame);   
-            } else if (frame.can_id == VIBRATOR_CAN_ID) {
-                sabscribeVibratorData();    
-            } else if (frame.can_id == TOUCH_CAN_ID){
+            }else if (frame.can_id == TOUCH_CAN_ID){
                 publishTouchData(frame);
             } else if (frame.can_id >= IMU_LINEAR_CAN_ID && frame.can_id <= IMU_ORIENTATION_CAN_ID){
                 publishImuData(frame);
             }else if (frame.can_id == SERVO_POS_CAN_ID){
                 publishServoPosData(frame);
-            }else if (frame.can_id == SERVO_TARGET_CAN_ID) {
-                subscribeServoTargetData();    
             }
         }
     }
-    void timerSubCallback() {
-        struct can_frame frame;
-        int nbytes = read(can_socket_ , &frame, sizeof(struct can_frame));
-        if (nbytes > 0) {
-            if (frame.can_id == VIBRATOR_CAN_ID) {
-                sabscribeVibratorData();    
-            }else if (frame.can_id == SERVO_TARGET_CAN_ID) {
-                subscribeServoTargetData();    
-            }
-        }
-    }
+    // void timerSubCallback() {
+    //     struct can_frame frame;
+    //     int nbytes = read(can_socket_ , &frame, sizeof(struct can_frame));
+    //     if (nbytes > 0) {
+    //         if (frame.can_id == VIBRATOR_CAN_ID) {
+    //             sabscribeVibratorData();    
+    //         }else if (frame.can_id == SERVO_TARGET_CAN_ID) {
+    //             subscribeServoTargetData();    
+    //         }
+    //     }
+    // }
 
 
     void publishTemperatureData(const struct can_frame &frame) {
@@ -272,17 +269,13 @@ private:
         static int8_t rssi = 0;
 
         if (frame.can_id == 0x10) {
-            // 0~5バイト目を使ってBSSIDを格納
             for (int i = 0; i < 6; ++i) {
                 mac_address[i] = frame.data[i];
             }
-            // 6バイト目を使ってチャンネルを設定
             channel = frame.data[6];
-            // 7バイト目を使ってRSSIを設定
             rssi = frame.data[7];
         } 
         else if (frame.can_id >= 0x0C && frame.can_id <= 0x0F) {
-            // SSIDのバイトを格納 (null文字を除去)
             for (int i = 0; i < frame.can_dlc; ++i) {
                 if (frame.data[i] != '\0') {
                     ssid += static_cast<char>(frame.data[i]);
@@ -413,33 +406,33 @@ private:
         }
     }
 
-    void vibrator1Callback(const std_msgs::msg::UInt8::SharedPtr msg)
-    {
-        data1_ = msg->data;
-    }
+    // void vibrator1Callback(const std_msgs::msg::UInt8::SharedPtr msg)
+    // {
+    //     data1_ = msg->data;
+    // }
 
-    void vibrator2Callback(const std_msgs::msg::UInt8::SharedPtr msg)
-    {
-        data2_ = msg->data;
-    }
+    // void vibrator2Callback(const std_msgs::msg::UInt8::SharedPtr msg)
+    // {
+    //     data2_ = msg->data;
+    // }
 
-    void vibrator3Callback(const std_msgs::msg::UInt8::SharedPtr msg)
-    {
-        data3_ = msg->data;
-    }
+    // void vibrator3Callback(const std_msgs::msg::UInt8::SharedPtr msg)
+    // {
+    //     data3_ = msg->data;
+    // }
 
-    void sabscribeVibratorData() {
-        struct can_frame vibrator_frame;
-        std::memset(&vibrator_frame, 0, sizeof(struct can_frame));
-        vibrator_frame.can_id = VIBRATOR_CAN_ID;
-        vibrator_frame.can_dlc = 3;
-        vibrator_frame.data[0] = data1_;
-        vibrator_frame.data[1] = data2_;
-        vibrator_frame.data[2] = data3_;
-        if (write(can_socket_, &vibrator_frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to send CAN message");
-        }
-    }
+    // void sabscribeVibratorData() {
+    //     struct can_frame vibrator_frame;
+    //     std::memset(&vibrator_frame, 0, sizeof(struct can_frame));
+    //     vibrator_frame.can_id = VIBRATOR_CAN_ID;
+    //     vibrator_frame.can_dlc = 3;
+    //     vibrator_frame.data[0] = data1_;
+    //     vibrator_frame.data[1] = data2_;
+    //     vibrator_frame.data[2] = data3_;
+    //     if (write(can_socket_, &vibrator_frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
+    //         RCLCPP_ERROR(this->get_logger(), "Failed to send CAN message");
+    //     }
+    // }
 
     void publishTouchData(const struct can_frame &frame) {
         if (frame.can_id == TOUCH_CAN_ID && frame.can_dlc >= 4) {
@@ -460,26 +453,25 @@ private:
             servo_pos_pub_->publish(servo_pos_pub_msg);
         }
     }
-    void servoTargetCallback(const std_msgs::msg::Int16::SharedPtr msg)
-    {
-        data4_ = msg->data;
-    }
+    // void servoTargetCallback(const std_msgs::msg::Int16::SharedPtr msg)
+    // {
+    //     data4_ = msg->data;
+    // }
 
-    void subscribeServoTargetData() {
-        struct can_frame vibrator_frame;
-        std::memset(&vibrator_frame, 0, sizeof(struct can_frame));
-        vibrator_frame.can_id = 0x1c;  // CAN ID: 0x1c に変更
-        vibrator_frame.can_dlc = 2;
-        vibrator_frame.data[0] = static_cast<uint8_t>(data4_ & 0xFF);  // Int16データの下位バイト
-        vibrator_frame.data[1] = static_cast<uint8_t>((data4_ >> 8) & 0xFF);  // Int16データの上位バイト
-
-        int nbytes = write(can_socket_, &vibrator_frame, sizeof(struct can_frame));
-        if (nbytes <= 0) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to write to CAN ID: 0x1c");
-        } else {
-            RCLCPP_INFO(this->get_logger(), "Written data to CAN ID: 0x1c");
-        }
-    } 
+    // void subscribeServoTargetData() {
+    //     struct can_frame vibrator_frame;
+    //     std::memset(&vibrator_frame, 0, sizeof(struct can_frame));
+    //     vibrator_frame.can_id = 0x1c; 
+    //     vibrator_frame.can_dlc = 2;
+    //     vibrator_frame.data[0] = static_cast<uint8_t>(data4_ & 0xFF);  
+    //     vibrator_frame.data[1] = static_cast<uint8_t>((data4_ >> 8) & 0xFF);
+    //     int nbytes = write(can_socket_, &vibrator_frame, sizeof(struct can_frame));
+    //     if (nbytes <= 0) {
+    //         RCLCPP_ERROR(this->get_logger(), "Failed to write to CAN ID: 0x1c");
+    //     } else {
+    //         RCLCPP_INFO(this->get_logger(), "Written data to CAN ID: 0x1c");
+    //     }
+    // } 
 
     sensor_msgs::msg::Imu imu_msg;
     rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_pub_1_;
