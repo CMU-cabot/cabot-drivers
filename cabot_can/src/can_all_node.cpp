@@ -43,7 +43,6 @@ const int IMU_ANGULAR_CAN_ID = 0x0A;
 const int IMU_ORIENTATION_CAN_ID = 0x0B;
 const int WIFI_SSID_CAN_ID_START = 0x0C;
 const int WIFI_SSID_CAN_ID_END = 0x0F;
-
 const int BME_CAN_ID = 0x11;
 const int TOUCH_CAN_ID = 0x12;
 const int TACT_CAN_ID = 0x13;
@@ -90,11 +89,13 @@ public:
         calibration_publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("calibration", 50);
         tact_pub_ = this->create_publisher<std_msgs::msg::Int8>("pushed", 50);
         capacitive_touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("capacitive/touch", 50);
+        servo_pos_pub_ = this->create_publisher<std_msgs::msg::Int16>("servo_pos", 50);
         touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("touch", 50);
 
         vibrator_1_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator1", 10, std::bind(&CanToRos2Node::vibrator1Callback, this, std::placeholders::_1));
         vibrator_2_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator2", 10, std::bind(&CanToRos2Node::vibrator2Callback, this, std::placeholders::_1));
         vibrator_3_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator3", 10, std::bind(&CanToRos2Node::vibrator3Callback, this, std::placeholders::_1));
+        servo_target_sub_ = this->create_subscription<std_msgs::msg::Int16>("servo_target", 10,std::bind(&CanToRos2Node::servoTargetCallback, this, std::placeholders::_1));
         imu_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>(
             "run_imu_calibration",
             std::bind(&CanToRos2Node::readImuCalibration, this, std::placeholders::_1, std::placeholders::_2)
@@ -106,9 +107,9 @@ public:
             std::chrono::microseconds(100),
             std::bind(&CanToRos2Node::timerPubCallback, this));
 
-        // sub_timer_ = this->create_wall_timer(
-        //     std::chrono::milliseconds(1),
-        //     std::bind(&CanToRos2Node::timerSubCallback, this));
+        sub_timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(1),
+            std::bind(&CanToRos2Node::timerSubCallback, this));
     }
 
 private:
@@ -131,6 +132,7 @@ private:
         }
         return s;
     }
+
     void readImuCalibration(const std::shared_ptr<std_srvs::srv::Trigger::Request> /*request*/,
                              std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
         struct can_frame frame;
@@ -156,7 +158,7 @@ private:
         if (nbytes > 0) {
             if (frame.can_id >= TEMPERATURE_CAN_ID_1 && frame.can_id <= TEMPERATURE_CAN_ID_5) {
                 publishTemperatureData(frame);
-            } else if (frame.can_id >= WIFI_SSID_CAN_ID_START && frame.can_id <= WIFI_SSID_CAN_ID_END) {
+            } else if (frame.can_id >= 0x0c && frame.can_id <= 0x10) {
                 publishWifiData(frame); 
             } else if (frame.can_id == BME_CAN_ID) {
                 publishBmeData(frame);
@@ -170,9 +172,25 @@ private:
                 publishTouchData(frame);
             } else if (frame.can_id >= IMU_LINEAR_CAN_ID && frame.can_id <= IMU_ORIENTATION_CAN_ID){
                 publishImuData(frame);
+            }else if (frame.can_id == SERVO_POS_CAN_ID){
+                publishServoPosData(frame);
+            }else if (frame.can_id == SERVO_TARGET_CAN_ID) {
+                subscribeServoTargetData();    
             }
         }
     }
+    void timerSubCallback() {
+        struct can_frame frame;
+        int nbytes = read(can_socket_ , &frame, sizeof(struct can_frame));
+        if (nbytes > 0) {
+            if (frame.can_id == VIBRATOR_CAN_ID) {
+                sabscribeVibratorData();    
+            }else if (frame.can_id == SERVO_TARGET_CAN_ID) {
+                subscribeServoTargetData();    
+            }
+        }
+    }
+
 
     void publishTemperatureData(const struct can_frame &frame) {
         int16_t temperature_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
@@ -247,22 +265,57 @@ private:
         }
     }
 
+    void publishWifiData(const struct can_frame &frame) {
+        static std::array<uint8_t, 6> mac_address{};
+        static std::string ssid;
+        static int8_t channel = 0;
+        static int8_t rssi = 0;
 
-    // void publishWifiData(const struct can_frame &frame) {
-    //     if (frame.can_id == 10) {
-    //         std::stringstream ss;
-    //         for (int i = 0; i < 4; ++i) {
-    //             ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(frame.data[i]);
-    //             if (i < 3) {
-    //                 ss << ":";
-    //             }
-    //         }
-    //         auto message = std_msgs::msg::String();
-    //         message.data = ss.str();
-    //         wifi_publisher_->publish(message);
-    //     }
-    // }
+        if (frame.can_id == 0x10) {
+            // 0~5バイト目を使ってBSSIDを格納
+            for (int i = 0; i < 6; ++i) {
+                mac_address[i] = frame.data[i];
+            }
+            // 6バイト目を使ってチャンネルを設定
+            channel = frame.data[6];
+            // 7バイト目を使ってRSSIを設定
+            rssi = frame.data[7];
+        } 
+        else if (frame.can_id >= 0x0C && frame.can_id <= 0x0F) {
+            // SSIDのバイトを格納 (null文字を除去)
+            for (int i = 0; i < frame.can_dlc; ++i) {
+                if (frame.data[i] != '\0') {
+                    ssid += static_cast<char>(frame.data[i]);
+                }
+            }
+        }
 
+        if (!ssid.empty() && mac_address[0] != 0 && channel != 0 && rssi != 0) {
+            std::string mac_str;
+            for (size_t i = 0; i < mac_address.size(); ++i) {
+                if (i != 0) {
+                    mac_str += ":";
+                }
+                std::stringstream hex_stream;
+                hex_stream << std::hex << static_cast<int>(mac_address[i]);
+                mac_str += hex_stream.str();
+            }
+            rclcpp::Time current_time = rclcpp::Clock().now();
+            int seconds = current_time.seconds();
+            int64_t nanoseconds = current_time.nanoseconds();
+            std::string num_str = std::to_string(nanoseconds);
+            std::string last_9_digits = num_str.substr(num_str.length() - 9);
+            std::string message = mac_str + "," + ssid + "," + std::to_string(channel) + "," + std::to_string(rssi) + "," + std::to_string(seconds) + "," + last_9_digits;
+            std_msgs::msg::String msg;
+            msg.data = message;
+            wifi_pub_->publish(msg);
+
+            mac_address.fill(0);
+            ssid.clear();
+            channel = 0;
+            rssi = 0;
+        }
+    }
 
     void publishBmeData(const struct can_frame &frame) {
         if (frame.can_id == BME_CAN_ID) {
@@ -322,7 +375,6 @@ private:
     void readImuCalibration2(const struct can_frame &frame) {
         static std::vector<int32_t> calibration_data(22); 
         static int received_count = 0; 
-
         if (frame.can_id == 0x34) {
             if (frame.can_dlc >= 8) {
                 for (int i = 0; i < 8; i++) {
@@ -345,7 +397,6 @@ private:
                 received_count++;
             }
         }
-
         if (received_count == 3) {
             std_msgs::msg::Int32MultiArray calibration_msg;
             calibration_msg.data = calibration_data;
@@ -353,7 +404,6 @@ private:
             received_count = 0;
         }
     }
-
 
     void publishTactData(const struct can_frame &frame) {
         if (frame.can_id == TACT_CAN_ID && frame.can_dlc >= 1) {
@@ -386,11 +436,8 @@ private:
         vibrator_frame.data[0] = data1_;
         vibrator_frame.data[1] = data2_;
         vibrator_frame.data[2] = data3_;
-        int nbytes = write(can_socket_, &vibrator_frame, sizeof(struct can_frame));
-        if (nbytes <= 0) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to write to CAN ID: 0x04");
-        } else {
-            RCLCPP_INFO(this->get_logger(), "Written data to CAN ID: 0x04");
+        if (write(can_socket_, &vibrator_frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to send CAN message");
         }
     }
 
@@ -402,7 +449,37 @@ private:
             capacitive_touch_pub_->publish(touch_msg);
             touch_pub_->publish(touch_msg);
         }
-    }    
+    }
+
+    void publishServoPosData(const struct can_frame &frame) {
+        if (frame.can_id == SERVO_POS_CAN_ID && frame.can_dlc >= 2) {
+            int16_t servo_pos2 = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
+            float servo_pos = ((servo_pos2 - 2048) / 1024.0) * 90;
+            std_msgs::msg::Int16 servo_pos_pub_msg;
+            servo_pos_pub_msg.data = static_cast<int16_t>(servo_pos);
+            servo_pos_pub_->publish(servo_pos_pub_msg);
+        }
+    }
+    void servoTargetCallback(const std_msgs::msg::Int16::SharedPtr msg)
+    {
+        data4_ = msg->data;
+    }
+
+    void subscribeServoTargetData() {
+        struct can_frame vibrator_frame;
+        std::memset(&vibrator_frame, 0, sizeof(struct can_frame));
+        vibrator_frame.can_id = 0x1c;  // CAN ID: 0x1c に変更
+        vibrator_frame.can_dlc = 2;
+        vibrator_frame.data[0] = static_cast<uint8_t>(data4_ & 0xFF);  // Int16データの下位バイト
+        vibrator_frame.data[1] = static_cast<uint8_t>((data4_ >> 8) & 0xFF);  // Int16データの上位バイト
+
+        int nbytes = write(can_socket_, &vibrator_frame, sizeof(struct can_frame));
+        if (nbytes <= 0) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to write to CAN ID: 0x1c");
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Written data to CAN ID: 0x1c");
+        }
+    } 
 
     sensor_msgs::msg::Imu imu_msg;
     rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_pub_1_;
@@ -418,9 +495,11 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr tact_pub_;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr capacitive_touch_pub_;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_pub_;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr servo_pos_pub_;
     rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_1_;
     rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_2_;
     rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_3_;   
+    rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr servo_target_sub_;   
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr imu_calibration_srv_;
     bool linear_data_received_ = false;
     bool angular_data_received_ = false;
@@ -431,10 +510,11 @@ private:
     int can_socket_;
     bool wifi_received_[4] = {false, false, false, false};
     uint8_t data1_ = 0, data2_ = 0, data3_ = 0;
+    int16_t data4_= 0;
     std::string wifi_data_[4];   
     
     rclcpp::TimerBase::SharedPtr pub_timer_;
-    // rclcpp::TimerBase::SharedPtr sub_timer_;
+    rclcpp::TimerBase::SharedPtr sub_timer_;
 };
 
 int main(int argc, char *argv[]) {
