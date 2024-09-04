@@ -50,6 +50,9 @@ public:
     this->declare_parameter("hz", 20.0);
     hz_ = this->get_parameter("hz").as_double();
 
+    this->declare_parameter("service_timeout_ms", 2000);
+    service_timeout_ms_ = this->get_parameter("service_timeout_ms").as_int();
+
     if(is_clockwise_) {
       sign_left_ = -1.0;
       sign_right_ = 1.0;
@@ -242,14 +245,14 @@ private:
   {
     // check timeout ready flag that request_axis_state service
     if(!axis_state_left_client_->wait_for_service(std::chrono::seconds(0)) &&
-        std::chrono::duration_cast<std::chrono::milliseconds>(left_service_call_time_ - std::chrono::system_clock::now()).count() >= 2000) {
+        std::chrono::duration_cast<std::chrono::milliseconds>(left_service_call_time_ - std::chrono::system_clock::now()).count() >= service_timeout_ms_) {
 
       axis_state_left_client_->prune_pending_requests();
       is_ready_axis_state_left_service_ = true;
     }
 
     if(!axis_state_right_client_->wait_for_service(std::chrono::seconds(0)) &&
-        std::chrono::duration_cast<std::chrono::milliseconds>(left_service_call_time_ - std::chrono::system_clock::now()).count() >= 2000) {
+        std::chrono::duration_cast<std::chrono::milliseconds>(left_service_call_time_ - std::chrono::system_clock::now()).count() >= service_timeout_ms_) {
 
       axis_state_right_client_->prune_pending_requests();
       is_ready_axis_state_right_service_ = true;
@@ -293,6 +296,7 @@ private:
   double wheel_diameter_m_;
   bool is_clockwise_;
   double hz_;
+  int service_timeout_ms_;
 
   double meter_per_round_;
 
