@@ -71,22 +71,22 @@ public:
       sign_right_ = -1.0;
     }
 
-    rclcpp::QoS control_message_left_qos(rclcpp::KeepAll{});
+    rclcpp::QoS control_message_left_qos(rclcpp::KeepLast(10));
     control_message_left_pub_ = create_publisher<odrive_can::msg::ControlMessage>(
                                   "/control_message_left",
                                   control_message_left_qos);
 
-    rclcpp::QoS control_message_right_qos(rclcpp::KeepAll{});
+    rclcpp::QoS control_message_right_qos(rclcpp::KeepLast(10));
     control_message_right_pub_ = create_publisher<odrive_can::msg::ControlMessage>(
                                   "/control_message_right",
                                   control_message_right_qos);
 
-    rclcpp::QoS motor_status_qos(rclcpp::KeepAll{});
+    rclcpp::QoS motor_status_qos(rclcpp::KeepLast(10));
     motor_status_pub_ = create_publisher<odriver_msgs::msg::MotorStatus>(
                                   "/motor_status",
                                   motor_status_qos);
 
-    rclcpp::QoS controller_status_left_qos(rclcpp::KeepAll{});
+    rclcpp::QoS controller_status_left_qos(rclcpp::KeepLast(10));
     controller_status_left_sub_ = create_subscription<odrive_can::msg::ControllerStatus>(
                                     "/controller_status_left",
                                     controller_status_left_qos,
@@ -95,7 +95,7 @@ public:
                                       this,
                                       _1));
 
-    rclcpp::QoS controller_status_right_qos(rclcpp::KeepAll{});
+    rclcpp::QoS controller_status_right_qos(rclcpp::KeepLast(10));
     controller_status_right_sub_ = create_subscription<odrive_can::msg::ControllerStatus>(
                                     "/controller_status_right",
                                     controller_status_right_qos,
@@ -104,7 +104,7 @@ public:
                                       this,
                                       _1));
 
-    rclcpp::QoS motor_target_qos(rclcpp::KeepAll{});
+    rclcpp::QoS motor_target_qos(rclcpp::KeepLast(10));
     motor_target_sub_ = create_subscription<odriver_msgs::msg::MotorTarget>(
                           "/motor_target",
                           motor_target_qos,
