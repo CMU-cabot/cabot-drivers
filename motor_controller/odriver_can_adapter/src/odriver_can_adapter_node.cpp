@@ -165,7 +165,6 @@ private:
         axis_state_left_client_->async_send_request(
           request,
           [&](AxisStateClient::SharedFutureWithRequest future) {
-            // WIP: check value
             (void) future;
             is_ready_axis_state_left_service_ = true;
             left_service_call_time_ = system_clock::now();
@@ -191,7 +190,6 @@ private:
         axis_state_right_client_->async_send_request(
           request,
           [&](AxisStateClient::SharedFutureWithRequest future) {
-            // WIP: check value
             (void) future;
             is_ready_axis_state_right_service_ = true;
             right_service_call_time_ = system_clock::now();
