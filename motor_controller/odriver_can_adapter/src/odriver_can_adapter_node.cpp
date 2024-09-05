@@ -30,6 +30,8 @@
 #include <odriver_msgs/msg/motor_status.hpp>
 #include <odriver_msgs/msg/motor_target.hpp>
 
+#include "odrive_manager.hpp"
+
 class ODriverCanAdapterNode: public rclcpp::Node
 {
   struct AxisStateClientInfo {

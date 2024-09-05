@@ -11,7 +11,9 @@ find_package(rclcpp REQUIRED)
 find_package(odriver_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
 
-add_executable(odriver_can_adapter_node src/odriver_can_adapter_node.cpp)
+add_executable(odriver_can_adapter_node
+  src/odriver_can_adapter_node.cpp
+  src/odrive_manager.cpp)
 target_include_directories(odriver_can_adapter_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
@@ -22,6 +24,8 @@ ament_target_dependencies(
   "odriver_msgs"
   "odrive_can"
 )
+
+include_directories(include)
 
 install(TARGETS odriver_can_adapter_node
   DESTINATION lib/${PROJECT_NAME})
