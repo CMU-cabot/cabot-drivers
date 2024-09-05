@@ -37,9 +37,10 @@ def generate_launch_description():
     output_type = LaunchConfiguration('output_type')
     frame_id = LaunchConfiguration('frame_id')
     cmdline_bd_code = LaunchConfiguration('cmdline_bd_code')
+    output_topic = LaunchConfiguration('output_topic')
     output = LaunchConfiguration('output')
 
-    user_config_path = PathJoinSubstitution([pkg_dir, 'config', 'livox', 'livox_lidar_config.json'])
+    user_config_path = PathJoinSubstitution([pkg_dir, 'config', 'livox', 'livox_lidar_return_dual.json'])
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -65,17 +66,22 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'output_type',
             default_value='0',
-            description=''
+            description='0-Output to ROS subscriber, 1-Output to rosbag file'
         ),
         DeclareLaunchArgument(
             'frame_id',
             default_value='livox_frame',
-            description=''
+            description='output topic frame ID'
         ),
         DeclareLaunchArgument(
             'cmdline_bd_code',
             default_value='livox0000000001',
-            description=''
+            description='LiDAR broadcast code'
+        ),
+        DeclareLaunchArgument(
+            'output_topic',
+            default_value='/livox/points',
+            description='output topic name'
         ),
         DeclareLaunchArgument(
             'output',
@@ -97,6 +103,7 @@ def generate_launch_description():
                 {"frame_id": frame_id},
                 {"user_config_path": user_config_path},
                 {"cmdline_input_bd_code": cmdline_bd_code}
-            ]
+            ],
+            remappings=[('/livox/lidar', output_topic)],
         )
     ])
