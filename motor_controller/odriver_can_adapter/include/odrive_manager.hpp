@@ -25,11 +25,20 @@
 class ODriveManager
 {
 public:
-  ODriveManager(rclcpp::Node *node, const std::string &axis_name, double sign);
+  ODriveManager(rclcpp::Node *node, const std::string &axis_name, double sign, double wheel_diameter_m);
   ~ODriveManager();
 
-  void setControlStatusMessage(const odrive_can::msg::ControllerStatus::SharedPtr msg);
+  void controllerStatusCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg);
   void callAxisStateService(unsigned int axis_state);
+  void publishControlMessage(const odrive_can::msg::ControlMessage &msg);
+  void publishControlMessage(int control_mode, int input_mode, double spd_m_per_sec);
+  unsigned int getAxisState() { return axis_state_; }
+  void checkTimeoutServiceResponse(double timeout);
+  double getSpdC() { return spd_c_; };
+  double getDistC() { return dist_c_; };
+  double getCurrentSetpoint() { return current_setpoint_; };
+  double getCurrentMeasured() { return current_measured_; };
+  double getSign() { return sign_; };
 private:
   rclcpp::Node *node_;
 
@@ -47,6 +56,9 @@ private:
   double current_measured_;
 
   double sign_;
+
+  double wheel_diameter_m_;
+  double meter_per_round_;
 
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_pub_;
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr controller_status_sub_;
