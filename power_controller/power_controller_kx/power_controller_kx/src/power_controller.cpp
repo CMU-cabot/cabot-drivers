@@ -48,6 +48,8 @@
 #define PERIOD 0.001s
 #define True_ 0x01
 #define False_ 0x00
+#define Kelvin 2731.0 // Kelvin = 273.1 * 10
+#define Duty 2.55
 
 class PowerController : public rclcpp::Node
 {
@@ -163,7 +165,7 @@ private:
   {
     mtx.lock();
     id = 0x15;
-    if (req->data == 1) {
+    if (req->data) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 24V_odrive");
       power_ = True_;
     } else {
@@ -181,7 +183,7 @@ private:
   {
     mtx.lock();
     id = 0x17;
-    if (req->data == 1) {
+    if (req->data) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_1");
       power_ = True_;
     } else {
@@ -199,7 +201,7 @@ private:
   {
     mtx.lock();
     id = 0x18;
-    if (req->data == 1) {
+    if (req->data) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_2");
       power_ = True_;
     } else {
@@ -217,7 +219,7 @@ private:
   {
     mtx.lock();
     id = 0x19;
-    if (req->data == 1) {
+    if (req->data) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 12V D455_3");
       power_ = True_;
     } else {
@@ -235,7 +237,7 @@ private:
   {
     mtx.lock();
     id = 0x1a;
-    if (req->data == 1) {
+    if (req->data) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 5V MCU");
       power_ = True_;
     } else {
@@ -276,14 +278,14 @@ private:
     mtx.unlock();
   }
   void fanControllerCallBack(std_msgs::msg::UInt8 msg){
-    uint8_t duty = msg.data;
-    if (duty > 100) {
+    uint8_t data_ = msg.data;
+    if (data_ > 100) {
       RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Only values from 0 to 100 can be entered");
       return;
     }
     mtx.lock();
     id = 0x1e;
-    uint8_t pwm = duty * 2.55;
+    uint8_t pwm = data_ * Duty;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "pwm is %d", pwm);
     std::memcpy(&send_can_value, &pwm, sizeof(bool));
     send_can_value_list.push_back({id, send_can_value});
@@ -296,7 +298,7 @@ private:
       return;
     }
     mtx.lock();
-    sendCanValueInfo send_can_value_temp = send_can_value_list.front();
+    SendCanValueInfo send_can_value_temp = send_can_value_list.front();
     frame.can_id = send_can_value_temp.id;
     frame.can_dlc = 1;
     frame.data[0] = send_can_value_temp.data;
@@ -308,6 +310,15 @@ private:
     send_can_value_list.pop_front();
     mtx.unlock();
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Send data");
+  }
+  float convertUnit(uint16_t data_, bool temperature_flag_ = false){
+    float result;
+    if (temperature_flag_){
+      result = (data_ - Kelvin) / 10.0;
+      return result;
+    }
+    result = static_cast<float>(data_) / 1000.0;
+    return result;
   }
   //message & combine bits
   void conbineBitAndUpdateMessage(
@@ -329,15 +340,12 @@ private:
     int array_num = location_ - 1;
     msg.batteryarray[array_num].header.stamp = this->get_clock()->now();
     // Converts voltage units from mV to V
-    float voltage = static_cast<float>(data[0]) / 1000.0;
-    msg.batteryarray[array_num].voltage = voltage;
+    msg.batteryarray[array_num].voltage = convertUnit(data[0]);
     // Converts current units from mA to A
-    float current = static_cast<float>(data[1]) / 1000.0;
-    msg.batteryarray[array_num].current = current;
+    msg.batteryarray[array_num].current = -convertUnit(data[1]);
     msg.batteryarray[array_num].percentage = data[2];
     // Convert absolute temperature to Celsius
-    float temperature = (static_cast<float>(data[3]) - 2731.0) / 10.0;
-    msg.batteryarray[array_num].temperature = temperature;
+    msg.batteryarray[array_num].temperature = convertUnit(data[3], temperature_flag_);
     msg.batteryarray[array_num].location = std::to_string(location_);
   }
   void publishPowerStatus()
@@ -391,7 +399,7 @@ private:
   };
 
   // struct
-  struct sendCanValueInfo {
+  struct SendCanValueInfo {
     uint8_t id;
     uint8_t data;
   };
@@ -401,8 +409,9 @@ private:
   uint8_t power_;
   // flag
   bool check_send_data;
+  bool temperature_flag_ = true;
   // list
-  std::list<sendCanValueInfo> send_can_value_list;
+  std::list<SendCanValueInfo> send_can_value_list;
   // can socket
   int can_socket_;
   // define publish msg
