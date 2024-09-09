@@ -130,10 +130,9 @@ private:
   int openCanSocket()
   {
     std::string can_interface_ = this->get_parameter("can_interface").as_string();
-    RCLCPP_ERROR(this->get_logger(), "%s", can_interface_.c_str());
     int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (s < 0) {
-      RCLCPP_ERROR(this->get_logger(), "Socket");
+      RCLCPP_ERROR(this->get_logger(), "socket");
       return -1;
     }
     struct ifreq ifr;
@@ -143,7 +142,7 @@ private:
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
     if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-      RCLCPP_ERROR(this->get_logger(), "Bind");
+      RCLCPP_ERROR(this->get_logger(), "bind");
       close(s);
       return -1;
     }
@@ -153,7 +152,7 @@ private:
   {
     int nbytes = write(can_socket, &frame, sizeof(struct can_frame));
     if (nbytes != sizeof(struct can_frame)) {
-      RCLCPP_ERROR(this->get_logger(), "The number of bytes is not equal to the number of bytes");
+      RCLCPP_ERROR(this->get_logger(), "the number of bytes is not equal to the number of bytes");
       check_send_data = false;
       return;
     }
@@ -260,7 +259,7 @@ private:
     send_can_value_list.push_back({id, send_can_value});
     (void)req;
     (void)res;
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Shutdown");
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "shutdown");
     mtx.unlock();
   }
   void rebootALL(
@@ -280,7 +279,7 @@ private:
   void fanControllerCallBack(std_msgs::msg::UInt8 msg){
     uint8_t data_ = msg.data;
     if (data_ > 100) {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Only values from 0 to 100 can be entered");
+      RCLCPP_ERROR(this->get_logger(), "only values from 0 to 100 can be entered");
       return;
     }
     mtx.lock();
@@ -309,7 +308,7 @@ private:
     }
     send_can_value_list.pop_front();
     mtx.unlock();
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "Send data");
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "send data");
   }
   float convertUnit(uint16_t data_, bool temperature_flag_ = false){
     float result;
@@ -366,17 +365,14 @@ private:
 	 conbineBitAndUpdateMessage(msg, location_, frame.data, data);
 	 break;
        case CanId::battery_id_2:  // Battery 2 Info
-	 RCLCPP_INFO(this->get_logger(), "Get data of Battery 2");
 	 location_ = 2;
 	 conbineBitAndUpdateMessage(msg, location_, frame.data, data);
 	 break;
        case CanId::battery_id_3:  // Battery 3 Info
 	 location_ = 3;
-	 RCLCPP_INFO(this->get_logger(), "Get data of Battery 3");
 	 conbineBitAndUpdateMessage(msg, location_, frame.data, data);
 	 break;
        case CanId::battery_id_4:  // Battery 4 Info
-	 RCLCPP_INFO(this->get_logger(), "Get data of Battery 4");
 	 location_ = 4;
 	 conbineBitAndUpdateMessage(msg, location_, frame.data, data);
 	 break;
