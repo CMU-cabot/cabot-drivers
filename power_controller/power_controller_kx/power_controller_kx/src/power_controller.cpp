@@ -151,12 +151,12 @@ private:
   void sendCanFrame(int can_socket, can_frame & frame)
   {
     int nbytes = write(can_socket, &frame, sizeof(struct can_frame));
-    if (nbytes != sizeof(struct can_frame)) {
-      RCLCPP_ERROR(this->get_logger(), "the number of bytes is not equal to the number of bytes");
-      check_send_data = false;
+    if (nbytes == sizeof(struct can_frame)) {
+      check_send_data = true;
       return;
     }
-    check_send_data = true;
+    RCLCPP_ERROR(this->get_logger(), "the number of bytes is not equal to the number of bytes");
+    check_send_data = false;
   }
   void set24vPower(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> req,
