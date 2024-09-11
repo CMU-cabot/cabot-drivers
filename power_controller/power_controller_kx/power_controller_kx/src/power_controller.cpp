@@ -341,7 +341,7 @@ private:
     // Converts voltage units from mV to V
     msg.batteryarray[array_num].voltage = convertUnit(data[0]);
     // Converts current units from mA to A
-    msg.batteryarray[array_num].current = -convertUnit(data[1]);
+    msg.batteryarray[array_num].current = convertUnit(-data[1]); // Signs are inverted because hexadecimal data is negative.
     msg.batteryarray[array_num].percentage = data[2];
     // Convert absolute temperature to Celsius
     msg.batteryarray[array_num].temperature = convertUnit(data[3], temperature_flag_);
