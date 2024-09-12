@@ -88,8 +88,8 @@ public:
         touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("touch", 50);
 
         vibrator_1_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator1", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg,1);});
-        vibrator_2_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator2", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) { this->subscribeVibratorData(msg, 2); });
-        vibrator_3_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator3", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) { this->subscribeVibratorData(msg, 3); });
+        vibrator_2_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator3", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) { this->subscribeVibratorData(msg, 2); });
+        vibrator_3_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator4", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) { this->subscribeVibratorData(msg, 3); });
         servo_target_sub_ = this->create_subscription<std_msgs::msg::Int16>("servo_target", 10, std::bind(&CanAllNode::subscribeServoTargetData, this, std::placeholders::_1));
         servo_free_sub_ = this->create_subscription<std_msgs::msg::Bool>("servo_free",10,std::bind(&CanAllNode::subServoFree, this, std::placeholders::_1));
 
@@ -131,13 +131,13 @@ private:
         frame.can_id = IMU_CALIBRATION_SEND_CAN_ID;
         frame.can_dlc = 1;
         frame.data[0] = 0x01;
-
         int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
         if (nbytes <= 0) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to write to CAN ID: 0x04");
+            RCLCPP_ERROR(this->get_logger(), "Failed to write to CAN ID: 0x38");
         } else {
-            RCLCPP_INFO(this->get_logger(), "Written 0x01 to CAN ID: 0x04");
+            RCLCPP_INFO(this->get_logger(), "Written 0x01 to CAN ID: 0x38");
         }
+        usleep(1000);
         frame.can_id = WRITE_IMU_CALIBRATION_ID_1;
         frame.can_dlc = 8;
         for (int i = 0; i < 8; ++i) {
@@ -278,6 +278,7 @@ private:
         }
         if (linear_data_received && angular_data_received && orientation_data_received) {
             imu_msg.header.stamp = this->get_clock()->now();
+            imu_msg.header.frame_id = "imu_frame";
             imu_pub_->publish(imu_msg);
             linear_data_received = false;
             angular_data_received = false;
@@ -414,9 +415,10 @@ private:
     }
 
     void subscribeVibratorData(const std_msgs::msg::UInt8::SharedPtr msg, int vibrator_id) {
-        static uint8_t vibrator1;
-        static uint8_t vibrator2;
-        static uint8_t vibrator3;
+        uint8_t vibrator1 = 0;
+        uint8_t vibrator2 = 0;
+        uint8_t vibrator3 = 0;
+        
         if (vibrator_id == 1) {
             vibrator1 = msg->data;
         } else if (vibrator_id == 2) {
@@ -424,17 +426,20 @@ private:
         } else if (vibrator_id == 3) {
             vibrator3 = msg->data;
         }
+
         struct can_frame frame;
         std::memset(&frame, 0, sizeof(struct can_frame));
         frame.can_id = VIBRATOR_CAN_ID;
-        frame.can_dlc = 3;  
+        frame.can_dlc = 3;
         frame.data[0] = vibrator1;
         frame.data[1] = vibrator2;
         frame.data[2] = vibrator3;
+
         if (write(can_socket_, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
             RCLCPP_ERROR(this->get_logger(), "Failed to send CAN message");
         }
     }
+
 
     void subscribeServoTargetData(const std_msgs::msg::Int16& msg) {
         int16_t received_value = msg.data;
@@ -452,7 +457,7 @@ private:
     }
 
     void subServoFree(const std_msgs::msg::Bool::SharedPtr msg) {
-        uint8_t can_data = msg->data ? 0x01 : 0x00;
+        uint8_t can_data = msg->data ? 0x00 : 0x01;
         struct can_frame frame;
         std::memset(&frame, 0, sizeof(struct can_frame));
         frame.can_id = SERVO_SWITCH_CAN_ID;
