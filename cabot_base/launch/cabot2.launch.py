@@ -308,7 +308,6 @@ def generate_launch_description():
                         ],
                         remappings=[
                             # ('/cabot/imu', '/cabot/imu/data'),
-                            ('/cabot/touch_speed', '/cabot/touch_speed_raw')
                         ],
                     ),
                 ]

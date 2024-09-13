@@ -146,10 +146,6 @@ private:
   void handle_callback(const uint8_t cmd, const std_msgs::msg::UInt8::SharedPtr msg);
   void handle_callback(const uint8_t cmd, const std_msgs::msg::Int16::SharedPtr msg);
   void handle_callback(const uint8_t cmd, const std_msgs::msg::Bool::SharedPtr msg);
-  void touch_callback(std_msgs::msg::Int16 & msg);
-  void set_touch_speed_active_mode(
-    const std_srvs::srv::SetBool::Request::SharedPtr req,
-    std_srvs::srv::SetBool::Response::SharedPtr res);
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_data(const std::vector<uint8_t> & data);
   std::shared_ptr<sensor_msgs::msg::Imu> process_imu_dev_data(const std::vector<uint8_t> & data);
   std::shared_ptr<sensor_msgs::msg::Imu> adjust_imu_message(const std::shared_ptr<sensor_msgs::msg::Imu>& msg);
@@ -169,12 +165,6 @@ private:
   std::vector<double> imu_accel_bias_;
   std::vector<double> imu_gyro_bias_;
 
-  bool touch_speed_active_mode_;
-  double touch_speed_max_speed_;
-  double touch_speed_max_speed_inactive_;
-
-  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr touch_speed_switched_pub_;
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr set_touch_speed_active_mode_srv;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_raw_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr button_pub_;
