@@ -311,18 +311,18 @@ private:
     mtx_.unlock();
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "send data");
   }
-  float convertUnit(uint16_t data_, bool temperature_flag_ = false){
+  float convertUnit(uint16_t data, bool temperature_flag = false){
     float result;
-    if (temperature_flag_){
-      result = (data_ - KELVIN) / 10.0;
+    if (temperature_flag){
+      result = (data - KELVIN) / 10.0;
       return result;
     }
-    result = static_cast<float>(data_) / 1000.0;
+    result = static_cast<float>(data) / 1000.0;
     return result;
   }
   //message & combine bits
   void conbineBitAndUpdateMessage(
-    power_controller_msgs::msg::BatteryArray & battery_msg, int location_,
+    power_controller_msgs::msg::BatteryArray & battery_msg, int location,
     uint8_t* frame_data, uint16_t data[4], bool battery_serial_number_flag = false){    
     data[0] = (frame_data[1] << 8) | frame_data[0];
     data[1] = (frame_data[3] << 8) | frame_data[2];
@@ -337,7 +337,7 @@ private:
       publisher_->publish(battery_msg);
       return;
     }
-    int array_num = location_ - 1;
+    int array_num = location - 1;
     battery_msg.batteryarray[array_num].header.stamp = this->get_clock()->now();
     // Converts voltage units from mV to V
     battery_msg.batteryarray[array_num].voltage = convertUnit(data[0]);
@@ -346,15 +346,15 @@ private:
     battery_msg.batteryarray[array_num].percentage = data[2];
     // Convert absolute temperature to Celsius
     battery_msg.batteryarray[array_num].temperature = convertUnit(data[3], temperature_flag_);
-    battery_msg.batteryarray[array_num].location = std::to_string(location_);
+    battery_msg.batteryarray[array_num].location = std::to_string(location);
   }
   void publishPowerStatus()
   {
-    uint16_t data[4];
+    uint16_t data_[4];
     int location_;
     int num_batteries = this->get_parameter("number_of_batteries").as_int();
     battery_message_.batteryarray.resize(num_batteries);
-    bool battery_serial_number_flag = true;
+    bool battery_serial_number_flag_ = true;
     struct can_frame frame;
     int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
     if (nbytes <= 0) {
@@ -363,23 +363,23 @@ private:
     switch (frame.can_id) {
        case CanId::battery_id_1:  // Battery 1 Info
 	 location_ = 1;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data);
+	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
 	 break;
        case CanId::battery_id_2:  // Battery 2 Info
 	 location_ = 2;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data);
+	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
 	 break;
        case CanId::battery_id_3:  // Battery 3 Info
 	 location_ = 3;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data);
+	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
 	 break;
        case CanId::battery_id_4:  // Battery 4 Info
 	 location_ = 4;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data);
+	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
 	 break;
        case CanId::battery_serial_number: // Serial Number
 	 location_ = 0;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data, battery_serial_number_flag);
+	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_, battery_serial_number_flag_);
 	 break;
        default:
 	 break;
