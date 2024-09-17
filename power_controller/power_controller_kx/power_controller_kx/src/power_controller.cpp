@@ -389,17 +389,17 @@ private:
   //enum
   enum CanId : uint8_t{
     battery_id_1 = 0x05,
-    battery_id_2 = 0x06,
-    battery_id_3 = 0x07,
-    battery_id_4 = 0x08,
-    battery_serial_number = 0x1d,
+    battery_id_2,
+    battery_id_3,
+    battery_id_4,
     odrive_id = 0x15,
-    power_id = 0x16,
-    d455_front_id = 0x17,
-    d455_left_id = 0x18,
-    d455_right_id = 0x19,
+    power_id,
+    d455_front_id,
+    d455_left_id,
+    d455_right_id,
     mcu_id = 0x1a,
-    fan_id = 0x1e
+    battery_serial_number = 0x1d,
+    fan_id
   };
 
   // struct
