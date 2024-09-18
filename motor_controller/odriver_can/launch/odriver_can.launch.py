@@ -1,5 +1,5 @@
 # ******************************************************************************
-#  Copyright (c) 2024  Miraikan - The National Museum of Emerging Science and Innovation
+#  Copyright (c) 2024  Carnegie Mellon University and Miraikan
 #
 #  Permission is hereby granted, free of charge, to any person obtaining a copy
 #  of this software and associated documentation files (the "Software"), to deal
@@ -20,31 +20,20 @@
 #  SOFTWARE.
 # ******************************************************************************
 
-services:
-  driver:
-    extends:
-      file: docker-compose-base.yaml
-      service: driver-base
-    volumes:
-      - ./docker/home:/home/developer/
+from launch.logging import launch_config
 
-  wifi_scan:
-    extends:
-      file: docker-compose-base.yaml
-      service: wifi_scan-base
-    volumes:
-      - ./docker/home:/home/developer/
+from launch import LaunchDescription
+from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration
+from launch.actions import SetEnvironmentVariable
 
-  ble_scan:
-    extends:
-      file: docker-compose-base.yaml
-      service: ble_scan-base
-    volumes:
-      - ./docker/home:/home/developer/
-
-  odriver_can:
-    extends:
-      file: docker-compose-base.yaml
-      service: odriver_can-base
-    volumes:
-      - ./docker/home:/home/developer/
+def generate_launch_description():
+    return LaunchDescription([
+        SetEnvironmentVariable('ROS_LOG_DIR', launch_config.log_dir),
+        Node(
+            package='odriver_can',
+            namespace='/',
+            executable='set_vel_gains_node',
+            name='set_vel_gains_node',
+        ),
+    ])

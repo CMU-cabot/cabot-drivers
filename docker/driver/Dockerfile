@@ -1,4 +1,4 @@
-# Copyright (c) 2023  Carnegie Mellon University
+# Copyright (c) 2023, 2024  Carnegie Mellon University and Miraikan
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -75,3 +75,15 @@ USER $USERNAME
 ENV HOME /home/$USERNAME
 
 WORKDIR $HOME/driver_ws
+
+USER root
+ENV UNDERLAY_WS=/opt/underlay_ws
+RUN mkdir -p $UNDERLAY_WS/src && \
+    cd $UNDERLAY_WS/src && \
+    git clone https://github.com/odriverobotics/ros_odrive.git && \
+    cd ros_odrive && \
+    git checkout 0fa84d3745a8c385076d29b7f54971e9f2d14de7 && \
+    cd $UNDERLAY_WS && \
+    /bin/bash -c "source /opt/ros/humble/setup.bash; colcon build --packages-select odrive_can"
+
+USER $USERNAME
