@@ -21,13 +21,13 @@
  *******************************************************************************/
 
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp" 
+#include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include "sensor_msgs/msg/temperature.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/fluid_pressure.hpp"
 #include "sensor_msgs/msg/temperature.hpp"
-#include "std_srvs/srv/trigger.hpp" 
+#include "std_srvs/srv/trigger.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_msgs/msg/int16.hpp"
@@ -35,7 +35,7 @@
 #include <linux/can.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
-# include <bits/stdc++.h>
+#include <bits/stdc++.h>
 
 const int IMU_LINEAR_CAN_ID = 0x09;
 const int IMU_ANGULAR_CAN_ID = 0x0A;
@@ -76,20 +76,20 @@ public:
         temperature_4_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature4", 2);
         temperature_5_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature5", 2);
         imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu_data", 100);
-        wifi_pub_ = this->create_publisher<std_msgs::msg::String>("wifi", 1); 
+        wifi_pub_ = this->create_publisher<std_msgs::msg::String>("wifi", 1);
         BME_temperature_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("bme/temperature", 2);
-        BME_pressure_pub_ = this->create_publisher<sensor_msgs::msg::FluidPressure>("bme/pressure", 2); 
+        BME_pressure_pub_ = this->create_publisher<sensor_msgs::msg::FluidPressure>("bme/pressure", 2);
         calibration_pub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("calibration", 50);
         tact_pub_ = this->create_publisher<std_msgs::msg::Int8>("pushed", 50);
         capacitive_touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("capacitive/touch", 50);
         capacitive_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("capacitive/touch_raw", 50);
-        tof_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("tof/touch_raw", 50);        
+        tof_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("tof/touch_raw", 50);
         servo_pos_pub_ = this->create_publisher<std_msgs::msg::Int16>("servo_pos", 50);
         touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("touch", 50);
 
         vibrator_1_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator1", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg,1);});
-        vibrator_2_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator3", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) { this->subscribeVibratorData(msg, 2); });
-        vibrator_3_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator4", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) { this->subscribeVibratorData(msg, 3); });
+        vibrator_3_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator3", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg,3);});
+        vibrator_4_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator4", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg,4);});
         servo_target_sub_ = this->create_subscription<std_msgs::msg::Int16>("servo_target", 10, std::bind(&CanAllNode::subscribeServoTargetData, this, std::placeholders::_1));
         servo_free_sub_ = this->create_subscription<std_msgs::msg::Bool>("servo_free",10,std::bind(&CanAllNode::subServoFree, this, std::placeholders::_1));
 
@@ -97,7 +97,7 @@ public:
 
         can_socket_ = openCanSocket();
         writeImuCalibration();
-        
+
         pub_timer_ = this->create_wall_timer(
             std::chrono::microseconds(100),
             std::bind(&CanAllNode::timerPubCallback, this));
@@ -167,13 +167,13 @@ private:
             if (frame.can_id >= TEMPERATURE_1_CAN_ID && frame.can_id <= TEMPERATURE_5_CAN_ID) {
                 publishTemperatureData(frame);
             } else if (frame.can_id >= WIFI_CAN_ID_START && frame.can_id <= WIFI_CAN_ID_END) {
-                publishWifiData(frame); 
+                publishWifiData(frame);
             } else if (frame.can_id == BME_CAN_ID) {
                 publishBmeData(frame);
             } else if (frame.can_id >= READ_IMU_CALIBRATION_ID_1 && frame.can_id <= READ_IMU_CALIBRATION_ID_3) {
-                 readImuCalibration(frame);
+                readImuCalibration(frame);
             } else if (frame.can_id == TACT_CAN_ID) {
-                publishTactData(frame);   
+                publishTactData(frame);
             } else if (frame.can_id == TOUCH_CAN_ID){
                 publishTouchData(frame);
             } else if (frame.can_id >= IMU_LINEAR_CAN_ID && frame.can_id <= IMU_ORIENTATION_CAN_ID){
@@ -185,7 +185,7 @@ private:
     }
 
     void readImuServiceCalibration(const std::shared_ptr<std_srvs::srv::Trigger::Request> /*request*/,
-                             std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+                                            std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
         struct can_frame frame;
         std::memset(&frame, 0, sizeof(struct can_frame));
         frame.can_id = IMU_CALIBRATION_SEND_CAN_ID;
@@ -204,8 +204,8 @@ private:
     }
 
     void readImuCalibration(const struct can_frame &frame) {
-        static std::vector<int32_t> calibration_data(22); 
-        static int received_count = 0; 
+        static std::vector<int32_t> calibration_data(22);
+        static int received_count = 0;
         if (frame.can_id == READ_IMU_CALIBRATION_ID_1) {
             if (frame.can_dlc >= 8) {
                 for (int i = 0; i < 8; i++) {
@@ -257,7 +257,7 @@ private:
                 int16_t angular_x = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
                 int16_t angular_y = (((uint16_t)frame.data[3]) << 8) | ((uint16_t)frame.data[2]);
                 int16_t angular_z = (((uint16_t)frame.data[5]) << 8) | ((uint16_t)frame.data[4]);
-                imu_msg.angular_velocity.x = (angular_x / 16.0) * (M_PI / 180.0); 
+                imu_msg.angular_velocity.x = (angular_x / 16.0) * (M_PI / 180.0);
                 imu_msg.angular_velocity.y = (angular_y / 16.0) * (M_PI / 180.0);
                 imu_msg.angular_velocity.z = (angular_z / 16.0) * (M_PI / 180.0);
                 angular_data_received = true;
@@ -297,7 +297,7 @@ private:
             }
             channel = frame.data[6];
             rssi = frame.data[7];
-        } 
+        }
         else if (frame.can_id >= WIFI_CAN_ID_START && frame.can_id <= WIFI_SSID_CAN_ID_END) {
             for (int i = 0; i < frame.can_dlc; ++i) {
                 if (frame.data[i] != '\0') {
@@ -330,7 +330,7 @@ private:
             channel = 0;
             rssi = 0;
         }
-    }    
+    }
 
     void publishBmeData(const struct can_frame &frame) {
         if (frame.can_id == BME_CAN_ID) {
@@ -416,15 +416,15 @@ private:
 
     void subscribeVibratorData(const std_msgs::msg::UInt8::SharedPtr msg, int vibrator_id) {
         uint8_t vibrator1 = 0;
-        uint8_t vibrator2 = 0;
         uint8_t vibrator3 = 0;
-        
+        uint8_t vibrator4 = 0;
+
         if (vibrator_id == 1) {
             vibrator1 = msg->data;
-        } else if (vibrator_id == 2) {
-            vibrator2 = msg->data;
         } else if (vibrator_id == 3) {
             vibrator3 = msg->data;
+        } else if (vibrator_id == 4) {
+            vibrator4 = msg->data;
         }
 
         struct can_frame frame;
@@ -432,8 +432,8 @@ private:
         frame.can_id = VIBRATOR_CAN_ID;
         frame.can_dlc = 3;
         frame.data[0] = vibrator1;
-        frame.data[1] = vibrator2;
-        frame.data[2] = vibrator3;
+        frame.data[1] = vibrator3;
+        frame.data[2] = vibrator4;
 
         if (write(can_socket_, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
             RCLCPP_ERROR(this->get_logger(), "Failed to send CAN message");
@@ -449,7 +449,7 @@ private:
         std::memset(&frame, 0, sizeof(struct can_frame));
         frame.can_id = SERVO_TARGET_CAN_ID;
         frame.can_dlc = 4;
-        frame.data[0] = value & 0xFF; 
+        frame.data[0] = value & 0xFF;
         frame.data[1] = (value >> 8) & 0xFF;
         if (write(can_socket_, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
             RCLCPP_ERROR(this->get_logger(), "Error sending CAN frame");
@@ -478,7 +478,7 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr wifi_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr BME_temperature_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr BME_pressure_pub_; 
+    rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr BME_pressure_pub_;
     rclcpp::Publisher< std_msgs::msg::Int32MultiArray>::SharedPtr calibration_pub_;
     rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr tact_pub_;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr capacitive_touch_pub_;
@@ -487,8 +487,8 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_pub_;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr servo_pos_pub_;
     rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_1_sub_;
-    rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_2_sub_;
-    rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_3_sub_;   
+    rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_3_sub_;
+    rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_4_sub_;
     rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr servo_target_sub_;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr servo_free_sub_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr imu_calibration_srv_;
