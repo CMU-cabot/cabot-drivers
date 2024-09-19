@@ -111,10 +111,7 @@ CaBotSerialNode::CaBotSerialNode(const rclcpp::NodeOptions & options)
   error_msg_(nullptr),
   updater_(this),
   client_logger_(rclcpp::get_logger("arduino-serial")),
-  vibrations_{},
-  touch_speed_active_mode_(false),
-  touch_speed_max_speed_(2.0),
-  touch_speed_max_speed_inactive_(0.5)
+  vibrations_{}
 {
   // use_intra_process_comms is currently not supported
   // publishers, diagnostic tasks, and related services
@@ -328,28 +325,9 @@ void CaBotSerialNode::publish(uint8_t cmd, const std::vector<uint8_t> & data)
     if (touch_pub_ == nullptr) {
       touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("touch", rclcpp::QoS(10));
       touch_check_task_ = std::make_shared<TopicCheckTask>(updater_, shared_from_this(), "Touch sensor", 50);
-
-      /* touch speed control
-       * touch speed activw mode
-       * True:  Touch - go,    Not Touch - no go
-       * False: Touch - no go, Not Touch - go
-       */
-      touch_speed_active_mode_ = true;
-      touch_speed_max_speed_ = this->declare_parameter("touch_speed_max_speed", touch_speed_max_speed_);
-      touch_speed_max_speed_inactive_ =
-        this->declare_parameter("touch_speed_max_speed_inactive", touch_speed_max_speed_inactive_);
-      rclcpp::QoS transient_local_qos(1);
-      transient_local_qos.transient_local();
-      touch_speed_switched_pub_ = this->create_publisher<std_msgs::msg::Float32>(
-        "touch_speed_switched", transient_local_qos);
-      set_touch_speed_active_mode_srv = this->create_service<std_srvs::srv::SetBool>(
-        "set_touch_speed_active_mode", std::bind(
-          &CaBotSerialNode::set_touch_speed_active_mode, this, std::placeholders::_1,
-          std::placeholders::_2));
     }
     std::unique_ptr<std_msgs::msg::Int16> msg = std::make_unique<std_msgs::msg::Int16>();
     msg->data = static_cast<int16_t>((data[1] << 8) | data[0]);
-    touch_callback(*msg);
     touch_pub_->publish(std::move(msg));
     touch_check_task_->tick();
   }
@@ -549,31 +527,6 @@ void CaBotSerialNode::handle_callback(uint8_t cmd, const std_msgs::msg::Bool::Sh
   std::vector<uint8_t>data;
   data.push_back((uint8_t)msg->data);
   client_->send_command(cmd, data);
-}
-
-void CaBotSerialNode::touch_callback(std_msgs::msg::Int16 & msg)
-{
-  std::unique_ptr<std_msgs::msg::Float32> touch_speed_msg =
-    std::make_unique<std_msgs::msg::Float32>();
-  if (touch_speed_active_mode_) {
-    touch_speed_msg->data = msg.data ? touch_speed_max_speed_ : 0.0;
-  } else {
-    touch_speed_msg->data = msg.data ? 0.0 : touch_speed_max_speed_inactive_;
-  }
-  touch_speed_switched_pub_->publish(std::move(touch_speed_msg));
-}
-
-void CaBotSerialNode::set_touch_speed_active_mode(
-  const std_srvs::srv::SetBool::Request::SharedPtr req,
-  std_srvs::srv::SetBool::Response::SharedPtr res)
-{
-  touch_speed_active_mode_ = req->data;
-  if (touch_speed_active_mode_) {
-    res->message = "touch speed active mode = True";
-  } else {
-    res->message = "touch speed active mode = False";
-  }
-  res->success = true;
 }
 
 std::shared_ptr<sensor_msgs::msg::Imu> CaBotSerialNode::process_imu_data(

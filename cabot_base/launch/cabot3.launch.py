@@ -296,6 +296,7 @@ def generate_launch_description():
                 launch_arguments={
                     'frame_id': 'livox_link',
                     'xfer_format': '0',
+                    'output_topic': '/livox/points',
                     'output': output
                 }.items(),
                 condition=IfCondition(AndSubstitution(use_livox, NotSubstitution(use_sim_time)))
