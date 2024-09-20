@@ -296,6 +296,7 @@ def generate_launch_description():
                 launch_arguments={
                     'frame_id': 'livox_link',
                     'xfer_format': '0',
+                    'output_topic': '/livox/points',
                     'output': output
                 }.items(),
                 condition=IfCondition(AndSubstitution(use_livox, NotSubstitution(use_sim_time)))
@@ -395,25 +396,83 @@ def generate_launch_description():
             ),
 
             # Motor Controller (ODrive)
+            #Node(
+            #    package='odriver',
+            #    executable='odriver_s1_node.py',
+            #    namespace='/cabot',
+            #    name='odriver_s1_node',
+            #    output=output,
+            #    parameters=[
+            #        *param_files,
+            #        {
+            #            'use_sim_time': use_sim_time,
+            #            'odrive_left_serial_number': odrive_left_serial_number,
+            #            'odrive_right_serial_number': odrive_right_serial_number
+            #        }
+            #    ],
+            #    remappings=[
+            #        ('/motorTarget', '/cabot/motorTarget'),
+            #        ('/motorStatus', '/cabot/motorStatus'),
+            #    ],
+            #    condition=UnlessCondition(use_sim_time),
+            #),
             Node(
-                package='odriver',
-                executable='odriver_s1_node.py',
+                package='odriver_can_adapter',
+                executable='odriver_can_adapter_node',
                 namespace='/cabot',
-                name='odriver_s1_node',
-                output=output,
+                name='odriver_can_adapter_node',
+                output='screen',
                 parameters=[
-                    *param_files,
                     {
-                        'use_sim_time': use_sim_time,
-                        'odrive_left_serial_number': odrive_left_serial_number,
-                        'odrive_right_serial_number': odrive_right_serial_number
+                        'is_clockwise' : True,
                     }
                 ],
                 remappings=[
-                    ('/motorTarget', '/cabot/motorTarget'),
-                    ('/motorStatus', '/cabot/motorStatus'),
+                    ('/control_message_left', '/cabot/control_message_left'),
+                    ('/control_message_right', '/cabot/control_message_right'),
+                    ('/controller_status_left', '/cabot/controller_status_left'),
+                    ('/controller_status_right', '/cabot/controller_status_right'),
+                    ('/motor_status', '/cabot/motorStatus'),
+                    ('/motor_target', '/cabot/motorTarget'),
+                    ('/request_axis_state_left', '/cabot/request_axis_state_left'),
+                    ('/request_axis_state_right', '/cabot/request_axis_state_right'),
                 ],
-                condition=UnlessCondition(use_sim_time),
+            ),
+            Node(
+                package='odrive_can',
+                executable='odrive_can_node',
+                namespace='/cabot',
+                name='odrive_can_node_left',
+                output='screen',
+                parameters=[
+                    {
+                        'node_id' : 0,
+                        'interface' : 'can0',
+                    }
+                ],
+                remappings=[
+                    ('/cabot/control_message', '/cabot/control_message_left'),
+                    ('/cabot/controller_status', '/cabot/controller_status_left'),
+                    ('/cabot/request_axis_state', '/cabot/request_axis_state_left')
+                ],
+            ),
+            Node(
+                package='odrive_can',
+                executable='odrive_can_node',
+                namespace='/cabot',
+                name='odrive_can_node_right',
+                output='screen',
+                parameters=[
+                    {
+                        'node_id' : 1,
+                        'interface' : 'can0',
+                    }
+                ],
+                remappings=[
+                    ('/cabot/control_message', '/cabot/control_message_right'),
+                    ('/cabot/controller_status', '/cabot/controller_status_right'),
+                    ('/cabot/request_axis_state', '/cabot/request_axis_state_right'),
+                ],
             ),
         ],
             condition=LaunchConfigurationNotEquals('model', '')
