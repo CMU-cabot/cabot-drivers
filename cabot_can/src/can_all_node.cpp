@@ -72,6 +72,8 @@ public:
 		{
 		std::vector<int64_t> calibration_params(22, 0);
 		declare_parameter("calibration_params", calibration_params);
+		std::string can_interface = "can0";
+		declare_parameter("can_interface", can_interface);
 		temperature_1_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature1", 2);
 		temperature_2_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature2", 2);
 		temperature_3_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature3", 2);
@@ -103,13 +105,14 @@ public:
 
 private:
 	int openCanSocket() {
+		std::string can_interface = this->get_parameter("can_interface").as_string();
 		int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
 		if (s < 0) {
 			RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Error while opening socket");
 			return -1;
 		}
 		struct ifreq ifr;
-		strcpy(ifr.ifr_name,"can0");
+		strcpy(ifr.ifr_name, can_interface.c_str());
 		ioctl(s, SIOCGIFINDEX, &ifr);
 		struct sockaddr_can addr;
 		addr.can_family = AF_CAN;
@@ -119,7 +122,7 @@ private:
 			close(s);
 			return -1;
 		}
-		return s;
+	return s;
 	}
 
 	void writeImuCalibration() {
