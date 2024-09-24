@@ -385,7 +385,20 @@ private:
 	void publishTactData(const struct can_frame &frame) {
 		if (frame.can_id == CanId::TACT_CAN_ID && frame.can_dlc >= 1) {
 			std_msgs::msg::Int8 tact_msg;
-			tact_msg.data = frame.data[0];
+			uint8_t tact_data = 0;
+			if (frame.data[0] == 1){
+				tact_data = 8;
+			}
+			if (frame.data[0] == 2){
+				tact_data = 4;
+			}
+			if (frame.data[0] == 4){
+				tact_data = 1;
+			}
+			if (frame.data[0] == 8){
+				tact_data = 2;
+			}
+			tact_msg.data = tact_data;
 			tact_pub_->publish(tact_msg);
 		}
 	}
