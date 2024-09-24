@@ -284,7 +284,8 @@ private:
     }
     mtx_.lock();
     id_ = fan_id;
-    uint8_t pwm = data_ * DUTY;
+    double d_pwm = data_ * DUTY;
+    uint8_t pwm = static_cast<uint8_t>(std::round(d_pwm));
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "pwm is %d", pwm);
     std::memcpy(&send_can_value_, &pwm, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
