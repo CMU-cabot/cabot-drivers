@@ -96,6 +96,8 @@ public:
     servo_target_sub_ = this->create_subscription<std_msgs::msg::Int16>("servo_target", 10, std::bind(&CanAllNode::subscribeServoTargetData, this, std::placeholders::_1));
     servo_free_sub_ = this->create_subscription<std_msgs::msg::Bool>("servo_free",10,std::bind(&CanAllNode::subServoFree, this, std::placeholders::_1));
     imu_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>("run_imu_calibration",std::bind(&CanAllNode::readImuServiceCalibration, this, std::placeholders::_1, std::placeholders::_2));
+    imu_accel_bias_ = declare_parameter("imu_accel_bias", std::vector<double>(3, 0.0)); // parameters for adjusting linear acceleration. default value = [0,0, 0.0, 0.0]
+    imu_gyro_bias_ = declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0)); // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
     can_socket_ = openCanSocket();
     writeImuCalibration();
     pub_timer_ = this->create_wall_timer(
@@ -252,6 +254,9 @@ private:
         imu_msg.linear_acceleration.x = linear_x / 100.0;
         imu_msg.linear_acceleration.y = linear_y / 100.0;
         imu_msg.linear_acceleration.z = linear_z / 100.0;
+        imu_msg.linear_acceleration.x -= this->imu_accel_bias_.at(0);
+        imu_msg.linear_acceleration.y -= this->imu_accel_bias_.at(1);
+        imu_msg.linear_acceleration.z -= this->imu_accel_bias_.at(2);
         linear_data_received = true;
         angular_data_received = false;
       }
@@ -267,6 +272,10 @@ private:
         imu_msg.angular_velocity.x = (angular_x / 16.0) * (M_PI / 180.0);
         imu_msg.angular_velocity.y = (angular_y / 16.0) * (M_PI / 180.0);
         imu_msg.angular_velocity.z = (angular_z / 16.0) * (M_PI / 180.0);
+        imu_msg.angular_velocity.x -= this->imu_gyro_bias_.at(0);
+        imu_msg.angular_velocity.y -= this->imu_gyro_bias_.at(1);
+        imu_msg.angular_velocity.z -= this->imu_gyro_bias_.at(2);
+
         angular_data_received = true;
       }
     }
@@ -515,6 +524,8 @@ private:
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr servo_free_sub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr imu_calibration_srv_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
+  std::vector<double> imu_accel_bias_;
+  std::vector<double> imu_gyro_bias_;
 };
 
 int main(int argc, char *argv[]) {
