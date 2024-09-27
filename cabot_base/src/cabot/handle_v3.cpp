@@ -33,7 +33,7 @@
 #include "handle_v3.hpp"
 
 using namespace std::chrono_literals;
-
+static DirectionalIndicator di;
 const std::vector<std::string> Handle::stimuli_names = 
 {"unknown", "left_turn", "right_turn", "left_dev", "right_dev", "front",
   "left_about_turn", "right_about_turn", "button_click", "button_holddown",
@@ -88,22 +88,37 @@ Handle::Handle(
     "turn_type", rclcpp::SensorDataQoS(), [this](std_msgs::msg::String::UniquePtr msg) {
       turnTypeCallback(msg);
     });
+  change_di_control_mode_sub_ = node_->create_subscription<std_msgs::msg::String>(
+    "change_di_control_mode", rclcpp::SensorDataQoS(), [this](std_msgs::msg::String::UniquePtr msg) {
+      changeDiControlModeCallback(msg);
+    });
+  local_plan_sub_ = node_->create_subscription<nav_msgs::msg::Path>(
+    "/local_plan", rclcpp::SensorDataQoS(), [this](nav_msgs::msg::Path::UniquePtr msg) {
+      localPlanCallback(msg);
+    });
   for (int i = 0; i < 9; ++i) {
     last_up[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
     last_dwn[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
     up_count[i] = 0;
     btn_dwn[i] = false;
   }
-  is_enabled_change_servo_pos_by_yaw_ = false;
   is_navigating_ = false;
   is_servo_free_ = true;
   is_waiting_ = true;
   is_waiting_cnt_ = 0;
-  servo_pos_callback_cnt_ = 0;
   last_turn_type_ = turn_type_::NORMAL;
-  current_yaw_degrees_ = 0.0;
-  start_yaw_degrees_ = 0.0;
-  target_yaw_degrees_ = 0.0;
+  current_imu_yaw_ = 0.0f;
+  previous_imu_yaw_ = 0.0f;  // yaw angle at turn start position
+  wma_filter_coef_ = -0.1f;
+  wma_window_size_ = 3;
+  di.control_mode = "both";
+  di.target_turn_angle = 0.0f;
+  di.is_controlled_by_imu = false;
+  di.target_pos_global = 0;
+  di.target_pos_local = 0;
+  q_.setRPY(0, 0, 0);
+  m_.setRotation(q_);
+
   callbacks_.resize(stimuli_names.size(), nullptr);
   callbacks_[1] = [this]() {
       vibrateLeftTurn();
@@ -145,6 +160,46 @@ Handle::Handle(
   vib_waiting_timer_ = node_->create_wall_timer(1.0s, std::bind(&Handle::vib_waiting_timer_callback, this));
 }
 
+float Handle::getEulerYawDegrees(const double & x, const double & y, const double & z, const double & w)
+{
+  double roll, pitch, yaw;
+  q_.setX(x);
+  q_.setY(y);
+  q_.setZ(z);
+  q_.setW(w);
+  m_.setRotation(q_);
+  m_.getRPY(roll, pitch, yaw);
+  RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "yaw: %f", yaw);
+  return static_cast<float>(yaw * 180 / M_PI);
+}
+
+float Handle::getWeightedMovingAverage(const std::vector<float> & data)
+{
+  float sum_weighted_value = 0.0f;
+  float sum_weight = 0.0f;
+  float median = getMedian(data);
+  for (float value: data) {
+    float weight = exp(wma_filter_coef_ * std::abs(value - median));
+    sum_weighted_value += value * weight;
+    sum_weight += weight;
+    RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "value: %f, weight: %f, median: %f", value, weight, median);
+  }
+  return 1.5f * sum_weighted_value / sum_weight;  // multiply 1.5 to emphasize the value of "di.target_pos_local"
+}
+
+float Handle::getMedian(const std::vector<float> & data)
+{
+  size_t data_size = data.size();
+  std::vector<float> buf(data_size);
+  std::copy(data.begin(), data.end(), std::back_inserter(buf));
+  std::sort(buf.begin(), buf.end());
+  if (data_size % 2 == 0) {
+    return (buf[static_cast<size_t>(data_size / 2) - 1] + buf[static_cast<size_t>(data_size / 2)]) / 2.0f;
+  } else {
+    return buf[static_cast<size_t>(data_size / 2)];
+  }
+}
+
 void Handle::timer_callback()
 {
   if (vibration_queue_.size() > 0) {
@@ -161,7 +216,7 @@ void Handle::timer_callback()
       msg->data = vibration.duration * 0.1;
       vibration.vibratorPub->publish(std::move(msg));
       RCLCPP_INFO(rclcpp::get_logger("handle"), "publish %d", vibration.duration);
-      RCLCPP_INFO(rclcpp::get_logger("handle"), "sleep %d ms", vibration.duration);
+      RCLCPP_INFO(rclcpp::get_logger("handle"), "sleep %d ms", vibration.sleep);
       vibration.i++;
     } else if (vibration.i == vibration.duration * 0.1 && vibration.numberVibrations == 1) {
       vibration.numberVibrations = 0;
@@ -180,6 +235,7 @@ void Handle::vib_waiting_timer_callback()
     if (is_waiting_cnt_ < 2) {  // 1.0sec(vib_waiting_timer_) * 2 = 2.0sec
       is_waiting_cnt_++;
     } else {
+      setServoFree(true);
       vibrateWaitingPattern();
     }
   } else {
@@ -279,69 +335,50 @@ void Handle::cmdVelCallback(geometry_msgs::msg::Twist::UniquePtr & msg)
 
 void Handle::handleImuCallback(sensor_msgs::msg::Imu::UniquePtr & msg)
 {
-  double roll, pitch, yaw;
-  tf2::Quaternion q(msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w);
-  tf2::Matrix3x3 m(q);
-  m.getRPY(roll, pitch, yaw);
-  current_yaw_degrees_ = static_cast<float>(yaw * 180 / M_PI);
+  current_imu_yaw_ = getEulerYawDegrees(msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w);
 }
 
 void Handle::servoPosCallback(std_msgs::msg::Int16::UniquePtr & msg)
 {
-  if (is_waiting_ && !is_navigating_) {
-    if (msg->data == 0 && !is_servo_free_) {
-      setServoFree(true);
+  if (di.is_controlled_by_imu) {
+    float turned_angle = current_imu_yaw_ - previous_imu_yaw_;  // Angle at which the Cabot has already turned
+    if (turned_angle >= 180.0f) {
+      turned_angle -= 360.0f;
+    } else if (turned_angle < -180.0f) {
+      turned_angle += 360.0f;
     }
-  }
-  if (last_turn_type_ == turn_type_::NORMAL) {
-    if (is_enabled_change_servo_pos_by_yaw_) {
-      float diff_yaw_degrees = current_yaw_degrees_ - start_yaw_degrees_;
-      if (diff_yaw_degrees >= 180.0) {
-        diff_yaw_degrees -= 360.0;
-      } else if (diff_yaw_degrees < -180.0) {
-        diff_yaw_degrees += 360.0;
-      }
-      int16_t target_servo_pos = static_cast<int16_t>(target_yaw_degrees_ - diff_yaw_degrees);
-      int16_t current_servo_pos = -1 * (msg->data);
-      RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "target_servo_pos: %d", target_servo_pos);
-      RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "current_servo_pos: %d", current_servo_pos);
-      if (std::abs(current_servo_pos - target_servo_pos) <= 180) {
-        changeServoPos(target_servo_pos);
-      } 
-      if (std::abs(target_servo_pos) < 10) {
+    di.target_pos_global = static_cast<int16_t>(di.target_turn_angle - turned_angle);
+    if (std::abs(di.target_pos_global) < di.THRESHOLD_RESET) {
+      if (std::abs(di.target_pos_global - di.target_pos_local) < di.THRESHOLD_PASS_CONTROL_MIN) {
         resetServoPosition();
+        RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "(global -> local) global: %d, local: %d ", di.target_pos_global, di.target_pos_local);
+      } else {
+        RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "(global -> local) waiting for pass control, global: %d, local: %d", di.target_pos_global, di.target_pos_local);
       }
-    }
-  } else if (last_turn_type_ == turn_type_::AVOIDING) {
-    servo_pos_callback_cnt_++;
-    if (servo_pos_callback_cnt_ > 100) {  // 20msec(Servo_pub_rate) * 100 = 2000msec
-      servo_pos_callback_cnt_ = 0;
-      last_turn_type_ = turn_type_::NORMAL;
-      RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "(Avoiding) Reset: servo_pos");
-      resetServoPosition();
+    } else {
+      if (std::abs(di.target_pos_global - di.target_pos_local) > di.THRESHOLD_PASS_CONTROL_MAX) {
+        resetServoPosition();
+        RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "(global -> local) over limit, global: %d, local: %d", di.target_pos_global, di.target_pos_local);
+      } else {
+        changeServoPos(di.target_pos_global);
+        RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "(global) global: %d, local: %d", di.target_pos_global, di.target_pos_local);
+      }
     }
   }
 }
 
 void Handle::turnAngleCallback(std_msgs::msg::Float32::UniquePtr & msg)
 {
-  RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "turn_angle: %f" , msg->data);
-
-  if (std::abs(msg->data) < 60.0) { // thtMinimumTurn = 60
-    if (msg->data > 0) {
-      target_yaw_degrees_ = 180 / 7;
-    } else {
-      target_yaw_degrees_ = -180 / 7;
+  RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "turn_angle: %f", msg->data);
+  if (std::abs(msg->data) >= 60.0f) {  // thtMinimumTurn = 60
+    if (di.control_mode == "both" || di.control_mode == "global") {
+      di.target_turn_angle = msg->data;
+      previous_imu_yaw_ = current_imu_yaw_;
+      di.is_controlled_by_imu = true;
+      changeServoPos(static_cast<int16_t>(di.target_turn_angle));
+      RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "(global) target_yaw: %d", static_cast<int16_t>(di.target_turn_angle));
+      RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "(global) start_yaw: %f", previous_imu_yaw_);
     }
-    changeServoPos(static_cast<int16_t>(target_yaw_degrees_));
-    RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "(Avoiding) target_yaw: %d", static_cast<int16_t>(target_yaw_degrees_));
-  } else {
-    target_yaw_degrees_ = msg->data;
-    start_yaw_degrees_ = current_yaw_degrees_;
-    changeServoPos(static_cast<int16_t>(target_yaw_degrees_));
-    RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "target_yaw: %d", static_cast<int16_t>(target_yaw_degrees_));
-    RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "start_yaw: %f", start_yaw_degrees_);
-    is_enabled_change_servo_pos_by_yaw_ = true;
   }
 }
 
@@ -357,11 +394,55 @@ void Handle::turnTypeCallback(std_msgs::msg::String::UniquePtr & msg)
   }
 }
 
+void Handle::localPlanCallback(nav_msgs::msg::Path::UniquePtr & msg)
+{
+  if (di.control_mode == "both" || di.control_mode == "local") {
+    size_t local_plan_len = msg->poses.size();
+    if (local_plan_len > 1) {
+      geometry_msgs::msg::PoseStamped start_pose = msg->poses[0];
+      geometry_msgs::msg::PoseStamped end_pose = msg->poses[local_plan_len - 1];
+      float start_pose_yaw = getEulerYawDegrees(start_pose.pose.orientation.x, start_pose.pose.orientation.y, start_pose.pose.orientation.z, start_pose.pose.orientation.w);
+      float end_pose_yaw = getEulerYawDegrees(end_pose.pose.orientation.x, end_pose.pose.orientation.y, end_pose.pose.orientation.z, end_pose.pose.orientation.w);
+      float di_target = end_pose_yaw - start_pose_yaw;
+      if (di_target > 180.0f) {
+        di_target -= 360.0f;
+      } else if (di_target < -180.0f) {
+        di_target += 360.0f;
+      }
+      if (wma_data_buffer_.size() >= wma_window_size_) {
+        wma_data_buffer_.erase(wma_data_buffer_.begin());
+        wma_data_buffer_.push_back(di_target);
+      } else {
+        wma_data_buffer_.push_back(di_target);
+      }
+      RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "(local) start: %f, end: %f, diff: %f", start_pose_yaw, end_pose_yaw, di_target);
+      di.target_pos_local = static_cast<int16_t>(getWeightedMovingAverage(wma_data_buffer_));
+      if (!di.is_controlled_by_imu) {
+        if (std::abs(di.target_pos_local) >= di.THRESHOLD_RESET) {
+          changeServoPos(di.target_pos_local);
+          RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "(local) target: %d", di.target_pos_local);
+        } else {
+          resetServoPosition();
+        }
+      }
+    }
+  }
+}
+
+void Handle::changeDiControlModeCallback(std_msgs::msg::String::UniquePtr & msg)
+{
+  if (msg->data == "both" || msg->data == "global" || msg->data == "local" || msg->data == "none") {
+    di.control_mode = msg->data;
+    RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "success change di control mode: %s", msg->data.c_str());
+  } else {
+    RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "failed change di control mode: %s", msg->data.c_str());
+  }
+}
+
 void Handle::changeServoPos(int16_t target_pos)
 {
   std::unique_ptr<std_msgs::msg::Int16> msg = std::make_unique<std_msgs::msg::Int16>();
   msg->data = -1 * target_pos;
-  RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "change_pos: %d", msg->data);
   servo_target_pub_->publish(std::move(msg));
 }
 
@@ -377,6 +458,7 @@ void Handle::setServoFree(bool is_free)
 void Handle::navigationArrived()
 {
   is_navigating_ = false;
+  wma_data_buffer_.clear();
   resetServoPosition();
   if (vibratorType_ == vibrator_type_::ERM) {
     vibratePattern(vibrator1_pub_, VibConst::ERM::NumVibrations::HAS_ARRIVED, VibConst::ERM::Duration::HAS_ARRIVED, VibConst::ERM::Sleep::DEFAULT);
@@ -388,6 +470,7 @@ void Handle::navigationArrived()
 void Handle::navigationStart()
 {
   is_navigating_ = true;
+  wma_data_buffer_.clear();
   resetServoPosition();
   setServoFree(false);
 }
@@ -395,8 +478,11 @@ void Handle::navigationStart()
 void Handle::resetServoPosition()
 {
   RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "Reset: servo_pos");
-  is_enabled_change_servo_pos_by_yaw_ = false;
+  di.is_controlled_by_imu = false;
+  di.target_turn_angle = 0.0f;
+  di.target_pos_global = 0.0f;
   changeServoPos(0);
+  setServoFree(true);
 }
 
 void Handle::vibrateLeftTurn()
@@ -465,9 +551,9 @@ void Handle::vibrateAboutRightTurn()
 void Handle::vibrateBack()
 {
   if (vibratorType_ == vibrator_type_::ERM) {
-    vibratePattern(vibrator2_pub_, VibConst::ERM::NumVibrations::CONFIRMATION, VibConst::ERM::Duration::SINGLE_VIBRATION, VibConst::ERM::Sleep::DEFAULT);
+    vibratePattern(vibrator1_pub_, VibConst::ERM::NumVibrations::CONFIRMATION, VibConst::ERM::Duration::SINGLE_VIBRATION, VibConst::ERM::Sleep::DEFAULT);
   } else if (vibratorType_ == vibrator_type_::LRA) {
-    vibratePattern(vibrator2_pub_, VibConst::LRA::NumVibrations::CONFIRMATION, VibConst::LRA::Duration::SINGLE_VIBRATION, VibConst::LRA::Sleep::DEFAULT);
+    vibratePattern(vibrator1_pub_, VibConst::LRA::NumVibrations::CONFIRMATION, VibConst::LRA::Duration::SINGLE_VIBRATION, VibConst::LRA::Sleep::DEFAULT);
   }
 }
 

@@ -38,7 +38,9 @@
 #include <std_msgs/msg/int16.hpp>
 #include <std_msgs/msg/float32.hpp>
 #include <sensor_msgs/msg/imu.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
+#include <nav_msgs/msg/path.hpp>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include "button.hpp"
@@ -117,6 +119,18 @@ typedef struct vibration
   int i = 0;
 } Vibration;
 
+typedef struct directionalIndicator
+{
+  std::string control_mode;
+  float target_turn_angle;
+  bool is_controlled_by_imu;
+  int16_t target_pos_local;
+  int16_t target_pos_global;
+  const uint8_t THRESHOLD_RESET = 10;
+  const uint8_t THRESHOLD_PASS_CONTROL_MAX = 180;
+  const uint8_t THRESHOLD_PASS_CONTROL_MIN = 15;
+} DirectionalIndicator;
+
 class Handle : public std::enable_shared_from_this<Handle>
 {
 public:
@@ -142,6 +156,9 @@ private:
   {
     ERM = 1, LRA = 2
   };
+  float getEulerYawDegrees(const double & x, const double & y, const double & z, const double & w);
+  float getWeightedMovingAverage(const std::vector<float> & data);
+  float getMedian(const std::vector<float> & data);
   void timer_callback();
   void vib_waiting_timer_callback();
   void buttonCallback(std_msgs::msg::Int8::UniquePtr & msg);
@@ -152,6 +169,8 @@ private:
   void servoPosCallback(std_msgs::msg::Int16::UniquePtr & msg);
   void turnAngleCallback(std_msgs::msg::Float32::UniquePtr & msg);
   void turnTypeCallback(std_msgs::msg::String::UniquePtr & msg);
+  void localPlanCallback(nav_msgs::msg::Path::UniquePtr & msg);
+  void changeDiControlModeCallback(std_msgs::msg::String::UniquePtr & msg);
   void startVibration(rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr & vibratorPub);
   void stopVibration(rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr & vibratorPub);
   void changeServoPos(int16_t target_pos);
@@ -188,21 +207,26 @@ private:
   rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr servo_pos_sub_;
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr turn_angle_sub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr turn_type_sub_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr change_di_control_mode_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr local_plan_sub_;
   rclcpp::Time last_up[9];
   rclcpp::Time last_dwn[9];
   int vibratorType_;
+  tf2::Quaternion q_;
+  tf2::Matrix3x3 m_;
   int up_count[9];
   bool btn_dwn[9];
-  bool is_enabled_change_servo_pos_by_yaw_;
   bool is_navigating_;
   bool is_servo_free_;
   bool is_waiting_;
   unsigned char is_waiting_cnt_;
   uint16_t servo_pos_callback_cnt_;
   uint8_t last_turn_type_;
-  float current_yaw_degrees_;
-  float start_yaw_degrees_;
-  float target_yaw_degrees_;
+  uint8_t wma_window_size_;
+  float current_imu_yaw_;
+  float previous_imu_yaw_;
+  float wma_filter_coef_;
+  std::vector<float> wma_data_buffer_;
   std::map<std::string, std::string> event;
   std::function<void(const std::map<std::string, std::string> &)> eventListener_;
   std::vector<std::string> buttonKeys_;
