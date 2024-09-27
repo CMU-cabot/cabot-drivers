@@ -53,6 +53,7 @@ namespace VibConst
       static constexpr unsigned int TURN = 150;
       static constexpr unsigned int ABOUT_TURN = 400;
       static constexpr unsigned int DEVIATION = 50;
+      static constexpr unsigned int HAS_ARRIVED = 400;
       static constexpr unsigned int SINGLE_VIBRATION = 400;
       static constexpr unsigned int BUTTON_CLICK = 200;
       static constexpr unsigned int BUTTON_HOLDDOWN = 200;
@@ -68,6 +69,7 @@ namespace VibConst
       static constexpr unsigned int TURN = 3;
       static constexpr unsigned int ABOUT_TURN = 2;
       static constexpr unsigned int DEVIATION = 2;
+      static constexpr unsigned int HAS_ARRIVED = 1;
       static constexpr unsigned int CONFIRMATION = 1;
       static constexpr unsigned int BUTTON_CLICK = 1;
       static constexpr unsigned int BUTTON_HOLDDOWN = 1;
@@ -80,6 +82,7 @@ namespace VibConst
       static constexpr unsigned int TURN = 150;
       static constexpr unsigned int ABOUT_TURN = 400;
       static constexpr unsigned int DEVIATION = 50;
+      static constexpr unsigned int HAS_ARRIVED = 400;
       static constexpr unsigned int SINGLE_VIBRATION = 400;
       static constexpr unsigned int BUTTON_CLICK = 50;
       static constexpr unsigned int BUTTON_HOLDDOWN = 100;
@@ -95,6 +98,7 @@ namespace VibConst
       static constexpr unsigned int TURN = 3;
       static constexpr unsigned int ABOUT_TURN = 2;
       static constexpr unsigned int DEVIATION = 2;
+      static constexpr unsigned int HAS_ARRIVED = 1;
       static constexpr unsigned int CONFIRMATION = 1;
       static constexpr unsigned int BUTTON_CLICK = 1;
       static constexpr unsigned int BUTTON_HOLDDOWN = 1;

@@ -378,6 +378,11 @@ void Handle::navigationArrived()
 {
   is_navigating_ = false;
   resetServoPosition();
+  if (vibratorType_ == vibrator_type_::ERM) {
+    vibratePattern(vibrator1_pub_, VibConst::ERM::NumVibrations::HAS_ARRIVED, VibConst::ERM::Duration::HAS_ARRIVED, VibConst::ERM::Sleep::DEFAULT);
+  } else if (vibratorType_ == vibrator_type_::LRA) {
+    vibratePattern(vibrator1_pub_, VibConst::LRA::NumVibrations::HAS_ARRIVED, VibConst::LRA::Duration::HAS_ARRIVED, VibConst::LRA::Sleep::DEFAULT);
+  }
 }
 
 void Handle::navigationStart()
