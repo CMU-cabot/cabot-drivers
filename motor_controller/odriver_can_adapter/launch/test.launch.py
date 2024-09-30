@@ -81,6 +81,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 {
+                    'interface': 'can1',
                     'node_id' : 0,
                 }
             ],
@@ -98,6 +99,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 {
+                    'interface': 'can1',
                     'node_id' : 1,
                 }
             ],

@@ -81,9 +81,9 @@ def generate_launch_description():
     vibrator_type = LaunchConfiguration('vibrator_type')
 
     # switch lidar node based on model_name
-    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
+    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1"]'])
     use_velodyne = NotSubstitution(use_hesai)
-    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
+    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1"]'])
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -345,11 +345,33 @@ def generate_launch_description():
                 ],
                 condition=IfCondition(use_sim_time)
             ),
+            #Node(
+            #    package='cabot_serial',
+            #    executable='cabot_serial_node',
+            #    namespace='/cabot',
+            #    name='cabot_serial',
+            #    output=output,
+            #    parameters=[
+            #        *param_files,
+            #        {
+            #            'use_sim_time': use_sim_time,
+            #            'touch_params': touch_params,
+            #            'imu_accel_bias': imu_accel_bias,
+            #            'imu_gyro_bias': imu_gyro_bias
+            #        }
+            #    ],
+            #    remappings=[
+            #        ('/cabot/imu', '/cabot/imu/data'),
+            #        ('/cabot/imu_raw', '/cabot/imu_raw/data'),
+            #        ('/cabot/touch_speed', '/cabot/touch_speed_raw')
+            #    ],
+            #    condition=UnlessCondition(use_sim_time)
+            #),
             Node(
-                package='cabot_serial',
-                executable='cabot_serial_node',
+                package='cabot_can',
+                executable='can_all_node',
                 namespace='/cabot',
-                name='cabot_serial',
+                name='cabot_can',
                 output=output,
                 parameters=[
                     *param_files,
@@ -362,12 +384,25 @@ def generate_launch_description():
                 ],
                 remappings=[
                     ('/cabot/imu', '/cabot/imu/data'),
-                    ('/cabot/imu_raw', '/cabot/imu_raw/data'),
-                    ('/cabot/touch_speed', '/cabot/touch_speed_raw')
+                    ('/cabot/touch_speed', '/cabot/touch_speed_raw'),
+                    ('/cabot/bme/pressure', '/cabot/pressure')
                 ],
                 condition=UnlessCondition(use_sim_time)
             ),
-
+            Node(
+                package='power_controller',
+                executable='power_controller',
+                namespace='/cabot',
+                name='power_controller',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {
+                        'use_sim_time': use_sim_time,
+                    }
+                ],
+                condition=UnlessCondition(use_sim_time)
+            ),
             # optional wifi scanner with ESP32
             Node(
                 package='cabot_serial',
@@ -447,7 +482,7 @@ def generate_launch_description():
                 parameters=[
                     {
                         'node_id' : 0,
-                        'interface' : 'can0',
+                        'interface' : 'can1',
                     }
                 ],
                 remappings=[
@@ -465,7 +500,7 @@ def generate_launch_description():
                 parameters=[
                     {
                         'node_id' : 1,
-                        'interface' : 'can0',
+                        'interface' : 'can1',
                     }
                 ],
                 remappings=[

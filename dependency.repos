@@ -7,4 +7,4 @@ repositories:
   cabot-description:
     type: git
     url: https://github.com/CMU-cabot/cabot-description
-    version: main
+    version: hatakeyam/cabot3-k1-description
