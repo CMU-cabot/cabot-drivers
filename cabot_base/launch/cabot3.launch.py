@@ -447,7 +447,7 @@ def generate_launch_description():
                 parameters=[
                     {
                         'node_id' : 0,
-                        'interface' : 'can0',
+                        'interface' : 'can1',
                     }
                 ],
                 remappings=[
@@ -465,7 +465,7 @@ def generate_launch_description():
                 parameters=[
                     {
                         'node_id' : 1,
-                        'interface' : 'can0',
+                        'interface' : 'can1',
                     }
                 ],
                 remappings=[
