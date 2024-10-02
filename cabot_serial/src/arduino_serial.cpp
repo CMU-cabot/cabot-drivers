@@ -36,9 +36,8 @@ Serial::Serial(std::string name, int baud, int read_timeout, int write_timeout)
 timespec timespec_from_ms(const uint32_t mills)
 {
   timespec time;
-  clock_gettime(CLOCK_REALTIME, &time);
-  time.tv_sec += mills / 1000;
-  time.tv_nsec += (mills % 1000) * 1000000;
+  time.tv_sec = mills / 1000;
+  time.tv_nsec = (mills % 1000) * 1000000;
   time.tv_sec += time.tv_nsec / 1000000000;
   time.tv_nsec %= 1000000000;
   return time;
@@ -133,8 +132,11 @@ int Serial::read(uint8_t * buf, int size)
   if (!is_open_) {
     throw std::runtime_error("Serial::read");
   }
-  waitReadable(1);
-  return ::read(fd_, buf, size);
+  if (waitReadable(1)) {
+    return ::read(fd_, buf, size);
+  } else {
+    return 0;
+  }
 }
 
 int Serial::write(std::vector<uint8_t> data, size_t length)
@@ -196,7 +198,7 @@ CaBotArduinoSerial::CaBotArduinoSerial(
   std::shared_ptr<Serial> port, int baud,
   std::chrono::milliseconds timeout)
 : is_alive_(true), port_(port), baud_(baud),
-  timeout_(timeout), read_count_(0), time_synced_(false), no_input_count_(0) {}
+  timeout_(timeout), read_count_(0), time_synced_(false), no_input_count_(0), timeout_count_(0) {}
 
 void CaBotArduinoSerial::start()
 {
@@ -308,6 +310,10 @@ bool CaBotArduinoSerial::try_read(int length, std::vector<uint8_t> & result)
           result.push_back(buf[i]);
         }
         bytes_remaining -= received;
+        timeout_count_ = 0;
+      } else {
+        timeout_count_++;
+        delegate_->log(rclcpp::Logger::Level::Debug, string_format("read timeout %d", timeout_count_));
       }
     }
     if (bytes_remaining != 0) {

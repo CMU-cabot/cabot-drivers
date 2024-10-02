@@ -120,6 +120,7 @@ private:
   int read_count_;
   bool time_synced_;
   int no_input_count_;
+  int timeout_count_;
   bool process_write_once();
   bool try_read(int length, std::vector<uint8_t> & result);
   bool process_read_once();
