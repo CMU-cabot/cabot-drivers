@@ -473,7 +473,8 @@ private:
 	}
 
 	void subscribeServoTargetData(const std_msgs::msg::Int16& msg) {
-		int16_t servo_target_per = msg.data;
+		int16_t servo_target_per = -1 * msg.data; // invert orientation
+		servo_target_per = std::clamp(servo_target_per, (int16_t)-90, (int16_t)90); // temporal clamp
 		float servo_targer_deg = (servo_target_per / 90.0) * 1024 + 2048;
 		int16_t servo_target = static_cast<int16_t>(servo_targer_deg);
 		struct can_frame frame;
@@ -482,6 +483,8 @@ private:
 		frame.can_dlc = 4;
 		frame.data[0] = servo_target & 0xFF;
 		frame.data[1] = (servo_target >> 8) & 0xFF;
+		frame.data[2] = 0;
+		frame.data[3] = 0;
 		if (write(can_socket_, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
 			RCLCPP_ERROR(this->get_logger(), "Error sending servo target frame");
 		}

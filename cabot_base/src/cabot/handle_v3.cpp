@@ -290,7 +290,7 @@ void Handle::servoPosCallback(std_msgs::msg::Int16::UniquePtr & msg)
 {
   if (is_waiting_ && !is_navigating_) {
     if (msg->data == 0 && !is_servo_free_) {
-      setServoFree(true);
+      // setServoFree(true);
     }
   }
   if (last_turn_type_ == turn_type_::NORMAL) {
@@ -384,7 +384,7 @@ void Handle::navigationStart()
 {
   is_navigating_ = true;
   resetServoPosition();
-  setServoFree(false);
+  // setServoFree(false);
 }
 
 void Handle::resetServoPosition()
