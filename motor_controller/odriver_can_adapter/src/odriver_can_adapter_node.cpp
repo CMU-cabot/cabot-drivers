@@ -105,17 +105,17 @@ public:
   }
 private:
   // change odrive axis.controller.config.control_mode
-  // closed_loop: true -> CLOSED_LOOP_CONTROL, false -> IDOL
+  // closed_loop: true -> CLOSED_LOOP_CONTROL, false -> IDLE
   void changeAxisState(bool closed_loop)
   {
     if(closed_loop &&
-          (odrive_left_->getAxisState() == kAxisStateIdol || odrive_right_->getAxisState() == kAxisStateIdol)) {
+          (odrive_left_->getAxisState() == kAxisStateIdle || odrive_right_->getAxisState() == kAxisStateIdle)) {
       odrive_left_->callAxisStateService(kAxisStateClosedLoopControl);
       odrive_right_->callAxisStateService(kAxisStateClosedLoopControl);
     } else if(!closed_loop &&
                 (odrive_left_->getAxisState() == kAxisStateClosedLoopControl || odrive_right_->getAxisState() == kAxisStateClosedLoopControl)) {
-      odrive_left_->callAxisStateService(kAxisStateIdol);
-      odrive_right_->callAxisStateService(kAxisStateIdol);
+      odrive_left_->callAxisStateService(kAxisStateIdle);
+      odrive_right_->callAxisStateService(kAxisStateIdle);
     }
   }
 
@@ -123,7 +123,7 @@ private:
   {
     changeAxisState(msg->loop_ctrl);
 
-    // !msg->loop_ctrl is IDOL mode
+    // !msg->loop_ctrl is IDLE mode
     if(!msg->loop_ctrl) { return; }
 
     odrive_left_->publishControlMessage(
@@ -179,7 +179,7 @@ private:
   }
 
   // refer from: https://github.com/odriverobotics/ros_odrive/blob/5e4dfe9df8e5ef4fb6c692c210eafb713cb41985/odrive_base/include/odrive_enums.h#L43-L58
-  const unsigned int kAxisStateIdol = 1;
+  const unsigned int kAxisStateIdle = 1;
   const unsigned int kAxisStateClosedLoopControl = 8;
 
   // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.ControlMode
