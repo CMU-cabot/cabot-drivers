@@ -83,6 +83,7 @@ public:
     wifi_pub_ = this->create_publisher<std_msgs::msg::String>("wifi", 1);
     BME_temperature_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("bme/temperature", 2);
     BME_pressure_pub_ = this->create_publisher<sensor_msgs::msg::FluidPressure>("bme/pressure", 2);
+    pressure_pub_ = this->create_publisher<sensor_msgs::msg::FluidPressure>("pressure", 2);
     calibration_pub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("calibration", 50);
     tact_pub_ = this->create_publisher<std_msgs::msg::Int8>("pushed", 50);
     capacitive_touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("capacitive/touch", 50);
@@ -99,7 +100,7 @@ public:
     can_socket_ = openCanSocket();
     writeImuCalibration();
     pub_timer_ = this->create_wall_timer(
-      std::chrono::microseconds(100),
+      std::chrono::microseconds(200),
       std::bind(&CanAllNode::timerPubCallback, this));
   }
 
@@ -126,7 +127,7 @@ private:
   }
 
   void writeImuCalibration() {
-    auto param = get_parameter("calibration_params").as_integer_array();
+    std::vector<int64_t> calibration_params = get_parameter("calibration_params").as_integer_array();
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
     frame.can_id = CanId::IMU_CALIBRATION_SEND_CAN_ID;
@@ -142,21 +143,21 @@ private:
     frame.can_id = CanId::WRITE_IMU_CALIBRATION_ID_1;
     frame.can_dlc = 8;
     for (int i = 0; i < 8; ++i) {
-      frame.data[i] = (param[i] >> 0) & 0xFF;
+      frame.data[i] = (calibration_params[i] >> 0) & 0xFF;
     }
     nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
     usleep(1000);
     frame.can_id = CanId::WRITE_IMU_CALIBRATION_ID_2;
     frame.can_dlc = 8;
     for (int i = 0; i < 8; ++i) {
-      frame.data[i] = (param[8 + i] >> 0) & 0xFF;
+      frame.data[i] = (calibration_params[8 + i] >> 0) & 0xFF;
     }
     nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
     usleep(1000);
     frame.can_id = CanId::WRITE_IMU_CALIBRATION_ID_3;
     frame.can_dlc = 6;
     for (int i = 0; i < 6; ++i) {
-      frame.data[i] = (param[16 + i] >> 0) & 0xFF;
+      frame.data[i] = (calibration_params[16 + i] >> 0) & 0xFF;
     }
     nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
   }
@@ -206,44 +207,45 @@ private:
 
   void readImuCalibration(const struct can_frame &frame) {
     static std::vector<int32_t> calibration_data(22);
-    static int count = 0;
-    if (count == 0) {
-      std::fill(calibration_data.begin(), calibration_data.end(), 0);
-    }
+    static bool imu_calibration_data_1 = false;
+    static bool imu_calibration_data_2 = false;
+    static bool imu_calibration_data_3 = false;
     if (frame.can_id == CanId::READ_IMU_CALIBRATION_ID_1) {
       if (frame.can_dlc >= 8) {
         for (int i = 0; i < 8; i++) {
-          calibration_data[i] = static_cast<int32_t>(frame.data[i]);
+          calibration_data[i] = static_cast<int32_t>(std::round(frame.data[i]));
         }
-        count++;
+        imu_calibration_data_1 = true;
       }
     } else if (frame.can_id == CanId::READ_IMU_CALIBRATION_ID_2) {
       if (frame.can_dlc >= 8) {
         for (int i = 0; i < 8; i++) {
-          calibration_data[i + 8] = static_cast<int32_t>(frame.data[i]);
+          calibration_data[i + 8] = static_cast<int32_t>(std::round(frame.data[i]));
         }
-        count++;
+        imu_calibration_data_2 = true;
       }
     } else if (frame.can_id == CanId::READ_IMU_CALIBRATION_ID_3) {
       if (frame.can_dlc >= 6) {
         for (int i = 0; i < 6; i++) {
-          calibration_data[i + 16] = static_cast<int32_t>(frame.data[i]);
+          calibration_data[i + 16] = static_cast<int32_t>(std::round(frame.data[i]));
         }
-        count++;
+        imu_calibration_data_3 = true;
       }
     }
-    if (count == 3) {
+    if (imu_calibration_data_1 && imu_calibration_data_2 && imu_calibration_data_3) {
       std_msgs::msg::Int32MultiArray calibration_msg;
       calibration_msg.data = calibration_data;
       calibration_pub_->publish(calibration_msg);
-      count = 0;
+      imu_calibration_data_1 = false;
+      imu_calibration_data_2 = false;
+      imu_calibration_data_3 = false;
     }
-    count = 0;
   }
 
+
   void publishImuData(const struct can_frame &frame) {
-    static bool linear_data_received = false;
-    static bool angular_data_received = false;
+    static bool linear_data = false;
+    static bool angular_data = false;
     if (frame.can_id == CanId::IMU_LINEAR_CAN_ID) {
       if (frame.can_dlc >= 6) {
         int16_t linear_x = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
@@ -252,14 +254,14 @@ private:
         imu_msg.linear_acceleration.x = linear_x / 100.0;
         imu_msg.linear_acceleration.y = linear_y / 100.0;
         imu_msg.linear_acceleration.z = linear_z / 100.0;
-        linear_data_received = true;
-        angular_data_received = false;
+        linear_data = true;
+        angular_data = false;
       }
     }
     if (frame.can_id == CanId::IMU_ANGULAR_CAN_ID) {
-      if (angular_data_received) {
-        linear_data_received = false;
-        angular_data_received = false;
+      if (angular_data) {
+        linear_data = false;
+        angular_data = false;
       } else if (frame.can_dlc >= 6) {
         int16_t angular_x = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
         int16_t angular_y = (((uint16_t)frame.data[3]) << 8) | ((uint16_t)frame.data[2]);
@@ -267,7 +269,7 @@ private:
         imu_msg.angular_velocity.x = (angular_x / 16.0) * (M_PI / 180.0);
         imu_msg.angular_velocity.y = (angular_y / 16.0) * (M_PI / 180.0);
         imu_msg.angular_velocity.z = (angular_z / 16.0) * (M_PI / 180.0);
-        angular_data_received = true;
+        angular_data = true;
       }
     }
     if (frame.can_id == CanId::IMU_ORIENTATION_CAN_ID) {
@@ -280,13 +282,13 @@ private:
         imu_msg.orientation.y = orientation_y * (1.0 / (1 << 14));
         imu_msg.orientation.z = orientation_z * (1.0 / (1 << 14));
         imu_msg.orientation.w = orientation_w * (1.0 / (1 << 14));
-        if (linear_data_received && angular_data_received) {
+        if (linear_data && angular_data) {
           imu_msg.header.stamp = this->get_clock()->now();
           imu_msg.header.frame_id = "imu_frame";
           imu_pub_->publish(imu_msg);
         }
-        linear_data_received = false;
-        angular_data_received = false;
+        linear_data = false;
+        angular_data = false;
       }
     }
   }
@@ -296,18 +298,27 @@ private:
     static std::string ssid;
     static int8_t channel = 0;
     static int8_t rssi = 0;
-    static int8_t frame_count = 0;
+    static bool ssid_data = false;
+    static bool mac_data = false;
+    static bool channel_data = false;
+    static bool rssi_data = false;
+
     if (frame.can_id == CanId::WIFI_CAN_ID_START) {
       ssid.clear();
-      frame_count = 0;
+      ssid_data = false;
+      mac_data = false;
+      channel_data = false;
+      rssi_data = false;
     }
     if (frame.can_id == CanId::WIFI_CAN_ID_END) {
       for (int i = 0; i < 6; ++i) {
         mac_address[i] = frame.data[i];
       }
+      mac_data = true;
       channel = frame.data[6];
+      channel_data = true;
       rssi = frame.data[7];
-      frame_count++;
+      rssi_data = true;
     }
     else if (frame.can_id >= CanId::WIFI_CAN_ID_START && frame.can_id <= CanId::WIFI_SSID_CAN_ID_END) {
       for (int i = 0; i < frame.can_dlc; ++i) {
@@ -315,9 +326,9 @@ private:
           ssid += static_cast<char>(frame.data[i]);
         }
       }
-      frame_count++;
+      ssid_data = true;
     }
-    if (frame_count >= 5 && !ssid.empty() && mac_address[0] != 0 && channel != 0 && rssi != 0) {
+    if (ssid_data && mac_data && channel_data && rssi_data && !ssid.empty()) {
       std::string mac_str;
       for (size_t i = 0; i < mac_address.size(); ++i) {
         if (i != 0) {
@@ -341,7 +352,10 @@ private:
       ssid.clear();
       channel = 0;
       rssi = 0;
-      frame_count = 0;
+      ssid_data = false;
+      mac_data = false;
+      channel_data = false;
+      rssi_data = false;
     }
   }
 
@@ -360,6 +374,7 @@ private:
         pressure_msg.header.stamp = this->get_clock()->now();
         pressure_msg.fluid_pressure = pressure;
         BME_pressure_pub_->publish(pressure_msg);
+        pressure_pub_->publish(pressure_msg);
       }
     }
   }
@@ -406,9 +421,9 @@ private:
   void publishServoPosData(const struct can_frame &frame) {
     if (frame.can_id == CanId::SERVO_POS_CAN_ID && frame.can_dlc >= 2) {
       int16_t servo_pos_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
-      float servo_pos = ((servo_pos_raw - 2048) / 1024.0) * 90;
+      float servo_pos = ((servo_pos_raw - 2048) / 2048.0) * 180;
       std_msgs::msg::Int16 servo_pos_pub_msg;
-      servo_pos_pub_msg.data = static_cast<int16_t>(servo_pos);
+      servo_pos_pub_msg.data = static_cast<int16_t>(std::round(servo_pos));
       servo_pos_pub_->publish(servo_pos_pub_msg);
     }
   }
@@ -464,15 +479,17 @@ private:
   }
 
   void subscribeServoTargetData(const std_msgs::msg::Int16& msg) {
-    int16_t servo_target_per = msg.data;
-    float servo_targer_deg = (servo_target_per / 90.0) * 1024 + 2048;
-    int16_t servo_target = static_cast<int16_t>(servo_targer_deg);
+    int16_t servo_target_per = -1 * msg.data;
+    float servo_targer_deg = (servo_target_per / 180.0) * 2048 + 2048;
+    int16_t servo_target = static_cast<int16_t>(std::round(servo_targer_deg));
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
     frame.can_id = CanId::SERVO_TARGET_CAN_ID;
     frame.can_dlc = 4;
     frame.data[0] = servo_target & 0xFF;
     frame.data[1] = (servo_target >> 8) & 0xFF;
+    frame.data[2] = 0;
+    frame.data[3] = 0;
     if (write(can_socket_, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
       RCLCPP_ERROR(this->get_logger(), "Error sending servo target frame");
     }
@@ -501,6 +518,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr wifi_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr BME_temperature_pub_;
   rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr BME_pressure_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
   rclcpp::Publisher< std_msgs::msg::Int32MultiArray>::SharedPtr calibration_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr tact_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr capacitive_touch_pub_;
