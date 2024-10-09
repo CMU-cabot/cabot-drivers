@@ -142,6 +142,11 @@ private:
     odrive_left_->checkTimeoutServiceResponse(service_timeout_ms_);
     odrive_right_->checkTimeoutServiceResponse(service_timeout_ms_);
 
+    if (!odrive_left_->isReady() || !odrive_right_->isReady()) {
+      // do not publish MotorStatus if one of odrives is not ready
+      return;
+    }
+
     double sign_left = odrive_left_->getSign();
     double sign_right = odrive_right_->getSign();
     double dist_left_c = odrive_left_->getDistC();
