@@ -36,6 +36,7 @@ ODriveManager::ODriveManager(rclcpp::Node *node, const std::string &axis_name,
     is_ready_axis_state_service_(true),
     axis_name_(axis_name),
     sign_(sign),
+    ready_(false),
     wheel_diameter_m_(wheel_diameter_m)
 {
   using std::placeholders::_1;
@@ -72,6 +73,7 @@ void ODriveManager::controllerStatusCallback(const odrive_can::msg::ControllerSt
   current_setpoint_ = msg->iq_setpoint;
   current_measured_ = msg->iq_measured;
   axis_state_ = msg->axis_state;
+  ready_ = true;
 }
 
 void ODriveManager::callAxisStateService(unsigned int axis_state)
