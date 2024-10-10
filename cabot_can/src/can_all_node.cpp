@@ -86,11 +86,12 @@ public:
     pressure_pub_ = this->create_publisher<sensor_msgs::msg::FluidPressure>("pressure", 2);
     calibration_pub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("calibration", 50);
     tact_pub_ = this->create_publisher<std_msgs::msg::Int8>("pushed", 50);
-    capacitive_touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("capacitive/touch", 50);
-    capacitive_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("capacitive/touch_raw", 50);
+    capacitive_touch_pub_ = this->create_publisher<std_msgs::msg::Int8>("capacitive/touch", 50);
+    tof_touch_pub_ = this->create_publisher<std_msgs::msg::Int8>("tof/touch", 50);
+    touch_pub_ = this->create_publisher<std_msgs::msg::Int8>("touch", 50);
+    capacitive_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int8>("capacitive/touch_raw", 50);
     tof_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("tof/touch_raw", 50);
     servo_pos_pub_ = this->create_publisher<std_msgs::msg::Int16>("servo_pos", 50);
-    touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("touch", 50);
     vibrator_1_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator1", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg, 1);});
     vibrator_3_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator3", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg, 3);});
     vibrator_4_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator4", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg, 4);});
@@ -381,19 +382,30 @@ private:
 
   void publishTouchData(const struct can_frame &frame) {
     if (frame.can_id == CanId::TOUCH_CAN_ID && frame.can_dlc >= 4) {
-      int16_t capacitive_touch = frame.data[3];
-      std_msgs::msg::Int16 touch_msg;
+      int8_t capacitive_touch = frame.data[3];
+      std_msgs::msg::Int8 touch_msg;
       touch_msg.data = capacitive_touch;
       capacitive_touch_pub_->publish(touch_msg);
       touch_pub_->publish(touch_msg);
-      int16_t capacitive_touch_raw = frame.data[2];
-      std_msgs::msg::Int16 touch_raw_msg;
-      touch_raw_msg.data = capacitive_touch_raw;
-      capacitive_touch_raw_pub_->publish(touch_raw_msg);
-      int16_t tof_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
+      
+      int8_t capacitive_touch_raw = frame.data[2];
+      std_msgs::msg::Int8 capacitive_touch_raw_msg;
+      capacitive_touch_raw_msg.data = capacitive_touch_raw;
+      capacitive_touch_raw_pub_->publish(capacitive_touch_raw_msg);
+      
+      int16_t tof_touch_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
       std_msgs::msg::Int16 tof_raw_msg;
-      tof_raw_msg.data = tof_raw;
+      tof_raw_msg.data = tof_touch_raw;
       tof_touch_raw_pub_->publish(tof_raw_msg);
+      int8_t tof_touch = 0;
+      if (tof_touch_raw >= 16 && tof_touch_raw <= 25) {
+          tof_touch = 1;
+      } else {
+          tof_touch = 0;
+      }
+      std_msgs::msg::Int8 tof_touch_msg;
+      tof_touch_msg.data = tof_touch;
+      tof_touch_pub_->publish(tof_touch_msg);  
     }
   }
 
@@ -421,7 +433,9 @@ private:
   void publishServoPosData(const struct can_frame &frame) {
     if (frame.can_id == CanId::SERVO_POS_CAN_ID && frame.can_dlc >= 2) {
       int16_t servo_pos_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
-      float servo_pos = ((servo_pos_raw - 2048) / 2048.0) * 180;
+      //The servo target angle (servo_target_deg) is determined by multiplying 2048
+      //by the servo angle (ranging from -179 to +179,0 ~ 4096)
+      float servo_pos = ((servo_pos_raw - 2048) / 2048.0) * 179 * -1;
       std_msgs::msg::Int16 servo_pos_pub_msg;
       servo_pos_pub_msg.data = static_cast<int16_t>(std::round(servo_pos));
       servo_pos_pub_->publish(servo_pos_pub_msg);
@@ -480,7 +494,9 @@ private:
 
   void subscribeServoTargetData(const std_msgs::msg::Int16& msg) {
     int16_t servo_target_per = -1 * msg.data;
-    float servo_targer_deg = (servo_target_per / 180.0) * 2048 + 2048;
+    //The servo target angle (servo_target_deg) is determined by multiplying 2048
+    //by the servo angle (ranging from -179 to +179,0 ~ 4096)
+    float servo_targer_deg = (servo_target_per / 179.0) * 2048 + 2048;
     int16_t servo_target = static_cast<int16_t>(std::round(servo_targer_deg));
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
@@ -521,10 +537,11 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
   rclcpp::Publisher< std_msgs::msg::Int32MultiArray>::SharedPtr calibration_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr tact_pub_;
-  rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr capacitive_touch_pub_;
-  rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr capacitive_touch_raw_pub_;
+  rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr capacitive_touch_pub_;
+  rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr capacitive_touch_raw_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr tof_touch_raw_pub_;
-  rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_pub_;
+  rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr tof_touch_pub_;
+  rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr servo_pos_pub_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_1_sub_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_3_sub_;
