@@ -27,6 +27,9 @@ services:
       service: driver-base
     volumes:
       - ./docker/home:/home/developer/
+    environment:
+      - ODRIVE_MODEL
+      - ODRIVE_FIRMWARE_VERSION
 
   wifi_scan:
     extends:

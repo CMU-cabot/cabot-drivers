@@ -31,6 +31,8 @@ RUN sudo ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ | sudo tee /
 
 RUN apt update && apt install -y \
 	libusb-1.0-0 \
+    libboost-all-dev \
+    nlohmann-json3-dev \
 	python3-pip \
 	python3-venv \
     python3-gi \
@@ -39,7 +41,8 @@ RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-joy-linux \
     ros-${ROS_DISTRO}-xacro \
     ros-${ROS_DISTRO}-realsense2-description \
-    ros-${ROS_DISTRO}-pointcloud-to-laserscan
+    ros-${ROS_DISTRO}-pointcloud-to-laserscan \
+    ros-${ROS_DISTRO}-ros2-control
 
 RUN pip3 install --no-cache-dir \
     odrive==0.6.5 \
@@ -75,17 +78,3 @@ USER $USERNAME
 ENV HOME /home/$USERNAME
 
 WORKDIR $HOME/driver_ws
-
-USER root
-ENV UNDERLAY_WS=/opt/underlay_ws
-RUN mkdir -p $UNDERLAY_WS/src && \
-    cd $UNDERLAY_WS/src && \
-    git clone https://github.com/odriverobotics/ros_odrive.git && \
-    cd ros_odrive && \
-    git checkout 0fa84d3745a8c385076d29b7f54971e9f2d14de7 && \
-    cd $UNDERLAY_WS && \
-    /bin/bash -c "source /opt/custom_ws/install/setup.bash; colcon build --packages-select odrive_can"
-
-RUN sed 's/custom_ws/underlay_ws/g' /ros_entrypoint.sh -i
-
-USER $USERNAME

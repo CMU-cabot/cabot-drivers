@@ -116,6 +116,16 @@ def generate_launch_description():
         ),
     ]
 
+    odrive_can_pkg_dir = get_package_share_directory('odrive_can')
+    odrive_model = LaunchConfiguration('odrive_model')
+    odrive_firmware_version = LaunchConfiguration('odrive_firmware_version')
+    flat_endpoints_json_path = PathJoinSubstitution([
+        odrive_can_pkg_dir,
+        PythonExpression(['"json"']),
+        odrive_firmware_version,
+        PythonExpression(['"flat_endpoints_',odrive_model,'.json"'])
+    ])
+
     # deprecated parameters
     # - offset
     # - no_vibration
@@ -191,6 +201,16 @@ def generate_launch_description():
             'vibrator_type',
             default_value=EnvironmentVariable('CABOT_VIBRATOR_TYPE', default_value='1'),
             description='1: ERM (Eccentric Rotating Mass), 2: LRA (Linear Resonant Actuator)'
+        ),
+        DeclareLaunchArgument(
+            'odrive_model',
+            default_value=EnvironmentVariable('ODRIVE_MODEL'),
+            description='odrive model'
+        ),
+        DeclareLaunchArgument(
+            'odrive_firmware_version',
+            default_value=EnvironmentVariable('ODRIVE_FIRMWARE_VERSION'),
+            description='odrive firmware version'
         ),
 
         # Kind error message
@@ -516,6 +536,7 @@ def generate_launch_description():
                     {
                         'node_id' : 0,
                         'interface' : 'can1',
+                        'json_file_path': flat_endpoints_json_path,
                     }
                 ],
                 remappings=[
@@ -535,6 +556,7 @@ def generate_launch_description():
                     {
                         'node_id' : 1,
                         'interface' : 'can1',
+                        'json_file_path': flat_endpoints_json_path,
                     }
                 ],
                 remappings=[

@@ -61,6 +61,7 @@ services:
       - ./power_controller:/home/developer/driver_ws/src/power_controller
       - ./wireless_scanner_ros:/home/developer/driver_ws/src/wireless_scanner_ros
       - ./script:/home/developer/driver_ws/script
+      - ./ros_odrive:/home/developer/driver_ws/src/ros_odrive
     privileged: true
     devices:
       - /dev/dri
