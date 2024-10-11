@@ -207,7 +207,7 @@ private:
   }
 
   void readImuCalibration(const struct can_frame &frame) {
-    static std::vector<int32_t> calibration_data(22);
+    static std::vector<int32_t> calibration_data(22, 0);
     static bool imu_calibration_data_1 = false;
     static bool imu_calibration_data_2 = false;
     static bool imu_calibration_data_3 = false;
@@ -382,12 +382,11 @@ private:
 
   void publishTouchData(const struct can_frame &frame) {
     if (frame.can_id == CanId::TOUCH_CAN_ID && frame.can_dlc >= 4) {
-      int8_t capacitive_touch = frame.data[3];
-      std_msgs::msg::Int16 touch_msg;
-      touch_msg.data = capacitive_touch;
-      capacitive_touch_pub_->publish(touch_msg);
-      touch_pub_->publish(touch_msg);
-      int8_t capacitive_touch_raw = frame.data[2];
+      int16_t capacitive_touch = frame.data[3];
+      std_msgs::msg::Int16 capacitive_touch_msg;
+      capacitive_touch_msg.data = capacitive_touch;
+      capacitive_touch_pub_->publish(capacitive_touch_msg);
+      int16_t capacitive_touch_raw = frame.data[2];
       std_msgs::msg::Int16 capacitive_touch_raw_msg;
       capacitive_touch_raw_msg.data = capacitive_touch_raw;
       capacitive_touch_raw_pub_->publish(capacitive_touch_raw_msg);
@@ -396,14 +395,25 @@ private:
       tof_raw_msg.data = tof_touch_raw;
       tof_touch_raw_pub_->publish(tof_raw_msg);
       int16_t tof_touch = 0;
-      if (tof_touch_raw >= 16 && tof_touch_raw <= 25) {
-          tof_touch = 1;
-      } else {
-          tof_touch = 0;
+      int16_t touch = frame.data[3];
+      if (touch == 0){
+        if (tof_touch_raw >= 16 && tof_touch_raw <= 25) {
+          touch = 1;
+        } else {
+          touch = 0;
+        }
       }
+      if (tof_touch_raw >= 16 && tof_touch_raw <= 25) {
+        tof_touch = 1;
+      } else {
+        tof_touch = 0;
+      }      
       std_msgs::msg::Int16 tof_touch_msg;
       tof_touch_msg.data = tof_touch;
       tof_touch_pub_->publish(tof_touch_msg);  
+      std_msgs::msg::Int16 touch_msg;
+      touch_msg.data = touch;
+      touch_pub_->publish(touch_msg);
     }
   }
 
