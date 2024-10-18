@@ -67,6 +67,7 @@ public:
   int write(std::vector<uint8_t>, size_t length);
   int available();
   void reset();
+  void close();
 
 private:
   int fd_;
