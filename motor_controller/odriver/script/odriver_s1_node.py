@@ -77,7 +77,7 @@ serialReading_timeout=0.01 #sec
 serialWriting_timeout=0.01 #sec
 lock=threading.Lock()
 use_checksum=False
-max_vel_gain = 100.0
+max_vel_gain = 20.0
 max_vel_integrator_gain = 100.0
 
 '''Configuarable parameter'''
