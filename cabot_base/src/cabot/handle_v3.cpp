@@ -402,8 +402,7 @@ void Handle::turnEndCallback(std_msgs::msg::Bool::UniquePtr & msg)
 {
   bool turn_end = msg->data;
   if (turn_end) {
-    RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "Passed turn end point, finish to controll di by imu.");
-    di.is_controlled_by_imu = false;
+    resetServoPosition();
   }
 }
 
