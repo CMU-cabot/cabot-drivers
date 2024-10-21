@@ -88,6 +88,10 @@ Handle::Handle(
     "turn_type", rclcpp::SensorDataQoS(), [this](std_msgs::msg::String::UniquePtr msg) {
       turnTypeCallback(msg);
     });
+  turn_end_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
+    "turn_end", rclcpp::SensorDataQoS(), [this](std_msgs::msg::Bool::UniquePtr msg) {
+      turnEndCallback(msg);
+    });
   change_di_control_mode_sub_ = node_->create_subscription<std_msgs::msg::String>(
     "change_di_control_mode", rclcpp::SensorDataQoS(), [this](std_msgs::msg::String::UniquePtr msg) {
       changeDiControlModeCallback(msg);
@@ -391,6 +395,15 @@ void Handle::turnTypeCallback(std_msgs::msg::String::UniquePtr & msg)
   } else if (turn_type == "Type.Avoiding") {
     last_turn_type_ = turn_type_::AVOIDING;
     RCLCPP_DEBUG(rclcpp::get_logger("Handle_v3"), "Turn_type: Avoiding");
+  }
+}
+
+void Handle::turnEndCallback(std_msgs::msg::Bool::UniquePtr & msg)
+{
+  bool turn_end = msg->data;
+  if (turn_end) {
+    RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "Passed turn end point, finish to controll di by imu.");
+    di.is_controlled_by_imu = false;
   }
 }
 
