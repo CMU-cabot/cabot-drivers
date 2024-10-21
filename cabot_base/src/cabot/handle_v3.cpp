@@ -402,7 +402,11 @@ void Handle::turnEndCallback(std_msgs::msg::Bool::UniquePtr & msg)
 {
   bool turn_end = msg->data;
   if (turn_end) {
-    resetServoPosition();
+    if (di.control_mode == "global") {
+      resetServoPosition();
+    } else {
+      di.is_controlled_by_imu = false;
+    }
   }
 }
 
