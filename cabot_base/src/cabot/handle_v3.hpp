@@ -37,6 +37,7 @@
 #include <std_msgs/msg/u_int8.hpp>
 #include <std_msgs/msg/int16.hpp>
 #include <std_msgs/msg/float32.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
@@ -169,7 +170,9 @@ private:
   void servoPosCallback(std_msgs::msg::Int16::UniquePtr & msg);
   void turnAngleCallback(std_msgs::msg::Float32::UniquePtr & msg);
   void turnTypeCallback(std_msgs::msg::String::UniquePtr & msg);
+  void turnEndCallback(std_msgs::msg::Bool::UniquePtr & msg);
   void localPlanCallback(nav_msgs::msg::Path::UniquePtr & msg);
+  void angularDistanceCallback(std_msgs::msg::Float64::UniquePtr & msg);
   void changeDiControlModeCallback(std_msgs::msg::String::UniquePtr & msg);
   void startVibration(rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr & vibratorPub);
   void stopVibration(rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr & vibratorPub);
@@ -207,8 +210,10 @@ private:
   rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr servo_pos_sub_;
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr turn_angle_sub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr turn_type_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr turn_end_sub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr change_di_control_mode_sub_;
   rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr local_plan_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr angular_distance_sub_;
   rclcpp::Time last_up[9];
   rclcpp::Time last_dwn[9];
   int vibratorType_;
