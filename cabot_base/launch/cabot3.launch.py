@@ -31,6 +31,9 @@ change from ROS1: each model had own launch file in ROS1, but ROS2 launch will h
   - cabot3-i1    (AIS-2024, Consortium)
   - cabot3-m1    (AIS-2024, Miraikan)
   - cabot3-m2    (AIS-2024, Miraikan)
+  - cabot3-k1
+  - cabot3-k2
+  - cabot3-k3
 """
 from launch.logging import launch_config
 
@@ -81,12 +84,13 @@ def generate_launch_description():
     vibrator_type = LaunchConfiguration('vibrator_type')
 
     # switch lidar node based on model_name
+    use_velodyne = PythonExpression(['"', model_name, '" in ["cabot3-s1"]'])
     use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1"]'])
-    #use_helios = PythonExpression(['"', model_name, '" in ["cabot3-k3"]'])
-    use_velodyne = NotSubstitution(use_hesai)
-    use_can = PythonExpression(['"', model_name, '" in ["cabot3-k1", "cabot3-k3"]'])
+    use_lslidar = PythonExpression(['"', model_name, '" in ["cabot3-k2"]'])
+    use_helios = PythonExpression(['"', model_name, '" in ["cabot3-k3"]'])
+    use_can = PythonExpression(['"', model_name, '" in ["cabot3-k1", "cabot3-k2", "cabot3-k3"]'])
     use_serial = NotSubstitution(use_can)
-    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1", "cabot3-k3"]'])
+    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1", "cabot3-k2", "cabot3-k3"]'])
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -274,6 +278,38 @@ def generate_launch_description():
                 ]
             ),
 
+            # launch hesai lidar node
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([
+                    PathJoinSubstitution([
+                        pkg_dir, 'launch', 'include', 'hesai_lidar.launch.py'
+                    ])
+                ]),
+                launch_arguments={
+                    'model': model_name,
+                    'output': output,
+                    'pandar': '/velodyne_points'
+                }.items(),
+                condition=IfCondition(AndSubstitution(use_hesai, NotSubstitution(use_sim_time)))  # if (use_hesai and (not use_simtime))
+            ),
+
+            # launch lslidar node
+            Node(
+                package='lslidar_driver',
+                executable='lslidar_driver_node',
+                parameters=[
+                    *param_files,
+                    {'use_sim_time': use_sim_time},
+                    {'frame_id': 'velodyne'},
+                    {'use_time_service': False},
+                    {'pcl_type': True}
+                ],
+                remappings=[
+                    ('/lslidar_point_cloud', '/velodyne_points'),
+                ],
+                condition=IfCondition(AndSubstitution(use_lslidar, NotSubstitution(use_sim_time)))  # if (use_lslidar and (not use_simtime))
+            ),
+
             # helios lidar
             #IncludeLaunchDescription(
             #    PythonLaunchDescriptionSource([
@@ -288,7 +324,7 @@ def generate_launch_description():
             #    }.items(),
             #    condition=IfCondition(use_sim_time)
             #),
-
+            
             Node(
                 namespace='rslidar_sdk',
                 package='rslidar_sdk',
@@ -300,23 +336,9 @@ def generate_launch_description():
                 ],
                 remappings=[
                     ('/rslidar_points',  '/velodyne_points')
-                ]
+                ],
+                condition=IfCondition(AndSubstitution(use_helios, NotSubstitution(use_sim_time)))  # if (use_helios and (not use_simtime))
             ),
-
-            # # launch hesai lidar node
-            # IncludeLaunchDescription(
-            #     PythonLaunchDescriptionSource([
-            #         PathJoinSubstitution([
-            #             pkg_dir, 'launch', 'include', 'hesai_lidar.launch.py'
-            #         ])
-            #     ]),
-            #     launch_arguments={
-            #         'model': model_name,
-            #         'output': output,
-            #         'pandar': '/velodyne_points'
-            #     }.items(),
-            #     condition=IfCondition(AndSubstitution(use_hesai, NotSubstitution(use_sim_time)))  # if (use_hesai and (not use_simtime))
-            # ),
 
             # launch livox node
             IncludeLaunchDescription(
