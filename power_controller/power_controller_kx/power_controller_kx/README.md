@@ -34,10 +34,10 @@ manage each power supply and output battery information via topic communication
     |shutdown|----|----|performs shutdown when called by the client|
     
 # Publisher
- - **/battery_state** (power_controller_msgs/msg/BatteryArray): publish information on multiple batteries
+ - **/battery_state** (power_controller_msgs::msg::BatteryArray): publish information on multiple batteries
 
 # Subscriber
- - **/fan_controller** (std_msgs/msg/UInt8): fan is regulated using PWM control(0~100)
+ - **/fan_controller** (std_msgs::msg::UInt8): fan is regulated using PWM control(0~100)
 
 # Parameters
 - **can_interface** (std::string): the interface of CAN can be changed
