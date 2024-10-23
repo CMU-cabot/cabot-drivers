@@ -390,14 +390,21 @@ private:
     static uint8_t previous_data = 0;
     static uint8_t data_count = 0;
     if (frame.can_id == CanId::TACT_CAN_ID && frame.can_dlc == 1) {
+      if (frame.data[0] == 0) {
+        std_msgs::msg::Int8 tact_msg;
+        tact_msg.data = 0;
+        tact_pub_->publish(tact_msg);
+        data_count = 0;
+        return;      
+      }
       if (frame.data[0] == previous_data) {
         data_count++;
       } else {
-        data_count = 1;
+        data_count++;
         previous_data = frame.data[0];
       }
       //change the threshold by rewriting data_count
-      if (data_count == 2) {
+      if (data_count >= 2) {
         std_msgs::msg::Int8 tact_msg;
         uint8_t tact_data = 0;
         if (frame.data[0] == 1) {
@@ -411,7 +418,6 @@ private:
         }
         tact_msg.data = tact_data;
         tact_pub_->publish(tact_msg);
-        data_count = 0;
       }
     }
   }
