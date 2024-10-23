@@ -1,26 +1,25 @@
-# powe_controller-node
+# powe_controller-kx
 
-Manage each power supply and output battery information via topic communication
-   -  
+manage each power supply and output battery information via topic communication
 
 ## Node
   - power_controller
 
 ## Services
 - **set_24v_power_odrive** (std_srvs::srv::SetBool)
-    - Managing odrive's power supply
+    - managing odrive's power supply
 - **set_12v_power_d455_front** (std_srvs::srv::SetBool)
-    - Managing framos front power supply
+    - managing framos front power supply
 - **set_12v_power_d455_right** (std_srvs::srv::SetBool)
-    - Managing framos right power supply
+    - managing framos right power supply
 - **set_12v_power_d455_left** (std_srvs::srv::SetBool)
-    - Managing framos left power supply
+    - managing framos left power supply
 - **set_5v_power_mcu** (std_srvs::srv::SetBool)
-    - Managing mcu power supply
+    - managing mcu power supply
 - **reboot** (std_srvs::srv::Empty)
-    - Managing power supply
+    - managing power supply
 - **shutdown** (std_srvs::srv::Empty)
-    - Managing power supply
+    - managing power supply
 
 
     
