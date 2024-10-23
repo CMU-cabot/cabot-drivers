@@ -132,7 +132,7 @@ int Serial::read(uint8_t * buf, int size)
   if (!is_open_) {
     throw std::runtime_error("Serial::read");
   }
-  if (waitReadable(1000)) {
+  if (waitReadable(2000)) {
     return ::read(fd_, buf, size);
   } else {
     return -1;
