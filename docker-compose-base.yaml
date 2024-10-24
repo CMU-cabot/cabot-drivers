@@ -57,6 +57,7 @@ services:
       - ./cabot_base:/home/developer/driver_ws/src/cabot_base
       - ./cabot_serial:/home/developer/driver_ws/src/cabot_serial
       - ./motor_controller:/home/developer/driver_ws/src/motor_controller
+      - ./power_controller:/home/developer/driver_ws/src/power_controller
       - ./wireless_scanner_ros:/home/developer/driver_ws/src/wireless_scanner_ros
       - ./script:/home/developer/driver_ws/script
     privileged: true
