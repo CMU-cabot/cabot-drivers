@@ -113,7 +113,8 @@ public:
         this,
         std::placeholders::_1));
     // publisher
-    publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_state", 10);
+    state_publisher_ = this->create_publisher<sensor_msgs::msg::BatteryState>("battery_state", 10);
+    states_publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_states", 10);
     pub_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::publishPowerStatus, this));
     send_can_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::sendCanMessageIfReceived, this));
     // open can socket
@@ -335,7 +336,27 @@ private:
       battery_msg.batteryarray[2].serial_number = std::to_string(data[2]);
       battery_msg.batteryarray[3].serial_number = std::to_string(data[3]);
       // publsih msg
-      publisher_->publish(battery_msg);
+      states_publisher_->publish(battery_msg);
+
+      sensor_msgs::msg::BatteryState average_battery_msg;
+      average_battery_msg.header.stamp = this->get_clock()->now();
+      average_battery_msg.serial_number = '0';
+      average_battery_msg.location = '0';
+      float percentage_sum = 0, voltage_sum = 0, current_sum = 0;
+      float max_temperature = battery_msg.batteryarray[0].temperature;
+      for(int i=0; i<static_cast<int>(battery_msg.batteryarray.size()); i++) {
+        percentage_sum += battery_msg.batteryarray[i].percentage;
+        voltage_sum += battery_msg.batteryarray[i].voltage;
+        current_sum += battery_msg.batteryarray[i].current;
+        if (battery_msg.batteryarray[i].temperature > max_temperature) {
+          max_temperature = battery_msg.batteryarray[i].temperature;
+        }
+      }
+      average_battery_msg.percentage = percentage_sum / battery_msg.batteryarray.size();
+      average_battery_msg.voltage = voltage_sum / battery_msg.batteryarray.size();
+      average_battery_msg.current = current_sum / battery_msg.batteryarray.size();
+      average_battery_msg.temperature = max_temperature;
+      state_publisher_->publish(average_battery_msg);
       return;
     }
     int array_num = location - 1;
@@ -432,7 +453,8 @@ private:
   // subscriber
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr subscriber_fan_;
   // publisher
-  rclcpp::Publisher<power_controller_msgs::msg::BatteryArray>::SharedPtr publisher_;
+  rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr state_publisher_;
+  rclcpp::Publisher<power_controller_msgs::msg::BatteryArray>::SharedPtr states_publisher_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
   rclcpp::TimerBase::SharedPtr send_can_timer_;
   //mutex
