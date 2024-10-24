@@ -237,7 +237,6 @@ std::tuple<int, int> CaBotSerialNode::system_time()
 void CaBotSerialNode::stopped()
 {
   if (client_ == nullptr) {return;}
-  client_->reset_serial();
   client_ = nullptr;
   port_ = nullptr;
   last_topic_alive_time_ = std::chrono::time_point<std::chrono::system_clock>();

@@ -132,10 +132,10 @@ int Serial::read(uint8_t * buf, int size)
   if (!is_open_) {
     throw std::runtime_error("Serial::read");
   }
-  if (waitReadable(1)) {
+  if (waitReadable(2000)) {
     return ::read(fd_, buf, size);
   } else {
-    return 0;
+    return -1;
   }
 }
 
@@ -194,6 +194,12 @@ void Serial::reset()
   }
 }
 
+void Serial::close()
+{
+  is_open_ = false;
+  ::close(fd_);
+}
+
 CaBotArduinoSerial::CaBotArduinoSerial(
   std::shared_ptr<Serial> port, int baud,
   std::chrono::milliseconds timeout)
@@ -217,6 +223,7 @@ void CaBotArduinoSerial::reset_serial()
 
 void CaBotArduinoSerial::stop()
 {
+  port_->close();
   is_alive_ = false;
   delegate_->stopped();
 }
@@ -305,13 +312,13 @@ bool CaBotArduinoSerial::try_read(int length, std::vector<uint8_t> & result)
       std::chrono::system_clock::now();
     while (bytes_remaining != 0 && (std::chrono::system_clock::now() - read_start) < timeout_) {
       received = port_->read(buf, bytes_remaining);
-      if (received != 0) {
+      if (received > 0) {
         for (int i = 0; i < received; i++) {
           result.push_back(buf[i]);
         }
         bytes_remaining -= received;
         timeout_count_ = 0;
-      } else {
+      } else if (received < 0) {
         timeout_count_++;
         delegate_->log(rclcpp::Logger::Level::Debug, string_format("read timeout %d", timeout_count_));
       }
