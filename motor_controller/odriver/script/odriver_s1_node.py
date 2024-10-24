@@ -515,6 +515,7 @@ def main():
                     "\nErrors of odrv0 \n" + str(format_errors(odrvs[0])) + \
                     "\nErrors of odrv1 \n" + str(format_errors(odrvs[1])) 
                 logger.error(odrive_error_str, throttle_duration_sec=1.0)
+                _error_recovery(relaunch = odrv_is_active)
                 time_disconnect = node.get_clock().now()
                 odrv_is_active = False
                 od_writeMode(0)
