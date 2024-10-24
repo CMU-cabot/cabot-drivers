@@ -1,7 +1,5 @@
-#!/bin/bash
-
 # ******************************************************************************
-#  Copyright (c) 2023, 2024  Carnegie Mellon University and Miraikan
+#  Copyright (c) 2024  Carnegie Mellon University and Miraikan
 #
 #  Permission is hereby granted, free of charge, to any person obtaining a copy
 #  of this software and associated documentation files (the "Software"), to deal
@@ -22,32 +20,20 @@
 #  SOFTWARE.
 # ******************************************************************************
 
-ulimit -S -c 0
+from launch.logging import launch_config
 
-while getopts "c" arg; do
-    case $arg in
-        c)
-	    ulimit -c unlimited
-	    echo 1 | sudo tee /proc/sys/kernel/core_uses_pid
-	    echo "/home/developer/core" | sudo tee /proc/sys/kernel/core_pattern
-	    ulimit -s 65536
-	    ;;
-    esac
-done
-shift $((OPTIND-1))
+from launch import LaunchDescription
+from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration
+from launch.actions import SetEnvironmentVariable
 
-if [[ $1 == "driver" ]]; then
-    shift 1
-    exec ./script/launch_driver.sh $@
-elif [[ $1 == "wifi-scan" ]]; then
-    source install/setup.bash
-    exec ros2 launch wireless_scanner_ros esp32.launch.xml
-elif [[ $1 == "ble-scan" ]]; then
-    source install/setup.bash
-    exec ros2 launch wireless_scanner_ros dbus_ibeacon_scanner.launch.xml
-elif [[ $1 == "build" ]]; then
-    shift 1
-    exec ./script/build_ws.sh $@
-fi
-
-exec bash
+def generate_launch_description():
+    return LaunchDescription([
+        SetEnvironmentVariable('ROS_LOG_DIR', launch_config.log_dir),
+        Node(
+            package='odriver_can',
+            namespace='/',
+            executable='set_vel_gains_node',
+            name='set_vel_gains_node',
+        ),
+    ])
