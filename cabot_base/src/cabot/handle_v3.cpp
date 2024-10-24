@@ -420,7 +420,7 @@ void Handle::localPlanCallback(nav_msgs::msg::Path::UniquePtr & msg)
     size_t local_plan_len = msg->poses.size();
     if (local_plan_len > 1) {
       geometry_msgs::msg::PoseStamped start_pose = msg->poses[0];
-      geometry_msgs::msg::PoseStamped end_pose = msg->poses[local_plan_len - 1];
+      geometry_msgs::msg::PoseStamped end_pose = msg->poses[static_cast<size_t>(local_plan_len / 2) - 1];
       float start_pose_yaw = getEulerYawDegrees(start_pose.pose.orientation.x, start_pose.pose.orientation.y, start_pose.pose.orientation.z, start_pose.pose.orientation.w);
       float end_pose_yaw = getEulerYawDegrees(end_pose.pose.orientation.x, end_pose.pose.orientation.y, end_pose.pose.orientation.z, end_pose.pose.orientation.w);
       float di_target = end_pose_yaw - start_pose_yaw;
