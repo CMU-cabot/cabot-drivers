@@ -100,6 +100,10 @@ Handle::Handle(
     "/local_plan", rclcpp::SensorDataQoS(), [this](nav_msgs::msg::Path::UniquePtr msg) {
       localPlanCallback(msg);
     });
+  angular_distance_sub_ = node_->create_subscription<std_msgs::msg::Float64>(
+    "/angular_distance", rclcpp::SensorDataQoS(), [this](std_msgs::msg::Float64::UniquePtr msg) {
+      angularDistanceCallback(msg);
+    });
   for (int i = 0; i < 9; ++i) {
     last_up[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
     last_dwn[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
@@ -442,6 +446,16 @@ void Handle::localPlanCallback(nav_msgs::msg::Path::UniquePtr & msg)
         }
       }
     }
+  }
+}
+
+void Handle::angularDistanceCallback(std_msgs::msg::Float64::UniquePtr & msg)
+{
+  if (di.control_mode == "both" || di.control_mode == "local") {
+    double angular_data = msg->data;
+    float di_target = static_cast<float>(angular_data) * 180 / M_PI;
+    RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "di control: %f", di_target);
+    changeServoPos(static_cast<int16_t>(di_target));
   }
 }
 
