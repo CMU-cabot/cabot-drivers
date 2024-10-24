@@ -54,6 +54,7 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   targetSpdTurn_(0),
   currentSpdLinear_(0),
   lastOdomTime_(0, 0, get_clock()->get_clock_type()),
+  lastReceivedTime_(0, 0, get_clock()->get_clock_type()),
 
   targetRate_(40),
   maxAcc_(0.5),
@@ -82,6 +83,10 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   encoderInput_ = declare_parameter("encoder_topic", encoderInput_);
   encoderSub = create_subscription<odriver_msgs::msg::MotorStatus>(
     encoderInput_, 10, std::bind(&ODriverNode::encoderCallback, this, _1));
+
+  encoderTimer_ = this->create_wall_timer(
+    std::chrono::milliseconds(50),
+    std::bind(&ODriverNode::encoderTimerCallback, this));
 
   odomOutput_ = declare_parameter("odom_topic", odomOutput_);
   odomPub = create_publisher<nav_msgs::msg::Odometry>(odomOutput_, 10);
@@ -224,6 +229,8 @@ void ODriverNode::cmdVelLoop(int publishRate)
 
 void ODriverNode::encoderCallback(const odriver_msgs::msg::MotorStatus::SharedPtr input)
 {
+  lastReceivedTime_ = this->now();
+  
   double time = rclcpp::Time(input->header.stamp).nanoseconds() / 1000000000.0;
   diffDrive_.update(
     input->dist_left,
@@ -270,6 +277,56 @@ void ODriverNode::encoderCallback(const odriver_msgs::msg::MotorStatus::SharedPt
   LRdouble & vel = diffDrive_.velocity();
   odom.twist.twist.linear.x = vel.l;
   odom.twist.twist.angular.z = vel.r;
+  odom.twist.covariance[0] = linear_covariance;
+  odom.twist.covariance[7] = linear_covariance;
+  odom.twist.covariance[14] = linear_covariance;
+  odom.twist.covariance[21] = angle_covariance;
+  odom.twist.covariance[28] = angle_covariance;
+  odom.twist.covariance[35] = angle_covariance;
+  odomPub->publish(odom);
+}
+
+void ODriverNode::encoderTimerCallback()
+{
+  rclcpp::Time current_time = this->now();
+
+  if (lastReceivedTime_.nanoseconds() == 0) {
+    return;
+  }
+
+  if ((current_time - lastReceivedTime_) < rclcpp::Duration(1000ms)) {
+    return;
+  }
+
+  Pose & pose = diffDrive_.pose();
+
+  nav_msgs::msg::Odometry odom;
+
+  odom.header.stamp = current_time;
+  odom.header.frame_id = "odom";
+  odom.child_frame_id = "base_footprint";
+
+  double linear_covariance = 0.1;
+  double angle_covariance = 0.2;
+
+  odom.pose.pose.position.x = pose.x;
+  odom.pose.pose.position.y = pose.y;
+  tf2::Quaternion q;
+  q.setRPY(0, 0, pose.a);
+  q.normalize();
+  odom.pose.pose.orientation.x = q[0];
+  odom.pose.pose.orientation.y = q[1];
+  odom.pose.pose.orientation.z = q[2];
+  odom.pose.pose.orientation.w = q[3];
+  odom.pose.covariance[0] = linear_covariance;
+  odom.pose.covariance[7] = linear_covariance;
+  odom.pose.covariance[14] = linear_covariance;
+  odom.pose.covariance[21] = angle_covariance;
+  odom.pose.covariance[28] = angle_covariance;
+  odom.pose.covariance[35] = angle_covariance;
+
+  odom.twist.twist.linear.x = 0.0;
+  odom.twist.twist.angular.z = 0.0;
   odom.twist.covariance[0] = linear_covariance;
   odom.twist.covariance[7] = linear_covariance;
   odom.twist.covariance[14] = linear_covariance;

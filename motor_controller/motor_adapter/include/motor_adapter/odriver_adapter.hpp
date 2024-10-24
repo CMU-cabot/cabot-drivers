@@ -54,6 +54,7 @@ private:
   void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr input);
   void imuCallback(const sensor_msgs::msg::Imu::SharedPtr input);
   void pauseControlCallback(const std_msgs::msg::Bool::SharedPtr input);
+  void encoderTimerCallback();
 
   MotorAdapter::DiffDrive diffDrive_;
 
@@ -69,6 +70,8 @@ private:
   double targetSpdTurn_;
   double currentSpdLinear_;
   rclcpp::Time lastOdomTime_;
+  rclcpp::TimerBase::SharedPtr encoderTimer_;
+  rclcpp::Time lastReceivedTime_;
 
   int targetRate_;
   double maxAcc_;
