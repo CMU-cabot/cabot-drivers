@@ -85,7 +85,7 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
     encoderInput_, 10, std::bind(&ODriverNode::encoderCallback, this, _1));
 
   encoderTimer_ = this->create_wall_timer(
-    std::chrono::milliseconds(50),
+    std::chrono::milliseconds(25),
     std::bind(&ODriverNode::encoderTimerCallback, this));
 
   odomOutput_ = declare_parameter("odom_topic", odomOutput_);
@@ -236,7 +236,6 @@ void ODriverNode::encoderCallback(const odriver_msgs::msg::MotorStatus::SharedPt
     input->dist_left,
     input->dist_right,
     time);
-  Pose & pose = diffDrive_.pose();
 
   // update measured velocity
   measuredSpdLinear_ = (input->spd_right + input->spd_left) / 2.0;
@@ -244,46 +243,12 @@ void ODriverNode::encoderCallback(const odriver_msgs::msg::MotorStatus::SharedPt
 
   // ROS_INFO("input %d, %d, pose %f, %f", input->dist_left_c, input->dist_right_c, pose.x, pose.y);
 
-  nav_msgs::msg::Odometry odom;
 
   if (rclcpp::Time(input->header.stamp) - lastOdomTime_ < rclcpp::Duration(7ms)) {
     return;
   }
 
   lastOdomTime_ = input->header.stamp;
-  odom.header.stamp = input->header.stamp;
-  odom.header.frame_id = "odom";
-  odom.child_frame_id = "base_footprint";
-
-  double linear_covariance = 0.1;
-  double angle_covariance = 0.2;
-
-  odom.pose.pose.position.x = pose.x;
-  odom.pose.pose.position.y = pose.y;
-  tf2::Quaternion q;
-  q.setRPY(0, 0, pose.a);
-  q.normalize();
-  odom.pose.pose.orientation.x = q[0];
-  odom.pose.pose.orientation.y = q[1];
-  odom.pose.pose.orientation.z = q[2];
-  odom.pose.pose.orientation.w = q[3];
-  odom.pose.covariance[0] = linear_covariance;
-  odom.pose.covariance[7] = linear_covariance;
-  odom.pose.covariance[14] = linear_covariance;
-  odom.pose.covariance[21] = angle_covariance;
-  odom.pose.covariance[28] = angle_covariance;
-  odom.pose.covariance[35] = angle_covariance;
-
-  LRdouble & vel = diffDrive_.velocity();
-  odom.twist.twist.linear.x = vel.l;
-  odom.twist.twist.angular.z = vel.r;
-  odom.twist.covariance[0] = linear_covariance;
-  odom.twist.covariance[7] = linear_covariance;
-  odom.twist.covariance[14] = linear_covariance;
-  odom.twist.covariance[21] = angle_covariance;
-  odom.twist.covariance[28] = angle_covariance;
-  odom.twist.covariance[35] = angle_covariance;
-  odomPub->publish(odom);
 }
 
 void ODriverNode::encoderTimerCallback()
@@ -294,15 +259,21 @@ void ODriverNode::encoderTimerCallback()
     return;
   }
 
-  if ((current_time - lastReceivedTime_) < rclcpp::Duration(1000ms)) {
-    return;
-  }
-
   Pose & pose = diffDrive_.pose();
 
   nav_msgs::msg::Odometry odom;
 
-  odom.header.stamp = current_time;
+  if ((current_time - lastReceivedTime_) < rclcpp::Duration(1000ms)) {
+    odom.header.stamp = lastOdomTime_;
+    LRdouble & vel = diffDrive_.velocity();
+    odom.twist.twist.linear.x = vel.l;
+    odom.twist.twist.angular.z = vel.r;
+  } else {
+    odom.header.stamp = current_time;
+    odom.twist.twist.linear.x = 0.0;
+    odom.twist.twist.angular.z = 0.0;
+  }
+
   odom.header.frame_id = "odom";
   odom.child_frame_id = "base_footprint";
 
@@ -325,8 +296,6 @@ void ODriverNode::encoderTimerCallback()
   odom.pose.covariance[28] = angle_covariance;
   odom.pose.covariance[35] = angle_covariance;
 
-  odom.twist.twist.linear.x = 0.0;
-  odom.twist.twist.angular.z = 0.0;
   odom.twist.covariance[0] = linear_covariance;
   odom.twist.covariance[7] = linear_covariance;
   odom.twist.covariance[14] = linear_covariance;
