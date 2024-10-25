@@ -81,9 +81,11 @@ def generate_launch_description():
     vibrator_type = LaunchConfiguration('vibrator_type')
 
     # switch lidar node based on model_name
-    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
+    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1"]'])
     use_velodyne = NotSubstitution(use_hesai)
-    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
+    use_can = PythonExpression(['"', model_name, '" in ["cabot3-k1"]'])
+    use_serial = NotSubstitution(use_can)
+    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1"]'])
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -365,9 +367,44 @@ def generate_launch_description():
                     ('/cabot/imu_raw', '/cabot/imu_raw/data'),
                     ('/cabot/touch_speed', '/cabot/touch_speed_raw')
                 ],
-                condition=UnlessCondition(use_sim_time)
+                condition=IfCondition(AndSubstitution(use_serial, NotSubstitution(use_sim_time)))
             ),
-
+            Node(
+                package='cabot_can',
+                executable='can_all_node',
+                namespace='/cabot',
+                name='cabot_can',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {
+                        'use_sim_time': use_sim_time,
+                        'touch_params': touch_params,
+                        'imu_accel_bias': imu_accel_bias,
+                        'imu_gyro_bias': imu_gyro_bias
+                    }
+                ],
+                remappings=[
+                    ('/cabot/imu', '/cabot/imu/data'),
+                    ('/cabot/touch_speed', '/cabot/touch_speed_raw'),
+                    ('/cabot/bme/pressure', '/cabot/pressure')
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+            ),
+            Node(
+                package='power_controller',
+                executable='power_controller',
+                namespace='/cabot',
+                name='power_controller',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {
+                        'use_sim_time': use_sim_time,
+                    }
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+            ),
             # optional wifi scanner with ESP32
             Node(
                 package='cabot_serial',
@@ -414,7 +451,68 @@ def generate_launch_description():
                     ('/motorTarget', '/cabot/motorTarget'),
                     ('/motorStatus', '/cabot/motorStatus'),
                 ],
-                condition=UnlessCondition(use_sim_time),
+                condition=IfCondition(AndSubstitution(use_serial, NotSubstitution(use_sim_time)))
+            ),
+            Node(
+                package='odriver_can_adapter',
+                executable='odriver_can_adapter_node',
+                namespace='/cabot',
+                name='odriver_can_adapter_node',
+                output='screen',
+                parameters=[
+                    {
+                        'is_clockwise' : True,
+                    }
+                ],
+                remappings=[
+                    ('/control_message_left', '/cabot/control_message_left'),
+                    ('/control_message_right', '/cabot/control_message_right'),
+                    ('/controller_status_left', '/cabot/controller_status_left'),
+                    ('/controller_status_right', '/cabot/controller_status_right'),
+                    ('/motor_status', '/cabot/motorStatus'),
+                    ('/motor_target', '/cabot/motorTarget'),
+                    ('/request_axis_state_left', '/cabot/request_axis_state_left'),
+                    ('/request_axis_state_right', '/cabot/request_axis_state_right'),
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+            ),
+            Node(
+                package='odrive_can',
+                executable='odrive_can_node',
+                namespace='/cabot',
+                name='odrive_can_node_left',
+                output='screen',
+                parameters=[
+                    {
+                        'node_id' : 0,
+                        'interface' : 'can1',
+                    }
+                ],
+                remappings=[
+                    ('/cabot/control_message', '/cabot/control_message_left'),
+                    ('/cabot/controller_status', '/cabot/controller_status_left'),
+                    ('/cabot/request_axis_state', '/cabot/request_axis_state_left')
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+            ),
+            Node(
+                package='odrive_can',
+                executable='odrive_can_node',
+                namespace='/cabot',
+                name='odrive_can_node_right',
+                output='screen',
+                parameters=[
+                    {
+                        'node_id' : 1,
+                        'interface' : 'can1',
+                    }
+                ],
+                remappings=[
+                    ('/cabot/control_message', '/cabot/control_message_right'),
+                    ('/cabot/controller_status', '/cabot/controller_status_right'),
+                    ('/cabot/request_axis_state', '/cabot/request_axis_state_right'),
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
             ),
         ],
             condition=LaunchConfigurationNotEquals('model', '')
