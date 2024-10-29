@@ -39,6 +39,7 @@ public:
   double getCurrentSetpoint() { return current_setpoint_; };
   double getCurrentMeasured() { return current_measured_; };
   double getSign() { return sign_; };
+  bool isReady() { return ready_; };
 private:
   rclcpp::Node *node_;
 
@@ -53,6 +54,7 @@ private:
   double dist_c_;
   double current_setpoint_;
   double current_measured_;
+  bool ready_;
 
   double sign_;
 

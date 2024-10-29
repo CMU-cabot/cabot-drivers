@@ -259,7 +259,7 @@ def generate_launch_description():
                         name='pointcloud_to_laserscan_node',
                         parameters=[*param_files, {'use_sim_time': use_sim_time}],
                         remappings=[
-                            ('/cloud_in', '/velodyne_points')
+                            ('/cloud_in', '/velodyne_points_cropped')
                         ]
                     ),
                     ComposableNode(
