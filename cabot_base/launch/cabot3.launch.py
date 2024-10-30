@@ -31,6 +31,9 @@ change from ROS1: each model had own launch file in ROS1, but ROS2 launch will h
   - cabot3-i1    (AIS-2024, Consortium)
   - cabot3-m1    (AIS-2024, Miraikan)
   - cabot3-m2    (AIS-2024, Miraikan)
+  - cabot3-k1
+  - cabot3-k2
+  - cabot3-k3
 """
 from launch.logging import launch_config
 
@@ -82,6 +85,7 @@ def generate_launch_description():
     vibrator_type = LaunchConfiguration('vibrator_type')
 
     # switch lidar node based on model_name
+    use_velodyne = PythonExpression(['"', model_name, '" in ["cabot3-s1"]'])
     use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1"]'])
     use_lslidar = PythonExpression(['"', model_name, '" in ["cabot3-k2"]'])
     use_rslidar = PythonExpression(['"', model_name, '" in ["cabot3-k3"]'])
