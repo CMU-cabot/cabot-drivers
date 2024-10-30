@@ -235,7 +235,7 @@ void Handle::vib_waiting_timer_callback()
     if (is_waiting_cnt_ < 2) {  // 1.0sec(vib_waiting_timer_) * 2 = 2.0sec
       is_waiting_cnt_++;
     } else {
-      setServoFree(true);
+      // setServoFree(true);
       vibrateWaitingPattern();
     }
   } else {
@@ -472,7 +472,7 @@ void Handle::navigationStart()
   is_navigating_ = true;
   wma_data_buffer_.clear();
   resetServoPosition();
-  setServoFree(false);
+  // setServoFree(false);
 }
 
 void Handle::resetServoPosition()
@@ -482,7 +482,7 @@ void Handle::resetServoPosition()
   di.target_turn_angle = 0.0f;
   di.target_pos_global = 0.0f;
   changeServoPos(0);
-  setServoFree(true);
+  // setServoFree(true);
 }
 
 void Handle::vibrateLeftTurn()

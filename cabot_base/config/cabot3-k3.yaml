@@ -1,0 +1,55 @@
+# config file for cabot3-k3
+
+pointcloud_to_laserscan_node:
+  ros__parameters:
+    angle_min: -2.57  # -M_PI/2 (front) - 1.0 (angle clipping)
+    angle_max: 1.05 # M_PI/2 (rear) - M_PI/6 (rear cover)
+
+# substitute these parameters to hesai/hesai_lidar.yaml
+hesai_lidar:
+  ros__parameters:
+    lidar_type: "PandarXT-32"
+    frame_id: "velodyne" # use velodyne for compatibility
+    timestamp_type: "realtime"
+    lidar_correction_file: "$(find-pkg-share hesai_lidar)/config/PandarXT-32.csv"
+
+cabot:
+  cabot_handle_v2_node:
+    ros__parameters:
+      no_vibration: false
+      buttons:
+        - BUTTON_UP
+        - BUTTON_DOWN
+        - BUTTON_LEFT
+        - BUTTON_RIGHT
+
+  cabot_handle_v3_node:
+    ros__parameters:
+      buttons:
+        - BUTTON_UP
+        - BUTTON_DOWN
+        - BUTTON_LEFT
+        - BUTTON_RIGHT
+
+  cabot_serial:
+    ros__parameters:
+      port: /dev/ttyESP32
+
+  odriver_adapter_node:
+    ros__parameters:
+      bias: 0.14 # same with cabot3-i1
+      gain_omega: 0.0
+      max_acc: 0.6
+
+  odriver_s1_node:
+    ros__parameters:
+      wheel_diameter: 0.171 #BotWheel
+      count_per_round: 3200 #BotWheel
+      left_is_1: false
+      is_clockwise: true
+      gain_left: 1.0
+      gain_right: 1.0
+      vel_gain: 10.0
+      vel_integrator_gain: 40.0
+      motor_bandwidth: 100
+      encoder_bandwidth: 100

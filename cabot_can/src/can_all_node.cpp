@@ -98,8 +98,8 @@ public:
     servo_target_sub_ = this->create_subscription<std_msgs::msg::Int16>("servo_target", 10, std::bind(&CanAllNode::subscribeServoTargetData, this, std::placeholders::_1));
     servo_free_sub_ = this->create_subscription<std_msgs::msg::Bool>("servo_free",10,std::bind(&CanAllNode::subServoFree, this, std::placeholders::_1));
     imu_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>("run_imu_calibration",std::bind(&CanAllNode::readImuServiceCalibration, this, std::placeholders::_1, std::placeholders::_2));
-    imu_accel_bias_ = declare_parameter("imu_accel_bias", std::vector<double>(3, 0.0)); // parameters for adjusting linear acceleration. default value = [0,0, 0.0, 0.0]
-    imu_gyro_bias_ = declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0)); // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
+    imu_accel_bias_ = this->declare_parameter("imu_accel_bias", std::vector<double>(3, 0.0)); // parameters for adjusting linear acceleration. default value = [0,0, 0.0, 0.0]
+    imu_gyro_bias_ = this->declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0)); // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
     can_socket_ = openCanSocket();
     writeImuCalibration();
     pub_timer_ = this->create_wall_timer(
@@ -210,44 +210,45 @@ private:
 
   void readImuCalibration(const struct can_frame &frame) {
     static std::vector<int32_t> calibration_data(22);
-    static int count = 0;
-    if (count == 0) {
-      std::fill(calibration_data.begin(), calibration_data.end(), 0);
-    }
+    static bool imu_calibration_data_1 = false;
+    static bool imu_calibration_data_2 = false;
+    static bool imu_calibration_data_3 = false;
     if (frame.can_id == CanId::READ_IMU_CALIBRATION_ID_1) {
       if (frame.can_dlc >= 8) {
         for (int i = 0; i < 8; i++) {
-          calibration_data[i] = static_cast<int32_t>(frame.data[i]);
+          calibration_data[i] = static_cast<int32_t>(std::round(frame.data[i]));
         }
-        count++;
+        imu_calibration_data_1 = true;
       }
     } else if (frame.can_id == CanId::READ_IMU_CALIBRATION_ID_2) {
       if (frame.can_dlc >= 8) {
         for (int i = 0; i < 8; i++) {
-          calibration_data[i + 8] = static_cast<int32_t>(frame.data[i]);
+          calibration_data[i + 8] = static_cast<int32_t>(std::round(frame.data[i]));
         }
-        count++;
+        imu_calibration_data_2 = true;
       }
     } else if (frame.can_id == CanId::READ_IMU_CALIBRATION_ID_3) {
       if (frame.can_dlc >= 6) {
         for (int i = 0; i < 6; i++) {
-          calibration_data[i + 16] = static_cast<int32_t>(frame.data[i]);
+          calibration_data[i + 16] = static_cast<int32_t>(std::round(frame.data[i]));
         }
-        count++;
+        imu_calibration_data_3 = true;
       }
     }
-    if (count == 3) {
+    if (imu_calibration_data_1 && imu_calibration_data_2 && imu_calibration_data_3) {
       std_msgs::msg::Int32MultiArray calibration_msg;
       calibration_msg.data = calibration_data;
       calibration_pub_->publish(calibration_msg);
-      count = 0;
+      imu_calibration_data_1 = false;
+      imu_calibration_data_2 = false;
+      imu_calibration_data_3 = false;
     }
-    count = 0;
   }
 
+
   void publishImuData(const struct can_frame &frame) {
-    static bool linear_data_received = false;
-    static bool angular_data_received = false;
+    static bool linear_data = false;
+    static bool angular_data = false;
     if (frame.can_id == CanId::IMU_LINEAR_CAN_ID) {
       if (frame.can_dlc >= 6) {
         int16_t linear_x = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
@@ -259,14 +260,14 @@ private:
         imu_msg.linear_acceleration.x -= this->imu_accel_bias_.at(0);
         imu_msg.linear_acceleration.y -= this->imu_accel_bias_.at(1);
         imu_msg.linear_acceleration.z -= this->imu_accel_bias_.at(2);
-        linear_data_received = true;
-        angular_data_received = false;
+        linear_data = true;
+        angular_data = false;
       }
     }
     if (frame.can_id == CanId::IMU_ANGULAR_CAN_ID) {
-      if (angular_data_received) {
-        linear_data_received = false;
-        angular_data_received = false;
+      if (angular_data) {
+        linear_data = false;
+        angular_data = false;
       } else if (frame.can_dlc >= 6) {
         int16_t angular_x = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
         int16_t angular_y = (((uint16_t)frame.data[3]) << 8) | ((uint16_t)frame.data[2]);
@@ -277,8 +278,7 @@ private:
         imu_msg.angular_velocity.x -= this->imu_gyro_bias_.at(0);
         imu_msg.angular_velocity.y -= this->imu_gyro_bias_.at(1);
         imu_msg.angular_velocity.z -= this->imu_gyro_bias_.at(2);
-
-        angular_data_received = true;
+        angular_data = true;
       }
     }
     if (frame.can_id == CanId::IMU_ORIENTATION_CAN_ID) {
@@ -291,13 +291,13 @@ private:
         imu_msg.orientation.y = orientation_y * (1.0 / (1 << 14));
         imu_msg.orientation.z = orientation_z * (1.0 / (1 << 14));
         imu_msg.orientation.w = orientation_w * (1.0 / (1 << 14));
-        if (linear_data_received && angular_data_received) {
+        if (linear_data && angular_data) {
           imu_msg.header.stamp = this->get_clock()->now();
           imu_msg.header.frame_id = "imu_frame";
           imu_pub_->publish(imu_msg);
         }
-        linear_data_received = false;
-        angular_data_received = false;
+        linear_data = false;
+        angular_data = false;
       }
     }
   }
@@ -307,18 +307,27 @@ private:
     static std::string ssid;
     static int8_t channel = 0;
     static int8_t rssi = 0;
-    static int8_t frame_count = 0;
+    static bool ssid_data = false;
+    static bool mac_data = false;
+    static bool channel_data = false;
+    static bool rssi_data = false;
+
     if (frame.can_id == CanId::WIFI_CAN_ID_START) {
       ssid.clear();
-      frame_count = 0;
+      ssid_data = false;
+      mac_data = false;
+      channel_data = false;
+      rssi_data = false;
     }
     if (frame.can_id == CanId::WIFI_CAN_ID_END) {
       for (int i = 0; i < 6; ++i) {
         mac_address[i] = frame.data[i];
       }
+      mac_data = true;
       channel = frame.data[6];
+      channel_data = true;
       rssi = frame.data[7];
-      frame_count++;
+      rssi_data = true;
     }
     else if (frame.can_id >= CanId::WIFI_CAN_ID_START && frame.can_id <= CanId::WIFI_SSID_CAN_ID_END) {
       for (int i = 0; i < frame.can_dlc; ++i) {
@@ -326,9 +335,9 @@ private:
           ssid += static_cast<char>(frame.data[i]);
         }
       }
-      frame_count++;
+      ssid_data = true;
     }
-    if (frame_count >= 5 && !ssid.empty() && mac_address[0] != 0 && channel != 0 && rssi != 0) {
+    if (ssid_data && mac_data && channel_data && rssi_data && !ssid.empty()) {
       std::string mac_str;
       for (size_t i = 0; i < mac_address.size(); ++i) {
         if (i != 0) {
@@ -352,7 +361,10 @@ private:
       ssid.clear();
       channel = 0;
       rssi = 0;
-      frame_count = 0;
+      ssid_data = false;
+      mac_data = false;
+      channel_data = false;
+      rssi_data = false;
     }
   }
 
