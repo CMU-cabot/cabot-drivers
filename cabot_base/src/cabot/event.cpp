@@ -145,8 +145,8 @@ BaseEvent * ClickEvent::_parse(const std::string & text, const std::string &)
 
 const char * ClickEvent::TYPE = "click";
 
-HoldDownEvent::HoldDownEvent(int holddown)
-: BaseEvent("holddown"), _holddown(holddown) {}
+HoldDownEvent::HoldDownEvent(int holddown, int duration)
+: BaseEvent("holddown"), _holddown(holddown), _duration(duration) {}
 bool HoldDownEvent::operator==(const HoldDownEvent & other) const
 {
   return getType() == other.getType() && _holddown == other._holddown;
@@ -157,7 +157,7 @@ int HoldDownEvent::get_holddown() const
 }
 std::string HoldDownEvent::toString() const
 {
-  return getType() + "_" + std::to_string(_holddown);
+  return getType() + "_" + std::to_string(_holddown) + "_" + std::to_string(_duration);
 }
 
 const char * HoldDownEvent::TYPE = "holddown";
@@ -168,7 +168,8 @@ BaseEvent * HoldDownEvent::_parse(const std::string & text, const std::string &)
     std::vector<std::string> items;
     boost::split(items, text, boost::is_any_of("_"));
     int holddown = std::stoi(items[1]);
-    return new HoldDownEvent(holddown);
+    int duration = std::stoi(items[2]);
+    return new HoldDownEvent(holddown, duration);
   }
   return nullptr;
 }

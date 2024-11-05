@@ -90,7 +90,7 @@ class HoldDownEvent : public BaseEvent
 {
 public:
   static const char * TYPE;
-  explicit HoldDownEvent(int holddown = 0);
+  HoldDownEvent(int holddown = 0, int duration = 0);
   bool operator==(const HoldDownEvent & other) const;
   int get_holddown() const;
   std::string toString() const override;
@@ -99,6 +99,7 @@ public:
 
 private:
   int _holddown;
+  int _duration;
 };
 
 class JoyClickEvent : public ClickEvent

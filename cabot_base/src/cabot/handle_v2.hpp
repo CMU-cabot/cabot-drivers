@@ -87,6 +87,7 @@ private:
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr event_sub_;
   rclcpp::Time last_up[9];
   rclcpp::Time last_dwn[9];
+  rclcpp::Time last_holddwn[9];
   int up_count[9];
   bool btn_dwn[9];
   int power_;
@@ -110,6 +111,8 @@ private:
   int button[10];
   static const rclcpp::Duration double_click_interval_;
   static const rclcpp::Duration ignore_interval_;
+  static const rclcpp::Duration holddown_min_interval_;
+  static const rclcpp::Duration holddown_max_interval_;
   static const rclcpp::Duration holddown_interval_;
   std::string get_name(int);
   std::vector<Vibration> vibration_queue_;

@@ -34,9 +34,11 @@ using namespace std::chrono_literals;
 const char * Handle::stimuli_names[] =
 {"unknown", "left_turn", "right_turn", "left_dev", "right_dev", "front",
   "left_about_turn", "right_about_turn", "button_click", "button_holddown"};
-const rclcpp::Duration Handle::double_click_interval_ = rclcpp::Duration(0, 250000000);
-const rclcpp::Duration Handle::ignore_interval_ = rclcpp::Duration(0, 50000000);
-const rclcpp::Duration Handle::holddown_interval_ = rclcpp::Duration(3, 0);
+const rclcpp::Duration Handle::double_click_interval_ = rclcpp::Duration(0, 250000000);  // 250 msec
+const rclcpp::Duration Handle::ignore_interval_ = rclcpp::Duration(0, 50000000);  // 50 msec
+const rclcpp::Duration Handle::holddown_min_interval_ = rclcpp::Duration(1, 0);
+const rclcpp::Duration Handle::holddown_max_interval_ = rclcpp::Duration(5, 100000000);  // 5.1 sec (margin=0.1sec)
+const rclcpp::Duration Handle::holddown_interval_ = rclcpp::Duration(1, 0);
 
 std::string Handle::get_name(int stimulus)
 {
@@ -56,8 +58,10 @@ Handle::Handle(
   vibrator3_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("vibrator3", 100);
   vibrator4_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("vibrator4", 100);
   for (int i = 0; i < 9; ++i) {
-    last_up[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
-    last_dwn[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
+    rclcpp::Time zerotime(0, 0, RCL_ROS_TIME);
+    last_up[i] = zerotime;
+    last_dwn[i] = zerotime;
+    last_holddwn[i] = zerotime;
     up_count[i] = 0;
     btn_dwn[i] = false;
   }
@@ -160,14 +164,14 @@ void Handle::buttonCheck(std_msgs::msg::Int8::UniquePtr & msg, int index)
   if (btn_push && !btn_dwn[index] &&
     !(last_up[index] != zerotime && now - last_up[index] < ignore_interval_))
   {
-    event.insert(std::pair("button", std::to_string(button_keys(index))));
-    event.insert(std::pair("up", "False"));
+    event.insert(std::pair<std::string, std::string>("button", std::to_string(button_keys(index))));
+    event.insert(std::pair<std::string, std::string>("up", "False"));
     btn_dwn[index] = true;
     last_dwn[index] = now;
   }
   if (!btn_push && btn_dwn[index]) {
-    event.insert(std::pair("button", std::to_string(button_keys(index))));
-    event.insert(std::pair("up", "True"));
+    event.insert(std::pair<std::string, std::string>("button", std::to_string(button_keys(index))));
+    event.insert(std::pair<std::string, std::string>("up", "True"));
     up_count[index]++;
     last_up[index] = now;
     btn_dwn[index] = false;
@@ -176,19 +180,24 @@ void Handle::buttonCheck(std_msgs::msg::Int8::UniquePtr & msg, int index)
     !btn_dwn[index] &&
     now - last_up[index] > double_click_interval_)
   {
-    if (last_dwn[index] != zerotime) {
-      event.insert(std::pair("buttons", std::to_string(button_keys(index))));
-      event.insert(std::pair("count", std::to_string(up_count[index])));
+    if (last_holddwn[index] == zerotime) {
+      event.insert(std::pair<std::string, std::string>("buttons", std::to_string(button_keys(index))));
+      event.insert(std::pair<std::string, std::string>("count", std::to_string(up_count[index])));
     }
     last_up[index] = zerotime;
+    last_holddwn[index] = zerotime;
     up_count[index] = 0;
   }
   if (btn_push && btn_dwn[index] &&
     last_dwn[index] != zerotime &&
-    now - last_dwn[index] > holddown_interval_)
+    (now - last_dwn[index] > holddown_min_interval_ &&
+     now - last_holddwn[index] > holddown_interval_ &&
+     now - last_dwn[index] < holddown_max_interval_))
   {
-    event.insert(std::pair("holddown", std::to_string(button_keys(index))));
-    last_dwn[index] = zerotime;
+    event.insert(std::pair<std::string, std::string>("holddown", std::to_string(button_keys(index))));
+    int duration = (int)(now - last_dwn[index]).seconds();
+    event.insert(std::pair<std::string, std::string>("duration", std::to_string(duration)));
+    last_holddwn[index] = now;
   }
   if (!event.empty()) {
     eventListener_(event);
