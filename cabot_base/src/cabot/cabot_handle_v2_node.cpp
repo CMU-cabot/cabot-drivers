@@ -106,12 +106,13 @@ void CaBotHandleV2Node::eventListener(const std::map<std::string, std::string> &
     std::shared_ptr<ButtonEvent> buttonEvent = std::make_shared<ButtonEvent>(button, up, hold);
     event = buttonEvent;
     // button down confirmation
-    if (buttonEvent && !buttonEvent->is_up()) {
+    if (buttonEvent && buttonEvent->is_up()) {
       this->handle_->executeStimulus(8);
     }
   } else if (msg_str.find("holddown") != std::string::npos) {
     const int & hold = std::stoi(msg.at("holddown"));
-    std::shared_ptr<HoldDownEvent> holdDownEvent = std::make_shared<HoldDownEvent>(hold);
+    const int & duration = std::stoi(msg.at("duration"));
+    std::shared_ptr<HoldDownEvent> holdDownEvent = std::make_shared<HoldDownEvent>(hold, duration);
     event = holdDownEvent;
     // button hold down confirmation
     if (holdDownEvent) {
