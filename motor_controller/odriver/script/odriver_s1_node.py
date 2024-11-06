@@ -59,7 +59,7 @@ from packaging import version
 from diagnostic_updater import Updater, DiagnosticTask
 from diagnostic_msgs.msg import DiagnosticStatus
 
-from std_srvs.srv import SetBool
+from std_srvs.srv import SetBool, Trigger
 
 # for update params
 from rcl_interfaces.msg import SetParametersResult
@@ -144,12 +144,23 @@ def find_controller(odrv_index, odrv_serial_number, clear=False, reset_watchdog_
         odrvs[odrv_index] = None
 
     odrv_is_not_found[odrv_index] = True
+    timeout_count = 0
     while odrvs[odrv_index] is None and rclpy.ok:
         try:
             logger.info("Finding Odrive controller... (Serial Number: " + str(odrv_serial_number)+")")
             logging.basicConfig(level=logging.DEBUG)
             odrvs[odrv_index] = odrive.find_any(timeout=5, serial_number=odrv_serial_number)
-        except:
+        except TimeoutError:
+            if timeout_count < 5:
+                timeout_count += 1
+                logger.error(traceback.format_exc())
+                logger.error("Check Odrive connection: " + str(odrv_serial_number)+ " (Serial Number) doesn't exist! ")
+                time.sleep(1)
+                continue
+            else:
+                logger.error("timeout count is over 5.")
+                _reload_xhci()
+        except Exception:
             logger.error(traceback.format_exc())
             logger.error("Check Odrive connection: " + str(odrv_serial_number)+ " (Serial Number) doesn't exist! ")
             time.sleep(1)
@@ -332,6 +343,15 @@ def _error_recovery(relaunch = True):
         clear_errors(odrvs[1])
         if (_odrv_has_error(odrvs[0]) and relaunch) or (_odrv_has_error(odrvs[1]) and relaunch) :
             _relaunch_odrive()
+
+def _reload_xhci():
+    logger.info('re-loading xhci_pci..')
+    cli = node.create_client(Trigger, '/reload_xhci_pci')
+    while not cli.wait_for_service(timeout_sec=1.0):
+        logger.info('waiting for xhci_pci service')
+    req = Trigger.Request()
+    logger.info('call xhci_pci service')
+    cli.call(req)
 
 # Refer to https://roboticsbackend.com/ros2-rclpy-parameter-callback/
 def parameters_callback(params):
