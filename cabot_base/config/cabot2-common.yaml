@@ -47,7 +47,6 @@ cabot:
       baud: 115200
       calibration_params: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
       touch_params: [128,48,24] # NEED_TO_BE_CONFIGURED
-      touch_speed_max_inactive: 0.5
 
   serial_esp32_wifi_scanner:
     ros__parameters:

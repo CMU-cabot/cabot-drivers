@@ -67,6 +67,7 @@ public:
   int write(std::vector<uint8_t>, size_t length);
   int available();
   void reset();
+  void close();
 
 private:
   int fd_;
@@ -120,6 +121,7 @@ private:
   int read_count_;
   bool time_synced_;
   int no_input_count_;
+  int timeout_count_;
   bool process_write_once();
   bool try_read(int length, std::vector<uint8_t> & result);
   bool process_read_once();

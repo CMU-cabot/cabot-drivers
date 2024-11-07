@@ -36,9 +36,8 @@ Serial::Serial(std::string name, int baud, int read_timeout, int write_timeout)
 timespec timespec_from_ms(const uint32_t mills)
 {
   timespec time;
-  clock_gettime(CLOCK_REALTIME, &time);
-  time.tv_sec += mills / 1000;
-  time.tv_nsec += (mills % 1000) * 1000000;
+  time.tv_sec = mills / 1000;
+  time.tv_nsec = (mills % 1000) * 1000000;
   time.tv_sec += time.tv_nsec / 1000000000;
   time.tv_nsec %= 1000000000;
   return time;
@@ -133,8 +132,11 @@ int Serial::read(uint8_t * buf, int size)
   if (!is_open_) {
     throw std::runtime_error("Serial::read");
   }
-  waitReadable(1);
-  return ::read(fd_, buf, size);
+  if (waitReadable(2000)) {
+    return ::read(fd_, buf, size);
+  } else {
+    return -1;
+  }
 }
 
 int Serial::write(std::vector<uint8_t> data, size_t length)
@@ -192,11 +194,17 @@ void Serial::reset()
   }
 }
 
+void Serial::close()
+{
+  is_open_ = false;
+  ::close(fd_);
+}
+
 CaBotArduinoSerial::CaBotArduinoSerial(
   std::shared_ptr<Serial> port, int baud,
   std::chrono::milliseconds timeout)
 : is_alive_(true), port_(port), baud_(baud),
-  timeout_(timeout), read_count_(0), time_synced_(false), no_input_count_(0) {}
+  timeout_(timeout), read_count_(0), time_synced_(false), no_input_count_(0), timeout_count_(0) {}
 
 void CaBotArduinoSerial::start()
 {
@@ -215,6 +223,7 @@ void CaBotArduinoSerial::reset_serial()
 
 void CaBotArduinoSerial::stop()
 {
+  port_->close();
   is_alive_ = false;
   delegate_->stopped();
 }
@@ -303,11 +312,15 @@ bool CaBotArduinoSerial::try_read(int length, std::vector<uint8_t> & result)
       std::chrono::system_clock::now();
     while (bytes_remaining != 0 && (std::chrono::system_clock::now() - read_start) < timeout_) {
       received = port_->read(buf, bytes_remaining);
-      if (received != 0) {
+      if (received > 0) {
         for (int i = 0; i < received; i++) {
           result.push_back(buf[i]);
         }
         bytes_remaining -= received;
+        timeout_count_ = 0;
+      } else if (received < 0) {
+        timeout_count_++;
+        delegate_->log(rclcpp::Logger::Level::Debug, string_format("read timeout %d", timeout_count_));
       }
     }
     if (bytes_remaining != 0) {
