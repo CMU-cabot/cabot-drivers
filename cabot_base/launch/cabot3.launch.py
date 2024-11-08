@@ -89,7 +89,7 @@ def generate_launch_description():
     use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1"]'])
     use_lslidar = PythonExpression(['"', model_name, '" in ["cabot3-k2"]'])
     use_rslidar = PythonExpression(['"', model_name, '" in ["cabot3-k3"]'])
-    use_velodyne = NotSubstitution(OrSubstitution([use_hesai, use_lslidar, use_rslidar]))
+    use_velodyne = NotSubstitution(OrSubstitution(use_hesai, OrSubstitution(use_lslidar, use_rslidar)))
     use_can = PythonExpression(['"', model_name, '" in ["cabot3-k1", "cabot3-k2", "cabot3-k3"]'])
     use_serial = NotSubstitution(use_can)
     use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1", "cabot3-k2", "cabot3-k3"]'])
