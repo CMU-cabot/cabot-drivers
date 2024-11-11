@@ -100,6 +100,10 @@ public:
 		imu_gyro_bias_ = this->declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0)); // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
 		can_socket_ = openCanSocket();
 		writeImuCalibration();
+		// initialize diagonal elements of imu_msg.orientation_covariance
+		imu_msg.orientation_covariance[0] = 0.1;
+		imu_msg.orientation_covariance[4] = 0.1;
+		imu_msg.orientation_covariance[8] = 0.1;
 		pub_timer_ = this->create_wall_timer(
 			std::chrono::microseconds(100),
 			std::bind(&CanAllNode::timerPubCallback, this));
