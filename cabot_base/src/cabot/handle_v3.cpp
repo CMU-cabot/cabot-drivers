@@ -455,7 +455,9 @@ void Handle::angularDistanceCallback(std_msgs::msg::Float64::UniquePtr & msg)
     double angular_data = msg->data;
     float di_target = static_cast<float>(angular_data) * 180 / M_PI;
     RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "di control: %f", di_target);
-    changeServoPos(static_cast<int16_t>(di_target));
+    if (!di.is_controlled_by_imu) {
+      changeServoPos(static_cast<int16_t>(di_target));
+    }
   }
 }
 
