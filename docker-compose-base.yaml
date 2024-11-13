@@ -39,6 +39,8 @@ services:
       - CYCLONEDDS_URI
       - CYCLONEDDS_NETWORK_INTERFACE_NAME
       - CYCLONEDDS_NETWORK_INTERFACE_AUTODETERMINE # set automatically by launch.sh
+      - ODRIVE_MODEL
+      - ODRIVE_FIRMWARE_VERSION
     volumes:
 # device, bluetooth
       - /dev:/dev

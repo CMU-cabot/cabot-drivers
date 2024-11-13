@@ -41,7 +41,8 @@ RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-realsense2-description \
     ros-${ROS_DISTRO}-pointcloud-to-laserscan \
     # patch build errors for odrive_ros2_control
-    ros-humble-hardware-interface
+    ros-humble-hardware-interface \
+    nlohmann-json3-dev
 
 RUN pip3 install --no-cache-dir \
     odrive==0.6.5 \
