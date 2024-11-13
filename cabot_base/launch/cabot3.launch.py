@@ -546,6 +546,7 @@ def generate_launch_description():
                     {
                         'node_id' : 0,
                         'interface' : 'can1',
+                        'axis_idle_on_shutdown' : True,
                         'json_file_path': flat_endpoints_json_path,
                     }
                 ],
@@ -566,6 +567,7 @@ def generate_launch_description():
                     {
                         'node_id' : 1,
                         'interface' : 'can1',
+                        'axis_idle_on_shutdown' : True,
                         'json_file_path': flat_endpoints_json_path,
                     }
                 ],
