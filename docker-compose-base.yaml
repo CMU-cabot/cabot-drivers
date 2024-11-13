@@ -53,6 +53,8 @@ services:
       - ./cabot-common/cabot_msgs:/home/developer/driver_ws/src/cabot_msgs
       - ./cabot-common/docker/humble-custom/people:/home/developer/driver_ws/src/people
       - ./cabot-description/cabot_description:/home/developer/driver_ws/src/cabot_description
+      - ./docker/driver/ros_odrive/odrive_base:/home/developer/driver_ws/src/ros_odrive/odrive_base
+      - ./docker/driver/ros_odrive/odrive_node:/home/developer/driver_ws/src/ros_odrive/odrive_node
 # code
       - ./cabot_base:/home/developer/driver_ws/src/cabot_base
       - ./cabot_serial:/home/developer/driver_ws/src/cabot_serial

@@ -75,17 +75,3 @@ USER $USERNAME
 ENV HOME /home/$USERNAME
 
 WORKDIR $HOME/driver_ws
-
-USER root
-ENV UNDERLAY_WS=/opt/underlay_ws
-RUN mkdir -p $UNDERLAY_WS/src && \
-    cd $UNDERLAY_WS/src && \
-    git clone https://github.com/odriverobotics/ros_odrive.git && \
-    cd ros_odrive && \
-    git checkout 0fa84d3745a8c385076d29b7f54971e9f2d14de7 && \
-    cd $UNDERLAY_WS && \
-    /bin/bash -c "source /opt/custom_ws/install/setup.bash; colcon build --packages-select odrive_can"
-
-RUN sed 's/custom_ws/underlay_ws/g' /ros_entrypoint.sh -i
-
-USER $USERNAME
