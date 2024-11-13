@@ -35,8 +35,8 @@ ODriveManager::ODriveManager(rclcpp::Node *node, const std::string &axis_name,
   : node_(node),
     is_ready_axis_state_service_(true),
     axis_name_(axis_name),
-    sign_(sign),
     ready_(false),
+    sign_(sign),
     wheel_diameter_m_(wheel_diameter_m)
 {
   using std::placeholders::_1;
