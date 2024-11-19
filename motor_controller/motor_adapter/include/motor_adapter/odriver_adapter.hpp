@@ -72,6 +72,7 @@ private:
 
   int targetRate_;
   double maxAcc_;
+  double maxDec_;
 
   double bias_;
   double wheel_diameter_;

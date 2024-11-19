@@ -57,6 +57,7 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
 
   targetRate_(40),
   maxAcc_(0.5),
+  maxDec_(-0.5),
 
   bias_(0),
   wheel_diameter_(0),
@@ -97,6 +98,7 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   imuSub = create_subscription<sensor_msgs::msg::Imu>("/imu", rclcpp::SensorDataQoS(), std::bind(&ODriverNode::imuCallback, this, _1));
 
   maxAcc_ = declare_parameter("max_acc", maxAcc_);
+  maxDec_ = declare_parameter("max_dec", maxDec_);
   targetRate_ = declare_parameter("target_rate", targetRate_);
   motorOutput_ = declare_parameter("motor_topic", motorOutput_);
 
@@ -127,7 +129,8 @@ void ODriverNode::cmdVelLoop(int publishRate)
 
   motorPub = create_publisher<odriver_msgs::msg::MotorTarget>(motorOutput_, 10);
 
-  double minimumStep = maxAcc_ / publishRate;
+  double maxAccStep = maxAcc_ / publishRate;
+  double maxDecStep = maxDec_ / publishRate;
 
   while (rclcpp::ok()) {
     odriver_msgs::msg::MotorTarget target;
@@ -135,15 +138,26 @@ void ODriverNode::cmdVelLoop(int publishRate)
     double targetL = targetSpdLinear_;
     double targetT = targetSpdTurn_;
 
-    // change linear speed by maximum acc rate
-    double lDiff = targetL - currentSpdLinear_;
-    if (fabs(lDiff) < minimumStep) {
-      currentSpdLinear_ = targetL;
+    if (targetL == 0.0) {
+      // change linear speed by maximum dec rate, if the control is zero (maybe not specified)
+      double lDiff = targetL - currentSpdLinear_;
+      if (fabs(lDiff) < fabs(maxDecStep)) {
+        currentSpdLinear_ = targetL;
+      } else {
+        currentSpdLinear_ -= maxDecStep * lDiff / fabs(lDiff);
+      }
     } else {
-      currentSpdLinear_ += minimumStep * lDiff / fabs(lDiff);
+      // change linear speed by maximum acc rate
+      double lDiff = targetL - currentSpdLinear_;
+      if (fabs(lDiff) < maxAccStep) {
+        currentSpdLinear_ = targetL;
+      } else {
+        currentSpdLinear_ += maxAccStep * lDiff / fabs(lDiff);
+      }
     }
 
     // adjust angular speed
+    target.header.stamp = get_clock()->now();
     target.spd_left = currentSpdLinear_ - targetT;
     target.spd_right = currentSpdLinear_ + targetT;
 
@@ -189,10 +203,10 @@ void ODriverNode::cmdVelLoop(int publishRate)
     } else {
       // reduce current speed to zero at maximum acc rate when feedback is disabled
       double lDiff = 0.0 - currentSpdLinear_;
-      if (fabs(lDiff) < minimumStep) {
+      if (fabs(lDiff) < fabs(maxDecStep)) {
         currentSpdLinear_ = 0.0;
       } else {
-        currentSpdLinear_ += minimumStep * lDiff / fabs(lDiff);
+        currentSpdLinear_ -= maxDecStep * lDiff / fabs(lDiff);
       }
 
       // reset integrator when feedback is disabled
