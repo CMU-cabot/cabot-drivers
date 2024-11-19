@@ -1,4 +1,4 @@
-# Copyright (c) 2024  Miraikan and Carnegie Mellon University
+# Copyright (c) Miraikan - The National Museum of Emerging Science and Innovation
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
