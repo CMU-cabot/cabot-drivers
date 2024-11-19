@@ -18,7 +18,7 @@
   SOFTWARE.
  -->
 <package format="3">
-  <name>power_controller</name>
+  <name>power_controller_kx</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="developer@todo.todo">developer</maintainer>
