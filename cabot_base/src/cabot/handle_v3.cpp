@@ -1,25 +1,22 @@
-/*******************************************************************************
- * Copyright (c) 2023  Miraikan and Carnegie Mellon University
- * Copyright (c) 2024  ALPS ALPINE CO., LTD.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *******************************************************************************/
+// Copyright (c) 2023, 2024  Miraikan, Carnegie Mellon University, and ALPS ALPINE CO., LTD.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 #include <vector>
 #include <string>
@@ -34,7 +31,7 @@
 
 using namespace std::chrono_literals;
 static DirectionalIndicator di;
-const std::vector<std::string> Handle::stimuli_names = 
+const std::vector<std::string> Handle::stimuli_names =
 {"unknown", "left_turn", "right_turn", "left_dev", "right_dev", "front",
   "left_about_turn", "right_about_turn", "button_click", "button_holddown",
   "caution", "navigation;event;navigation_start", "navigation_arrived"};
@@ -186,7 +183,7 @@ float Handle::getWeightedMovingAverage(const std::vector<float> & data)
   float sum_weighted_value = 0.0f;
   float sum_weight = 0.0f;
   float median = getMedian(data);
-  for (float value: data) {
+  for (float value : data) {
     float weight = exp(wma_filter_coef_ * std::abs(value - median));
     sum_weighted_value += value * weight;
     sum_weight += weight;
@@ -335,9 +332,9 @@ void Handle::cmdVelCallback(geometry_msgs::msg::Twist::UniquePtr & msg)
   std::vector<double> linear = {msg->linear.x, msg->linear.y, msg->linear.z};
   std::vector<double> angular = {msg->angular.x, msg->angular.y, msg->angular.z};
   if ((linear == std::vector<double> {0.0, 0.0, 0.0}) && (angular == std::vector<double> {0.0, 0.0, 0.0})) {
-      is_waiting_ = true;
+    is_waiting_ = true;
   } else {
-      is_waiting_ = false;
+    is_waiting_ = false;
   }
 }
 
@@ -455,7 +452,9 @@ void Handle::angularDistanceCallback(std_msgs::msg::Float64::UniquePtr & msg)
     double angular_data = msg->data;
     float di_target = static_cast<float>(angular_data) * 180 / M_PI;
     RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "di control: %f", di_target);
-    changeServoPos(static_cast<int16_t>(di_target));
+    if (!di.is_controlled_by_imu) {
+      changeServoPos(static_cast<int16_t>(di_target));
+    }
   }
 }
 
