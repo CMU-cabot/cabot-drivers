@@ -2,14 +2,14 @@ repositories:
   cabot-common:
     type: git
     url: https://github.com/CMU-cabot/cabot-common
-    version: yushim/kx-merge-check
+    version: dev
 
   cabot-description:
     type: git
     url: https://github.com/CMU-cabot/cabot-description
-    version: yushim/kx-merge-check
+    version: dev
 
-  docker/home/driver_ws/src/ros_odrive:
+  docker/driver/ros_odrive:
     type: git
     url: https://github.com/CMU-cabot/ros_odrive.git
     version: cabot
