@@ -28,6 +28,7 @@ from typing import Callable, List
 import queue
 import traceback
 
+
 class CaBotArduinoSerialDelegate(abc.ABC):
     """Delegate definition for CaBotArduinoDriver class"""
     def __init__(self):
@@ -132,7 +133,7 @@ class CaBotArduinoSerial:
                 if self.no_input_count > 10000:
                     self.no_input_count = 0
                     self.stop()
-        except OSError as error:
+        except OSError:
             # somtimes read error can happen even if it is okay
             pass
         except:  # noqa: E722
