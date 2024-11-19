@@ -88,6 +88,10 @@ Handle::Handle(
     "turn_type", rclcpp::SensorDataQoS(), [this](std_msgs::msg::String::UniquePtr msg) {
       turnTypeCallback(msg);
     });
+  turn_end_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
+    "turn_end", rclcpp::SensorDataQoS(), [this](std_msgs::msg::Bool::UniquePtr msg) {
+      turnEndCallback(msg);
+    });
   change_di_control_mode_sub_ = node_->create_subscription<std_msgs::msg::String>(
     "change_di_control_mode", rclcpp::SensorDataQoS(), [this](std_msgs::msg::String::UniquePtr msg) {
       changeDiControlModeCallback(msg);
@@ -95,6 +99,10 @@ Handle::Handle(
   local_plan_sub_ = node_->create_subscription<nav_msgs::msg::Path>(
     "/local_plan", rclcpp::SensorDataQoS(), [this](nav_msgs::msg::Path::UniquePtr msg) {
       localPlanCallback(msg);
+    });
+  angular_distance_sub_ = node_->create_subscription<std_msgs::msg::Float64>(
+    "/angular_distance", rclcpp::SensorDataQoS(), [this](std_msgs::msg::Float64::UniquePtr msg) {
+      angularDistanceCallback(msg);
     });
   for (int i = 0; i < 9; ++i) {
     last_up[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
@@ -394,13 +402,25 @@ void Handle::turnTypeCallback(std_msgs::msg::String::UniquePtr & msg)
   }
 }
 
+void Handle::turnEndCallback(std_msgs::msg::Bool::UniquePtr & msg)
+{
+  bool is_turn_end = msg->data;
+  if (is_turn_end) {
+    if (di.control_mode == "both" || di.control_mode == "local") {
+      di.is_controlled_by_imu = false;
+    } else {
+      resetServoPosition();
+    }
+  }
+}
+
 void Handle::localPlanCallback(nav_msgs::msg::Path::UniquePtr & msg)
 {
   if (di.control_mode == "both" || di.control_mode == "local") {
     size_t local_plan_len = msg->poses.size();
     if (local_plan_len > 1) {
       geometry_msgs::msg::PoseStamped start_pose = msg->poses[0];
-      geometry_msgs::msg::PoseStamped end_pose = msg->poses[local_plan_len - 1];
+      geometry_msgs::msg::PoseStamped end_pose = msg->poses[static_cast<size_t>(local_plan_len / 2) - 1];
       float start_pose_yaw = getEulerYawDegrees(start_pose.pose.orientation.x, start_pose.pose.orientation.y, start_pose.pose.orientation.z, start_pose.pose.orientation.w);
       float end_pose_yaw = getEulerYawDegrees(end_pose.pose.orientation.x, end_pose.pose.orientation.y, end_pose.pose.orientation.z, end_pose.pose.orientation.w);
       float di_target = end_pose_yaw - start_pose_yaw;
@@ -425,6 +445,18 @@ void Handle::localPlanCallback(nav_msgs::msg::Path::UniquePtr & msg)
           resetServoPosition();
         }
       }
+    }
+  }
+}
+
+void Handle::angularDistanceCallback(std_msgs::msg::Float64::UniquePtr & msg)
+{
+  if (di.control_mode == "both" || di.control_mode == "local") {
+    double angular_data = msg->data;
+    float di_target = static_cast<float>(angular_data) * 180 / M_PI;
+    RCLCPP_INFO(rclcpp::get_logger("Handle_v3"), "di control: %f", di_target);
+    if (!di.is_controlled_by_imu) {
+      changeServoPos(static_cast<int16_t>(di_target));
     }
   }
 }
