@@ -37,7 +37,8 @@
 #include <sys/ioctl.h>
 #include <bits/stdc++.h>
 
-enum CanId : uint8_t{
+enum CanId : uint8_t
+{
   IMU_LINEAR_CAN_ID = 0x09,
   IMU_ANGULAR_CAN_ID,
   IMU_ORIENTATION_CAN_ID,
@@ -65,11 +66,12 @@ enum CanId : uint8_t{
   IMU_CALIBRATION_SEND_CAN_ID = 0x38,
 };
 
-class  CanAllNode: public rclcpp::Node {
+class CanAllNode : public rclcpp::Node
+{
 public:
   CanAllNode()
-    : Node("can_all_node")
-    {
+  : Node("can_all_node")
+  {
     std::vector<int64_t> calibration_params(22, 0);
     declare_parameter("calibration_params", calibration_params);
     std::string can_interface = "can0";
@@ -92,12 +94,12 @@ public:
     capacitive_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("capacitive/touch_raw", 50);
     tof_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("tof/touch_raw", 50);
     servo_pos_pub_ = this->create_publisher<std_msgs::msg::Int16>("servo_pos", 50);
-    vibrator_1_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator1", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg, 1);});
-    vibrator_3_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator3", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg, 3);});
-    vibrator_4_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator4", 10,[this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg, 4);});
+    vibrator_1_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator1", 10, [this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg, 1);});
+    vibrator_3_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator3", 10, [this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg, 3);});
+    vibrator_4_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator4", 10, [this](const std_msgs::msg::UInt8::SharedPtr msg) {this->subscribeVibratorData(msg, 4);});
     servo_target_sub_ = this->create_subscription<std_msgs::msg::Int16>("servo_target", 10, std::bind(&CanAllNode::subscribeServoTargetData, this, std::placeholders::_1));
-    servo_free_sub_ = this->create_subscription<std_msgs::msg::Bool>("servo_free",10,std::bind(&CanAllNode::subServoFree, this, std::placeholders::_1));
-    imu_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>("run_imu_calibration",std::bind(&CanAllNode::readImuServiceCalibration, this, std::placeholders::_1, std::placeholders::_2));
+    servo_free_sub_ = this->create_subscription<std_msgs::msg::Bool>("servo_free", 10, std::bind(&CanAllNode::subServoFree, this, std::placeholders::_1));
+    imu_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>("run_imu_calibration", std::bind(&CanAllNode::readImuServiceCalibration, this, std::placeholders::_1, std::placeholders::_2));
     imu_accel_bias_ = this->declare_parameter("imu_accel_bias", std::vector<double>(3, 0.0)); // parameters for adjusting linear acceleration. default value = [0,0, 0.0, 0.0]
     imu_gyro_bias_ = this->declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0)); // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
     can_socket_ = openCanSocket();
@@ -108,7 +110,8 @@ public:
   }
 
 private:
-  int openCanSocket() {
+  int openCanSocket()
+  {
     std::string can_interface = this->get_parameter("can_interface").as_string();
     int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (s < 0) {
@@ -126,10 +129,11 @@ private:
       close(s);
       return -1;
     }
-  return s;
+    return s;
   }
 
-  void writeImuCalibration() {
+  void writeImuCalibration()
+  {
     std::vector<int64_t> calibration_params = get_parameter("calibration_params").as_integer_array();
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
@@ -165,9 +169,10 @@ private:
     nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
   }
 
-  void timerPubCallback() {
+  void timerPubCallback()
+  {
     struct can_frame frame;
-    int nbytes = read(can_socket_ , &frame, sizeof(struct can_frame));
+    int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
     if (nbytes > 0) {
       if (frame.can_id >= CanId::TEMPERATURE_1_CAN_ID && frame.can_id <= CanId::TEMPERATURE_5_CAN_ID) {
         publishTemperatureData(frame);
@@ -179,18 +184,20 @@ private:
         readImuCalibration(frame);
       } else if (frame.can_id == CanId::TACT_CAN_ID) {
         publishTactData(frame);
-      } else if (frame.can_id == CanId::TOUCH_CAN_ID){
+      } else if (frame.can_id == CanId::TOUCH_CAN_ID) {
         publishTouchData(frame);
-      } else if (frame.can_id >= CanId::IMU_LINEAR_CAN_ID && frame.can_id <= CanId::IMU_ORIENTATION_CAN_ID){
+      } else if (frame.can_id >= CanId::IMU_LINEAR_CAN_ID && frame.can_id <= CanId::IMU_ORIENTATION_CAN_ID) {
         publishImuData(frame);
-      } else if (frame.can_id == CanId::SERVO_POS_CAN_ID){
+      } else if (frame.can_id == CanId::SERVO_POS_CAN_ID) {
         publishServoPosData(frame);
       }
     }
   }
 
-  void readImuServiceCalibration(const std::shared_ptr<std_srvs::srv::Trigger::Request> /*request*/,
-                                        std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+  void readImuServiceCalibration(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request>/*request*/,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+  {
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
     frame.can_id = CanId::IMU_CALIBRATION_SEND_CAN_ID;
@@ -208,7 +215,8 @@ private:
     }
   }
 
-  void readImuCalibration(const struct can_frame &frame) {
+  void readImuCalibration(const struct can_frame & frame)
+  {
     static std::vector<int32_t> calibration_data(22);
     static bool imu_calibration_data_1 = false;
     static bool imu_calibration_data_2 = false;
@@ -246,7 +254,8 @@ private:
   }
 
 
-  void publishImuData(const struct can_frame &frame) {
+  void publishImuData(const struct can_frame & frame)
+  {
     static bool linear_data = false;
     static bool angular_data = false;
     if (frame.can_id == CanId::IMU_LINEAR_CAN_ID) {
@@ -302,7 +311,8 @@ private:
     }
   }
 
-  void publishWifiData(const struct can_frame &frame) {
+  void publishWifiData(const struct can_frame & frame)
+  {
     static std::array<uint8_t, 6> mac_address{};
     static std::string ssid;
     static int8_t channel = 0;
@@ -328,8 +338,7 @@ private:
       channel_data = true;
       rssi = frame.data[7];
       rssi_data = true;
-    }
-    else if (frame.can_id >= CanId::WIFI_CAN_ID_START && frame.can_id <= CanId::WIFI_SSID_CAN_ID_END) {
+    } else if (frame.can_id >= CanId::WIFI_CAN_ID_START && frame.can_id <= CanId::WIFI_SSID_CAN_ID_END) {
       for (int i = 0; i < frame.can_dlc; ++i) {
         if (frame.data[i] != '\0') {
           ssid += static_cast<char>(frame.data[i]);
@@ -368,7 +377,8 @@ private:
     }
   }
 
-  void publishBmeData(const struct can_frame &frame) {
+  void publishBmeData(const struct can_frame & frame)
+  {
     if (frame.can_id == CanId::BME_CAN_ID) {
       if (frame.can_dlc >= 8) {
         int16_t temperature_raw = ((uint16_t)(frame.data[1] << 8) | ((uint16_t)frame.data[0]));
@@ -388,7 +398,8 @@ private:
     }
   }
 
-  void publishTouchData(const struct can_frame &frame) {
+  void publishTouchData(const struct can_frame & frame)
+  {
     if (frame.can_id == CanId::TOUCH_CAN_ID && frame.can_dlc >= 4) {
       int16_t capacitive_touch = frame.data[3];
       std_msgs::msg::Int16 capacitive_touch_msg;
@@ -404,7 +415,7 @@ private:
       tof_touch_raw_pub_->publish(tof_raw_msg);
       int16_t tof_touch = 0;
       int16_t touch = frame.data[3];
-      if (touch == 0){
+      if (touch == 0) {
         if (tof_touch_raw >= 16 && tof_touch_raw <= 25) {
           touch = 1;
         } else {
@@ -415,30 +426,31 @@ private:
         tof_touch = 1;
       } else {
         tof_touch = 0;
-      }      
+      }
       std_msgs::msg::Int16 tof_touch_msg;
       tof_touch_msg.data = tof_touch;
-      tof_touch_pub_->publish(tof_touch_msg);  
+      tof_touch_pub_->publish(tof_touch_msg);
       std_msgs::msg::Int16 touch_msg;
       touch_msg.data = touch;
       touch_pub_->publish(touch_msg);
     }
   }
 
-  void publishTactData(const struct can_frame &frame) {
+  void publishTactData(const struct can_frame & frame)
+  {
     if (frame.can_id == CanId::TACT_CAN_ID && frame.can_dlc >= 1) {
       std_msgs::msg::Int8 tact_msg;
       uint8_t tact_data = 0;
-      if (frame.data[0] == 1){
+      if (frame.data[0] == 1) {
         tact_data = 8;
       }
-      if (frame.data[0] == 2){
+      if (frame.data[0] == 2) {
         tact_data = 4;
       }
-      if (frame.data[0] == 4){
+      if (frame.data[0] == 4) {
         tact_data = 1;
       }
-      if (frame.data[0] == 8){
+      if (frame.data[0] == 8) {
         tact_data = 2;
       }
       tact_msg.data = tact_data;
@@ -446,7 +458,8 @@ private:
     }
   }
 
-  void publishServoPosData(const struct can_frame &frame) {
+  void publishServoPosData(const struct can_frame & frame)
+  {
     if (frame.can_id == CanId::SERVO_POS_CAN_ID && frame.can_dlc >= 2) {
       int16_t servo_pos_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
       //The servo target angle (servo_target_deg) is determined by multiplying 2048
@@ -458,7 +471,8 @@ private:
     }
   }
 
-  void publishTemperatureData(const struct can_frame &frame) {
+  void publishTemperatureData(const struct can_frame & frame)
+  {
     int16_t temperature_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
     float temperature = temperature_raw * 0.0625;
     sensor_msgs::msg::Temperature msg;
@@ -485,7 +499,8 @@ private:
     }
   }
 
-  void subscribeVibratorData(const std_msgs::msg::UInt8::SharedPtr msg, int vibrator_id) {
+  void subscribeVibratorData(const std_msgs::msg::UInt8::SharedPtr msg, int vibrator_id)
+  {
     uint8_t vibrator1 = 0;
     uint8_t vibrator3 = 0;
     uint8_t vibrator4 = 0;
@@ -508,7 +523,8 @@ private:
     }
   }
 
-  void subscribeServoTargetData(const std_msgs::msg::Int16& msg) {
+  void subscribeServoTargetData(const std_msgs::msg::Int16 & msg)
+  {
     int16_t servo_target_per = -1 * msg.data;
     //The servo target angle (servo_target_deg) is determined by multiplying 2048
     //by the servo angle (ranging from -179 to +179,0 ~ 4096)
@@ -527,7 +543,8 @@ private:
     }
   }
 
-  void subServoFree(const std_msgs::msg::Bool::SharedPtr msg) {
+  void subServoFree(const std_msgs::msg::Bool::SharedPtr msg)
+  {
     uint8_t servo_free = msg->data ? 0x00 : 0x01;
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
@@ -551,7 +568,7 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr BME_temperature_pub_;
   rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr BME_pressure_pub_;
   rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
-  rclcpp::Publisher< std_msgs::msg::Int32MultiArray>::SharedPtr calibration_pub_;
+  rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr calibration_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr tact_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr capacitive_touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr capacitive_touch_raw_pub_;
@@ -570,7 +587,8 @@ private:
   std::vector<double> imu_gyro_bias_;
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char * argv[])
+{
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<CanAllNode>());
   rclcpp::shutdown();

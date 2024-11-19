@@ -1,4 +1,4 @@
-// Copyright (c) Miraikan - The National Museum of Emerging Science and Innovation
+// Copyright (c) 2024  Miraikan - The National Museum of Emerging Science and Innovation
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -136,7 +136,7 @@ private:
       return -1;
     }
     struct ifreq ifr;
-    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", can_interface_.c_str());
+    strncpy(ifr.ifr_name, can_interface_.c_str(), sizeof(ifr.ifr_name));
     ioctl(s, SIOCGIFINDEX, &ifr);
     struct sockaddr_can addr;
     addr.can_family = AF_CAN;

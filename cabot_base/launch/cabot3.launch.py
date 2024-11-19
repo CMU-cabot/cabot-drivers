@@ -129,7 +129,7 @@ def generate_launch_description():
         odrive_can_pkg_dir,
         PythonExpression(['"json"']),
         odrive_firmware_version,
-        PythonExpression(['"flat_endpoints_',odrive_model,'.json"'])
+        PythonExpression(['"flat_endpoints_', odrive_model, '.json"'])
     ])
 
     # deprecated parameters
@@ -521,7 +521,7 @@ def generate_launch_description():
                 output='screen',
                 parameters=[
                     {
-                        'is_clockwise' : True,
+                        'is_clockwise': True,
                     }
                 ],
                 remappings=[
@@ -544,9 +544,9 @@ def generate_launch_description():
                 output='screen',
                 parameters=[
                     {
-                        'node_id' : 0,
-                        'interface' : 'can1',
-                        'axis_idle_on_shutdown' : True,
+                        'node_id': 0,
+                        'interface': 'can1',
+                        'axis_idle_on_shutdown': True,
                         'json_file_path': flat_endpoints_json_path,
                     }
                 ],
@@ -565,9 +565,9 @@ def generate_launch_description():
                 output='screen',
                 parameters=[
                     {
-                        'node_id' : 1,
-                        'interface' : 'can1',
-                        'axis_idle_on_shutdown' : True,
+                        'node_id': 1,
+                        'interface': 'can1',
+                        'axis_idle_on_shutdown': True,
                         'json_file_path': flat_endpoints_json_path,
                     }
                 ],

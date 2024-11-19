@@ -22,8 +22,7 @@
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess
-from launch.substitutions import LaunchConfiguration
+
 
 def generate_launch_description():
     return LaunchDescription([
@@ -35,11 +34,11 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 {
-                    'max_acc' : 1.2,
-                    'target_rage' : 20,
-                    'bias' : 1.0,
-                    'gain_omega' : 1.0,
-                    'gain_omega_i' : 0.0,
+                    'max_acc': 1.2,
+                    'target_rage': 20,
+                    'bias': 1.0,
+                    'gain_omega': 1.0,
+                    'gain_omega_i': 0.0,
                 }
             ],
             remappings=[
@@ -59,7 +58,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 {
-                    'is_clockwise' : True,
+                    'is_clockwise': True,
                 }
             ],
             remappings=[
@@ -82,7 +81,7 @@ def generate_launch_description():
             parameters=[
                 {
                     'interface': 'can1',
-                    'node_id' : 0,
+                    'node_id': 0,
                 }
             ],
             remappings=[
@@ -100,7 +99,7 @@ def generate_launch_description():
             parameters=[
                 {
                     'interface': 'can1',
-                    'node_id' : 1,
+                    'node_id': 1,
                 }
             ],
             remappings=[

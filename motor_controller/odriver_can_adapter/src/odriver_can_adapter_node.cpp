@@ -1,24 +1,24 @@
-/*******************************************************************************
- * Copyright (c) 2024  Miraikan - The National Museum of Emerging Science and Innovation
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *******************************************************************************/
+//
+// Copyright (c) 2024  Miraikan - The National Museum of Emerging Science and Innovation
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
 
 #include <math.h>
 
@@ -32,18 +32,20 @@
 
 #include "odrive_manager.hpp"
 
-class ODriverCanAdapterNode: public rclcpp::Node
+class ODriverCanAdapterNode : public rclcpp::Node
 {
-  struct AxisStateClientInfo {
+  struct AxisStateClientInfo
+  {
     rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr client;
     std::chrono::system_clock::time_point last_call_time;
     bool is_ready_axis_state_service;
     std::string name;
     unsigned int axis_state;
   };
+
 public:
   ODriverCanAdapterNode()
-    : Node("odriver_can_adapter_node")
+  : Node("odriver_can_adapter_node")
   {
     using std::placeholders::_1;
 
@@ -61,7 +63,7 @@ public:
     service_timeout_ms_ = this->get_parameter("service_timeout_ms").as_int();
 
     double sign_left, sign_right;
-    if(is_clockwise_) {
+    if (is_clockwise_) {
       sign_left = -1.0;
       sign_right = 1.0;
     } else {
@@ -69,51 +71,50 @@ public:
       sign_right = -1.0;
     }
     odrive_left_ = std::make_shared<ODriveManager>(
-                      this,
-                      "left",
-                      sign_left,
-                      wheel_diameter_m_);
+      this,
+      "left",
+      sign_left,
+      wheel_diameter_m_);
     odrive_right_ = std::make_shared<ODriveManager>(
-                      this,
-                      "right",
-                      sign_right,
-                      wheel_diameter_m_);
+      this,
+      "right",
+      sign_right,
+      wheel_diameter_m_);
 
     rclcpp::QoS motor_status_qos(rclcpp::KeepLast(10));
     motor_status_pub_ = create_publisher<odriver_msgs::msg::MotorStatus>(
-                                  "/motor_status",
-                                  motor_status_qos);
+      "/motor_status",
+      motor_status_qos);
 
     rclcpp::QoS motor_target_qos(rclcpp::KeepLast(10));
     motor_target_sub_ = create_subscription<odriver_msgs::msg::MotorTarget>(
-                          "/motor_target",
-                          motor_target_qos,
-                          std::bind(
-                            &ODriverCanAdapterNode::motorTargetCallback,
-                            this,
-                            _1));
+      "/motor_target",
+      motor_target_qos,
+      std::bind(
+        &ODriverCanAdapterNode::motorTargetCallback,
+        this,
+        _1));
 
     timer_ = create_wall_timer(
-              std::chrono::seconds(1) / hz_,
-              std::bind(
-                &ODriverCanAdapterNode::timerCallback,
-                this));
+      std::chrono::seconds(1) / hz_,
+      std::bind(
+        &ODriverCanAdapterNode::timerCallback,
+        this));
   }
 
   ~ODriverCanAdapterNode()
   {
   }
+
 private:
   // change odrive axis.controller.config.control_mode
   // closed_loop: true -> CLOSED_LOOP_CONTROL, false -> IDLE
   void changeAxisState(bool closed_loop)
   {
-    if(closed_loop &&
-          (odrive_left_->getAxisState() == kAxisStateIdle || odrive_right_->getAxisState() == kAxisStateIdle)) {
+    if (closed_loop && (odrive_left_->getAxisState() == kAxisStateIdle || odrive_right_->getAxisState() == kAxisStateIdle)) {
       odrive_left_->callAxisStateService(kAxisStateClosedLoopControl);
       odrive_right_->callAxisStateService(kAxisStateClosedLoopControl);
-    } else if(!closed_loop &&
-                (odrive_left_->getAxisState() == kAxisStateClosedLoopControl || odrive_right_->getAxisState() == kAxisStateClosedLoopControl)) {
+    } else if (!closed_loop && (odrive_left_->getAxisState() == kAxisStateClosedLoopControl || odrive_right_->getAxisState() == kAxisStateClosedLoopControl)) {
       odrive_left_->callAxisStateService(kAxisStateIdle);
       odrive_right_->callAxisStateService(kAxisStateIdle);
     }
@@ -124,17 +125,17 @@ private:
     changeAxisState(msg->loop_ctrl);
 
     // !msg->loop_ctrl is IDLE mode
-    if(!msg->loop_ctrl) { return; }
+    if (!msg->loop_ctrl) {return;}
 
     odrive_left_->publishControlMessage(
-                    kVelocityControlMode,
-                    kPassthroughInputMode,
-                    msg->spd_left);
+      kVelocityControlMode,
+      kPassthroughInputMode,
+      msg->spd_left);
 
     odrive_right_->publishControlMessage(
-                    kVelocityControlMode,
-                    kPassthroughInputMode,
-                    msg->spd_right);
+      kVelocityControlMode,
+      kPassthroughInputMode,
+      msg->spd_right);
   }
 
   void timerCallback()
@@ -210,7 +211,7 @@ private:
   std::shared_ptr<ODriveManager> odrive_right_;
 };
 
-int main(int argc, char* argv[])
+int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<ODriverCanAdapterNode>());
