@@ -41,19 +41,6 @@ cabot:
       gain_omega: 0.0
       max_acc: 0.6
 
-  odriver_s1_node:
-    ros__parameters:
-      wheel_diameter: 0.171 #BotWheel
-      count_per_round: 3200 #BotWheel
-      left_is_1: false
-      is_clockwise: true
-      gain_left: 1.0
-      gain_right: 1.0
-      vel_gain: 10.0
-      vel_integrator_gain: 40.0
-      motor_bandwidth: 100
-      encoder_bandwidth: 100
-
   lslidar_driver_node:
     ros__parameters:
       packet_rate: 1695.0
