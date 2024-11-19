@@ -54,7 +54,6 @@ from launch.substitutions import Command
 from launch.substitutions import EnvironmentVariable
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import AndSubstitution
-from launch.substitutions import OrSubstitution
 from launch.substitutions import NotSubstitution
 from launch.substitutions import PathJoinSubstitution
 from launch.substitutions import PythonExpression
@@ -84,15 +83,30 @@ def generate_launch_description():
     use_directional_indicator = LaunchConfiguration('use_directional_indicator')
     vibrator_type = LaunchConfiguration('vibrator_type')
 
-    # switch lidar node based on model_name
-    use_velodyne = PythonExpression(['"', model_name, '" in ["cabot3-s1"]'])
-    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1"]'])
-    use_lslidar = PythonExpression(['"', model_name, '" in ["cabot3-k2"]'])
-    use_rslidar = PythonExpression(['"', model_name, '" in ["cabot3-k3"]'])
-    use_velodyne = NotSubstitution(OrSubstitution(use_hesai, OrSubstitution(use_lslidar, use_rslidar)))
-    use_can = PythonExpression(['"', model_name, '" in ["cabot3-k1", "cabot3-k2", "cabot3-k3"]'])
-    use_serial = NotSubstitution(use_can)
-    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2", "cabot3-k1", "cabot3-k2", "cabot3-k3"]'])
+    # Define models with their associated flags (without the "use_" prefix)
+    model_flags = {
+        "cabot3-s1":   ["velodyne", "serial"],
+        "cabot3-ace2": ["hesai", "serial"],
+        "cabot3-i1":   ["hesai", "livox", "serial"],
+        "cabot3-m1":   ["hesai", "livox", "serial"],
+        "cabot3-m2":   ["hesai", "livox", "serial"],
+        "cabot3-k1":   ["hesai", "livox", "can"],
+        "cabot3-k2":   ["lslidar", "livox", "can"],
+        "cabot3-k3":   ["rslidar", "livox", "can"],
+    }
+
+    # Helper function to check if a flag applies to the given model
+    def has_flag(flag_name):
+        return PythonExpression(['"', model_name, '" in ', str([k for k, v in model_flags.items() if flag_name in v])])
+
+    # Flags derived from the model's features (using the "use_" prefix for variable names)
+    use_velodyne = has_flag("velodyne")
+    use_hesai = has_flag("hesai")
+    use_lslidar = has_flag("lslidar")
+    use_rslidar = has_flag("rslidar")
+    use_livox = has_flag("livox")
+    use_serial = has_flag("serial")
+    use_can = has_flag("can")
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -143,6 +157,19 @@ def generate_launch_description():
         # save all log file in the directory where the launch.log file is saved
         SetEnvironmentVariable('ROS_LOG_DIR', launch_config.log_dir),
         DeclareLaunchArgument(
+            'model',
+            default_value=EnvironmentVariable('CABOT_MODEL'),
+            description='CaBot model'
+        ),
+        LogInfo(msg=PythonExpression(["\"Launching for model: ", model_name, "\""])),
+        LogInfo(msg=PythonExpression(["\"       use_velodyne: ", use_velodyne, "\""])),
+        LogInfo(msg=PythonExpression(["\"          use_hesai: ", use_hesai, "\""])),
+        LogInfo(msg=PythonExpression(["\"        use_lslidar: ", use_lslidar, "\""])),
+        LogInfo(msg=PythonExpression(["\"        use_rslidar: ", use_rslidar, "\""])),
+        LogInfo(msg=PythonExpression(["\"          use_livox: ", use_livox, "\""])),
+        LogInfo(msg=PythonExpression(["\"         use_serial: ", use_serial, "\""])),
+        LogInfo(msg=PythonExpression(["\"            use_can: ", use_can, "\""])),
+        DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
             description='Whether the simulated time is used or not'
@@ -151,11 +178,6 @@ def generate_launch_description():
         RegisterEventHandler(
             OnShutdown(on_shutdown=[AppendLogDirPrefix("cabot_base")]),
             condition=UnlessCondition(use_sim_time)
-        ),
-        DeclareLaunchArgument(
-            'model',
-            default_value=EnvironmentVariable('CABOT_MODEL'),
-            description='CaBot model'
         ),
         DeclareLaunchArgument(
             'touch_params',
