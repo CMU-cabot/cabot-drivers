@@ -69,7 +69,7 @@ def generate_launch_description():
         ParameterFile(PathJoinSubstitution([
                 pkg_dir,
                 'config',
-                'cabot2-common-remote.yaml'
+                'cabot-common-remote.yaml'
             ]), allow_substs=True
         ),
         ParameterFile(PathJoinSubstitution([

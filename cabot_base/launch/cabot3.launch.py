@@ -123,7 +123,7 @@ def generate_launch_description():
         ParameterFile(PathJoinSubstitution([
             pkg_dir,
             'config',
-            'cabot2-common.yaml'
+            'cabot3-common.yaml'
         ]),
             allow_substs=True,
         ),
