@@ -135,6 +135,9 @@ def generate_launch_description():
             allow_substs=True,
         ),
     ]
+    helios_config_file = PathJoinSubstitution([
+        pkg_dir, 'config', 'helios', 'helios.yaml'
+    ])
 
     odrive_can_pkg_dir = get_package_share_directory('odrive_can')
     odrive_model = LaunchConfiguration('odrive_model')
@@ -328,7 +331,7 @@ def generate_launch_description():
                 package='rslidar_sdk',
                 executable='rslidar_sdk_node',
                 parameters=[
-                    {'config_path': '/home/developer/driver_ws/install/cabot_base/share/cabot_base/config/helios/helios.yaml'},
+                    {'config_path': helios_config_file},
                     {'rslidar_points': 'pandar'},
                     {'use_sim_time': use_sim_time}
                 ],
