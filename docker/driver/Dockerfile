@@ -1,4 +1,4 @@
-# Copyright (c) 2023  Carnegie Mellon University
+# Copyright (c) 2023, 2024  Carnegie Mellon University and Miraikan
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,12 +22,51 @@ ARG ROS_DISTRO
 ARG PREFIX=cabot
 ARG FROM_IMAGE=${PREFIX}__jammy-humble-custom-mesa
 
+# build underlay
+FROM ${FROM_IMAGE} as cache
+
+ENV UNDERLAY_WS=/opt/underlay_ws
+
+RUN mkdir -p $UNDERLAY_WS/src
+COPY ./ros_odrive $UNDERLAY_WS/src/ros_odrive
+
+RUN apt update && apt install -y \
+    nlohmann-json3-dev \
+    && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR $UNDERLAY_WS
+
+# copy package.xml files with parent directories for cache
+RUN find . -name "src" -type d \
+      -mindepth 1 -maxdepth 2 -printf '%P\n' \
+      | xargs -I % mkdir -p /tmp/opt/% && \
+    find . -name "package.xml" \
+      | xargs cp --parents -t /tmp/opt && \
+    find . -name "COLCON_IGNORE" \
+      | xargs cp --parents -t /tmp/opt || true
+
+RUN apt update && rosdep update && rosdep install -q -y \
+	--from-paths src \
+	--ignore-src
+
+RUN . /opt/custom_ws/install/setup.sh && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+
 FROM ${FROM_IMAGE}
 ENV ROS_DISTRO=humble
 
 ARG TZ=UTC
 ENV TZ=$TZ
 RUN sudo ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ | sudo tee /etc/timezone
+ENV UNDERLAY_WS=/opt/underlay_ws
+
+WORKDIR $UNDERLAY_WS
+
+COPY --from=cache $UNDERLAY_WS/install $UNDERLAY_WS/install
+# copy package.xml files from cache
+COPY --from=cache /tmp/opt/src $UNDERLAY_WS/src
 
 RUN apt update && apt install -y \
 	libusb-1.0-0 \
@@ -39,7 +78,12 @@ RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-joy-linux \
     ros-${ROS_DISTRO}-xacro \
     ros-${ROS_DISTRO}-realsense2-description \
-    ros-${ROS_DISTRO}-pointcloud-to-laserscan
+    ros-${ROS_DISTRO}-pointcloud-to-laserscan \
+    # patch build errors for odrive_ros2_control
+    ros-humble-hardware-interface \
+    nlohmann-json3-dev \
+    && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --no-cache-dir \
     odrive==0.6.5 \
@@ -56,6 +100,9 @@ RUN python3 -m venv --system-site-packages /opt/venv/cabot2 && \
 RUN python3 -m venv --system-site-packages /opt/venv/cabot3
 
 COPY ./launch.sh /
+
+# change location of ros base
+RUN sed -i 's:custom_ws:underlay_ws:' /ros_entrypoint.sh
 
 ENV USERNAME developer
 # Replace 1000 with your user/group id

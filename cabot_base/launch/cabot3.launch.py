@@ -31,6 +31,9 @@ change from ROS1: each model had own launch file in ROS1, but ROS2 launch will h
   - cabot3-i1    (AIS-2024, Consortium)
   - cabot3-m1    (AIS-2024, Miraikan)
   - cabot3-m2    (AIS-2024, Miraikan)
+  - cabot3-k1
+  - cabot3-k2
+  - cabot3-k3
 """
 from launch.logging import launch_config
 
@@ -80,10 +83,30 @@ def generate_launch_description():
     use_directional_indicator = LaunchConfiguration('use_directional_indicator')
     vibrator_type = LaunchConfiguration('vibrator_type')
 
-    # switch lidar node based on model_name
-    use_hesai = PythonExpression(['"', model_name, '" in ["cabot3-ace2", "cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
-    use_velodyne = NotSubstitution(use_hesai)
-    use_livox = PythonExpression(['"', model_name, '" in ["cabot3-i1", "cabot3-m1", "cabot3-m2"]'])
+    # Define models with their associated flags (without the "use_" prefix)
+    model_flags = {
+        "cabot3-s1":   ["velodyne", "serial"],
+        "cabot3-ace2": ["hesai", "serial"],
+        "cabot3-i1":   ["hesai", "livox", "serial"],
+        "cabot3-m1":   ["hesai", "livox", "serial"],
+        "cabot3-m2":   ["hesai", "livox", "serial"],
+        "cabot3-k1":   ["hesai", "livox", "can"],
+        "cabot3-k2":   ["lslidar", "livox", "can"],
+        "cabot3-k3":   ["rslidar", "livox", "can"],
+    }
+
+    # Helper function to check if a flag applies to the given model
+    def has_flag(flag_name):
+        return PythonExpression(['"', model_name, '" in ', str([k for k, v in model_flags.items() if flag_name in v])])
+
+    # Flags derived from the model's features (using the "use_" prefix for variable names)
+    use_velodyne = has_flag("velodyne")
+    use_hesai = has_flag("hesai")
+    use_lslidar = has_flag("lslidar")
+    use_rslidar = has_flag("rslidar")
+    use_livox = has_flag("livox")
+    use_serial = has_flag("serial")
+    use_can = has_flag("can")
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -112,6 +135,19 @@ def generate_launch_description():
             allow_substs=True,
         ),
     ]
+    helios_config_file = PathJoinSubstitution([
+        pkg_dir, 'config', 'helios', 'helios.yaml'
+    ])
+
+    odrive_can_pkg_dir = get_package_share_directory('odrive_can')
+    odrive_model = LaunchConfiguration('odrive_model')
+    odrive_firmware_version = LaunchConfiguration('odrive_firmware_version')
+    flat_endpoints_json_path = PathJoinSubstitution([
+        odrive_can_pkg_dir,
+        PythonExpression(['"json"']),
+        odrive_firmware_version,
+        PythonExpression(['"flat_endpoints_', odrive_model, '.json"'])
+    ])
 
     # deprecated parameters
     # - offset
@@ -124,6 +160,19 @@ def generate_launch_description():
         # save all log file in the directory where the launch.log file is saved
         SetEnvironmentVariable('ROS_LOG_DIR', launch_config.log_dir),
         DeclareLaunchArgument(
+            'model',
+            default_value=EnvironmentVariable('CABOT_MODEL'),
+            description='CaBot model'
+        ),
+        LogInfo(msg=PythonExpression(["\"Launching for model: ", model_name, "\""])),
+        LogInfo(msg=PythonExpression(["\"       use_velodyne: ", use_velodyne, "\""])),
+        LogInfo(msg=PythonExpression(["\"          use_hesai: ", use_hesai, "\""])),
+        LogInfo(msg=PythonExpression(["\"        use_lslidar: ", use_lslidar, "\""])),
+        LogInfo(msg=PythonExpression(["\"        use_rslidar: ", use_rslidar, "\""])),
+        LogInfo(msg=PythonExpression(["\"          use_livox: ", use_livox, "\""])),
+        LogInfo(msg=PythonExpression(["\"         use_serial: ", use_serial, "\""])),
+        LogInfo(msg=PythonExpression(["\"            use_can: ", use_can, "\""])),
+        DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
             description='Whether the simulated time is used or not'
@@ -132,11 +181,6 @@ def generate_launch_description():
         RegisterEventHandler(
             OnShutdown(on_shutdown=[AppendLogDirPrefix("cabot_base")]),
             condition=UnlessCondition(use_sim_time)
-        ),
-        DeclareLaunchArgument(
-            'model',
-            default_value=EnvironmentVariable('CABOT_MODEL'),
-            description='CaBot model'
         ),
         DeclareLaunchArgument(
             'touch_params',
@@ -188,6 +232,16 @@ def generate_launch_description():
             'vibrator_type',
             default_value=EnvironmentVariable('CABOT_VIBRATOR_TYPE', default_value='1'),
             description='1: ERM (Eccentric Rotating Mass), 2: LRA (Linear Resonant Actuator)'
+        ),
+        DeclareLaunchArgument(
+            'odrive_model',
+            default_value=EnvironmentVariable('ODRIVE_MODEL'),
+            description='odrive model'
+        ),
+        DeclareLaunchArgument(
+            'odrive_firmware_version',
+            default_value=EnvironmentVariable('ODRIVE_FIRMWARE_VERSION'),
+            description='odrive firmware version'
         ),
 
         # Kind error message
@@ -254,7 +308,7 @@ def generate_launch_description():
                         name='pointcloud_to_laserscan_node',
                         parameters=[*param_files, {'use_sim_time': use_sim_time}],
                         remappings=[
-                            ('/cloud_in', '/velodyne_points')
+                            ('/cloud_in', '/velodyne_points_cropped')
                         ]
                     ),
                     ComposableNode(
@@ -271,6 +325,22 @@ def generate_launch_description():
                 ]
             ),
 
+            # rslidar node
+            Node(
+                namespace='rslidar_sdk',
+                package='rslidar_sdk',
+                executable='rslidar_sdk_node',
+                parameters=[
+                    {'config_path': helios_config_file},
+                    {'rslidar_points': 'pandar'},
+                    {'use_sim_time': use_sim_time}
+                ],
+                remappings=[
+                    ('/rslidar_points',  '/velodyne_points')
+                ],
+                condition=IfCondition(AndSubstitution(use_rslidar, NotSubstitution(use_sim_time)))  # if (use_rslidar and (not use_simtime))
+            ),
+
             # launch hesai lidar node
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([
@@ -284,6 +354,23 @@ def generate_launch_description():
                     'pandar': '/velodyne_points'
                 }.items(),
                 condition=IfCondition(AndSubstitution(use_hesai, NotSubstitution(use_sim_time)))  # if (use_hesai and (not use_simtime))
+            ),
+
+            # launch lslidar node
+            Node(
+                package='lslidar_driver',
+                executable='lslidar_driver_node',
+                parameters=[
+                    *param_files,
+                    {'use_sim_time': use_sim_time},
+                    {'frame_id': 'velodyne'},
+                    {'use_time_service': False},
+                    {'pcl_type': True}
+                ],
+                remappings=[
+                    ('/lslidar_point_cloud', '/velodyne_points'),
+                ],
+                condition=IfCondition(AndSubstitution(use_lslidar, NotSubstitution(use_sim_time)))  # if (use_lslidar and (not use_simtime))
             ),
 
             # launch livox node
@@ -365,9 +452,44 @@ def generate_launch_description():
                     ('/cabot/imu_raw', '/cabot/imu_raw/data'),
                     ('/cabot/touch_speed', '/cabot/touch_speed_raw')
                 ],
-                condition=UnlessCondition(use_sim_time)
+                condition=IfCondition(AndSubstitution(use_serial, NotSubstitution(use_sim_time)))
             ),
-
+            Node(
+                package='cabot_can',
+                executable='can_all_node',
+                namespace='/cabot',
+                name='cabot_can',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {
+                        'use_sim_time': use_sim_time,
+                        'touch_params': touch_params,
+                        'imu_accel_bias': imu_accel_bias,
+                        'imu_gyro_bias': imu_gyro_bias
+                    }
+                ],
+                remappings=[
+                    ('/cabot/imu', '/cabot/imu/data'),
+                    ('/cabot/touch_speed', '/cabot/touch_speed_raw'),
+                    ('/cabot/bme/pressure', '/cabot/pressure')
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+            ),
+            Node(
+                package='power_controller',
+                executable='power_controller',
+                namespace='/cabot',
+                name='power_controller',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {
+                        'use_sim_time': use_sim_time,
+                    }
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+            ),
             # optional wifi scanner with ESP32
             Node(
                 package='cabot_serial',
@@ -414,7 +536,72 @@ def generate_launch_description():
                     ('/motorTarget', '/cabot/motorTarget'),
                     ('/motorStatus', '/cabot/motorStatus'),
                 ],
-                condition=UnlessCondition(use_sim_time),
+                condition=IfCondition(AndSubstitution(use_serial, NotSubstitution(use_sim_time)))
+            ),
+            Node(
+                package='odriver_can_adapter',
+                executable='odriver_can_adapter_node',
+                namespace='/cabot',
+                name='odriver_can_adapter_node',
+                output='screen',
+                parameters=[
+                    {
+                        'is_clockwise': True,
+                    }
+                ],
+                remappings=[
+                    ('/control_message_left', '/cabot/control_message_left'),
+                    ('/control_message_right', '/cabot/control_message_right'),
+                    ('/controller_status_left', '/cabot/controller_status_left'),
+                    ('/controller_status_right', '/cabot/controller_status_right'),
+                    ('/motor_status', '/cabot/motorStatus'),
+                    ('/motor_target', '/cabot/motorTarget'),
+                    ('/request_axis_state_left', '/cabot/request_axis_state_left'),
+                    ('/request_axis_state_right', '/cabot/request_axis_state_right'),
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+            ),
+            Node(
+                package='odrive_can',
+                executable='odrive_can_node',
+                namespace='/cabot',
+                name='odrive_can_node_left',
+                output='screen',
+                parameters=[
+                    {
+                        'node_id': 0,
+                        'interface': 'can1',
+                        'axis_idle_on_shutdown': True,
+                        'json_file_path': flat_endpoints_json_path,
+                    }
+                ],
+                remappings=[
+                    ('/cabot/control_message', '/cabot/control_message_left'),
+                    ('/cabot/controller_status', '/cabot/controller_status_left'),
+                    ('/cabot/request_axis_state', '/cabot/request_axis_state_left')
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+            ),
+            Node(
+                package='odrive_can',
+                executable='odrive_can_node',
+                namespace='/cabot',
+                name='odrive_can_node_right',
+                output='screen',
+                parameters=[
+                    {
+                        'node_id': 1,
+                        'interface': 'can1',
+                        'axis_idle_on_shutdown': True,
+                        'json_file_path': flat_endpoints_json_path,
+                    }
+                ],
+                remappings=[
+                    ('/cabot/control_message', '/cabot/control_message_right'),
+                    ('/cabot/controller_status', '/cabot/controller_status_right'),
+                    ('/cabot/request_axis_state', '/cabot/request_axis_state_right'),
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
             ),
         ],
             condition=LaunchConfigurationNotEquals('model', '')
