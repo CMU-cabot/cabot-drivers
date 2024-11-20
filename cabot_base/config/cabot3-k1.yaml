@@ -40,3 +40,8 @@ cabot:
       bias: 0.14 # same with cabot3-i1
       gain_omega: 0.0
       max_acc: 0.6
+
+  cabot_can:
+    ros__parameters:
+      can_interface: can0
+      # calibration_params: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
