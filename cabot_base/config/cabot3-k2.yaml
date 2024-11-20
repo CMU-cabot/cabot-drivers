@@ -5,14 +5,6 @@ pointcloud_to_laserscan_node:
     angle_min: -2.57  # -M_PI/2 (front) - 1.0 (angle clipping)
     angle_max: 1.05 # M_PI/2 (rear) - M_PI/6 (rear cover)
 
-# substitute these parameters to hesai/hesai_lidar.yaml
-hesai_lidar:
-  ros__parameters:
-    lidar_type: "PandarXT-32"
-    frame_id: "velodyne" # use velodyne for compatibility
-    timestamp_type: "realtime"
-    lidar_correction_file: "$(find-pkg-share hesai_lidar)/config/PandarXT-32.csv"
-
 cabot:
   cabot_handle_v2_node:
     ros__parameters:
@@ -41,24 +33,7 @@ cabot:
       gain_omega: 0.0
       max_acc: 0.6
 
-  lslidar_driver_node:
+  cabot_can:
     ros__parameters:
-      packet_rate: 1695.0
-      device_ip: 192.168.1.200  #雷达ip
-      msop_port: 2368           #雷达目的数据端口
-      difop_port: 2369          #雷达目的设备端口
-      pcl_type: false           #点云类型 true: xyzi
-      add_multicast: false      #雷达是否使用组播模式 true: 使用组播模式 
-      group_ip: 224.1.1.2       #组播ip
-      use_time_service: true   #雷达是否使用外部授时(GPS PTP NTP) true: 使用外部授时
-      min_range: 0.05           #雷达扫描最小距离(小于此值的点会被过滤)
-      max_range: 200.0          #雷达扫描最大距离(大于此值的点会被过滤)
-      angle_disable_min: 0      #雷达扫描最小角度裁剪 单位 0.01°
-      angle_disable_max: 0      #雷达扫描最大角度裁剪 单位 0.01°
-      distance_unit: 0.4
-      horizontal_angle_resolution: 0.18     #10Hz:0.18  20Hz:0.36 5Hz: 0.09
-      frame_id: velodyne      #点云帧id
-      topic_name: /velodyne_points #点云话题名称
-      publish_scan: false       #是否发布 laserscan话题
-      scan_num: 8               #laserscan线号
-      coordinate_opt: false     #点云0度角对应方向  true: x轴正方向
+      can_interface: can0
+      # calibration_params: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
