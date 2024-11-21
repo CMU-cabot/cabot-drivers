@@ -24,7 +24,7 @@
 <package format="3">
   <name>power_controller_kx</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Node that controls battery information and each power source</description>
   <maintainer email="developer@todo.todo">developer</maintainer>
   <license>MIT</license>
 

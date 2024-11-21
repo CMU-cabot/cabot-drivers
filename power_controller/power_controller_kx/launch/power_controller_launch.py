@@ -24,8 +24,10 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    # launchの構成を示すLaunchDescription型の変数の定義
     ld = LaunchDescription()
 
+    # publisher nodeを、"talker_renamed1"という名前で定義
     power_controller_node = Node(
         package='power_controller_kx',
         executable='power_controller',
