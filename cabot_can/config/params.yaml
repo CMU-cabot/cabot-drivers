@@ -1,0 +1,7 @@
+can_all_node:
+  ros__parameters:
+    calibration_params : [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    can_interface : "can0"
+    publish_rate : 200
+    imu_frame_id : "imu_frame"
+    #vibrator_power : 100
