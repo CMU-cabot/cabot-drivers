@@ -1,36 +1,37 @@
-// Copyright (c) 2024  Miraikan - The National Museum of Emerging Science and Innovation
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
+/*******************************************************************************
+ * Copyright (c) 2024  Miraikan and Carnegie Mellon University
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *******************************************************************************/
 
-// include header file
+//include header file
+#include <cstdio>
+#include <cstdint>
+#include <regex>
+#include <chrono>
 #include <sys/socket.h>
 #include <linux/can.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
-#include <atomic>
-#include <chrono>
-#include <cstdio>
 #include <list>
-#include <memory>
 #include <mutex>
-#include <regex>
-#include <string>
+#include <atomic>
 
 // include ROS2
 #include <rclcpp/rclcpp.hpp>
@@ -48,7 +49,7 @@
 #define PERIOD 0.001s
 #define True_ 0x01
 #define False_ 0x00
-#define KELVIN 2731.0  // KELVIN = 273.1 * 10
+#define KELVIN 2731.0 // KELVIN = 273.1 * 10
 #define DUTY 2.55
 
 class PowerController : public rclcpp::Node
@@ -113,7 +114,8 @@ public:
         this,
         std::placeholders::_1));
     // publisher
-    publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_state", 10);
+    state_publisher_ = this->create_publisher<sensor_msgs::msg::BatteryState>("battery_state", 10);
+    states_publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_states", 10);
     pub_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::publishPowerStatus, this));
     send_can_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::sendCanMessageIfReceived, this));
     // open can socket
@@ -136,7 +138,7 @@ private:
       return -1;
     }
     struct ifreq ifr;
-    strncpy(ifr.ifr_name, can_interface_.c_str(), sizeof(ifr.ifr_name));
+    strcpy(ifr.ifr_name, can_interface_.c_str());
     ioctl(s, SIOCGIFINDEX, &ifr);
     struct sockaddr_can addr;
     addr.can_family = AF_CAN;
@@ -276,8 +278,7 @@ private:
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "reboot");
     mtx_.unlock();
   }
-  void fanController(std_msgs::msg::UInt8 msg)
-  {
+  void fanController(std_msgs::msg::UInt8 msg){
     uint8_t data_ = msg.data;
     if (data_ > 100) {
       RCLCPP_ERROR(this->get_logger(), "only values from 0 to 100 can be entered");
@@ -304,7 +305,7 @@ private:
     frame.can_dlc = 1;
     frame.data[0] = send_can_value_temp.data;
     sendCanFrame(can_socket_, frame);
-    if (!check_send_data_) {
+    if (!check_send_data_){
       RCLCPP_ERROR(this->get_logger(), "can not send data");
       mtx_.unlock();
       return;
@@ -313,32 +314,47 @@ private:
     mtx_.unlock();
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "send data");
   }
-  float convertUnit(uint16_t data, bool temperature_flag = false)
-  {
+  float convertUnit(uint16_t data, bool temperature_flag = false){
     float result;
-    if (temperature_flag) {
+    if (temperature_flag){
       result = (data - KELVIN) / 10.0;
       return result;
     }
     result = static_cast<float>(data) / 1000.0;
     return result;
   }
-  // message & combine bits
+  //message & combine bits
   void conbineBitAndUpdateMessage(
     power_controller_msgs::msg::BatteryArray & battery_msg, int location,
-    uint8_t * frame_data, uint16_t data[4], bool battery_serial_number_flag = false)
-  {
+    uint8_t* frame_data, uint16_t data[4], bool battery_serial_number_flag = false){    
     data[0] = (frame_data[1] << 8) | frame_data[0];
     data[1] = (frame_data[3] << 8) | frame_data[2];
     data[2] = (frame_data[5] << 8) | frame_data[4];
     data[3] = (frame_data[7] << 8) | frame_data[6];
-    if (battery_serial_number_flag) {
+    if (battery_serial_number_flag){
       battery_msg.batteryarray[0].serial_number = std::to_string(data[0]);
       battery_msg.batteryarray[1].serial_number = std::to_string(data[1]);
       battery_msg.batteryarray[2].serial_number = std::to_string(data[2]);
       battery_msg.batteryarray[3].serial_number = std::to_string(data[3]);
       // publsih msg
-      publisher_->publish(battery_msg);
+      states_publisher_->publish(battery_msg);
+
+      sensor_msgs::msg::BatteryState average_battery_msg;
+      average_battery_msg.header.stamp = this->get_clock()->now();
+      average_battery_msg.serial_number = '0';
+      average_battery_msg.location = '0';
+      float percentage_sum = 0, voltage_sum = 0, current_sum = 0, temperature_sum = 0;
+      for(int i=0; i<static_cast<int>(battery_msg.batteryarray.size()); i++) {
+        percentage_sum += battery_msg.batteryarray[i].percentage;
+        voltage_sum += battery_msg.batteryarray[i].voltage;
+        current_sum += battery_msg.batteryarray[i].current;
+	temperature_sum += battery_msg.batteryarray[i].temperature;
+      }
+      average_battery_msg.percentage = percentage_sum / battery_msg.batteryarray.size();
+      average_battery_msg.voltage = voltage_sum / battery_msg.batteryarray.size();
+      average_battery_msg.current = current_sum / battery_msg.batteryarray.size();
+      average_battery_msg.temperature = temperature_sum / battery_msg.batteryarray.size();
+      state_publisher_->publish(average_battery_msg);
       return;
     }
     int array_num = location - 1;
@@ -346,8 +362,8 @@ private:
     // Converts voltage units from mV to V
     battery_msg.batteryarray[array_num].voltage = convertUnit(data[0]);
     // Converts current units from mA to A
-    battery_msg.batteryarray[array_num].current = convertUnit(-data[1]);  // Signs are inverted because hexadecimal data is negative.
-    battery_msg.batteryarray[array_num].percentage = data[2];
+    battery_msg.batteryarray[array_num].current = convertUnit(-data[1]); // Signs are inverted because hexadecimal data is negative.
+    battery_msg.batteryarray[array_num].percentage = data[2] / 100;
     // Convert absolute temperature to Celsius
     battery_msg.batteryarray[array_num].temperature = convertUnit(data[3], temperature_flag_);
     battery_msg.batteryarray[array_num].location = std::to_string(location);
@@ -365,34 +381,49 @@ private:
       return;
     }
     switch (frame.can_id) {
-      case CanId::battery_id_1:   // Battery 1 Info
-        location_ = 1;
-        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-        break;
-      case CanId::battery_id_2:   // Battery 2 Info
-        location_ = 2;
-        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-        break;
-      case CanId::battery_id_3:   // Battery 3 Info
-        location_ = 3;
-        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-        break;
-      case CanId::battery_id_4:   // Battery 4 Info
-        location_ = 4;
-        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-        break;
-      case CanId::battery_serial_number:  // Serial Number
-        location_ = 0;
-        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_, battery_serial_number_flag_);
-        break;
-      default:
-        break;
-    }
+       case CanId::power_sequence:
+	 // RCLCPP_INFO(this->get_logger(), "%d", frame.data);
+	 if (static_cast<int8_t>(*frame.data) == 1)
+	 {
+	   RCLCPP_INFO(this->get_logger(), "power on");
+	 }
+	 else if (static_cast<int8_t>(*frame.data) == 2)
+	 {
+	   RCLCPP_INFO(this->get_logger(), "power 0ff");
+	 }
+	 else if (static_cast<int8_t>(*frame.data) == 4)
+	 {
+	   RCLCPP_INFO(this->get_logger(), "reboot");
+	 }
+	 break;
+       case CanId::battery_id_1:  // Battery 1 Info
+	 location_ = 1;
+	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+	 break;
+       case CanId::battery_id_2:  // Battery 2 Info
+	 location_ = 2;
+	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+	 break;
+       case CanId::battery_id_3:  // Battery 3 Info
+	 location_ = 3;
+	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+	 break;
+       case CanId::battery_id_4:  // Battery 4 Info
+	 location_ = 4;
+	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+	 break;
+       case CanId::battery_serial_number: // Serial Number
+	 location_ = 0;
+	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_, battery_serial_number_flag_);
+	 break;
+       default:
+	 break;
+      }
   }
 
-  // enum
-  enum CanId : uint8_t
-  {
+  //enum
+  enum CanId : uint8_t{
+    power_sequence = 0x03,
     battery_id_1 = 0x05,
     battery_id_2,
     battery_id_3,
@@ -408,8 +439,7 @@ private:
   };
 
   // struct
-  struct SendCanValueInfo
-  {
+  struct SendCanValueInfo {
     uint8_t id;
     uint8_t data;
   };
@@ -437,10 +467,11 @@ private:
   // subscriber
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr subscriber_fan_;
   // publisher
-  rclcpp::Publisher<power_controller_msgs::msg::BatteryArray>::SharedPtr publisher_;
+  rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr state_publisher_;
+  rclcpp::Publisher<power_controller_msgs::msg::BatteryArray>::SharedPtr states_publisher_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
   rclcpp::TimerBase::SharedPtr send_can_timer_;
-  // mutex
+  //mutex
   std::mutex mtx_;
 };
 
