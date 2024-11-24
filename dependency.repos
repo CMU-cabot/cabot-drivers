@@ -2,12 +2,12 @@ repositories:
   cabot-common:
     type: git
     url: https://github.com/CMU-cabot/cabot-common
-    version: dev
+    version: main
 
   cabot-description:
     type: git
     url: https://github.com/CMU-cabot/cabot-description
-    version: dev
+    version: main
 
   docker/driver/ros_odrive:
     type: git
