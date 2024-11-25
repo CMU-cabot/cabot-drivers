@@ -381,21 +381,6 @@ private:
       return;
     }
     switch (frame.can_id) {
-       case CanId::power_sequence:
-	 // RCLCPP_INFO(this->get_logger(), "%d", frame.data);
-	 if (static_cast<int8_t>(*frame.data) == 1)
-	 {
-	   RCLCPP_INFO(this->get_logger(), "power on");
-	 }
-	 else if (static_cast<int8_t>(*frame.data) == 2)
-	 {
-	   RCLCPP_INFO(this->get_logger(), "power 0ff");
-	 }
-	 else if (static_cast<int8_t>(*frame.data) == 4)
-	 {
-	   RCLCPP_INFO(this->get_logger(), "reboot");
-	 }
-	 break;
        case CanId::battery_id_1:  // Battery 1 Info
 	 location_ = 1;
 	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);

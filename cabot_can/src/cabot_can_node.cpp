@@ -37,9 +37,6 @@
 #include "sensor_msgs/msg/fluid_pressure.hpp"
 #include "sensor_msgs/msg/temperature.hpp"
 #include "std_srvs/srv/trigger.hpp"
-#include "diagnostic_updater/publisher.hpp"
-#include "diagnostic_updater/update_functions.hpp"
-#include "diagnostic_msgs/msg/diagnostic_status.hpp"
 
 enum CanId : uint8_t{
   IMU_LINEAR_CAN_ID = 0x09,
@@ -84,7 +81,7 @@ enum CanDlc : uint8_t{
   BME_CAN_DLC = 8,
   TOUCH_CAN_DLC = 4,
   TACT_CAN_DLC = 1,
-  VIBRATOR_CAN_DLC = 6,
+  VIBRATOR_CAN_DLC = 3,
   SERVO_TARGET_CAN_DLC = 4,
   SERVO_POS_CAN_DLC = 4,
   SERVO_FREE_CAN_DLC = 1,
@@ -130,7 +127,6 @@ public:
     capacitive_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("capacitive/touch_raw", 10);
     tof_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("tof/touch_raw", 10);
     servo_pos_pub_ = this->create_publisher<std_msgs::msg::Int16>("servo_pos", 10);
-    diagnostics_pub_= this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("diagnostics", 10);
     vibrator_1_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator1", 10, static_cast<std::function<void(std_msgs::msg::UInt8::SharedPtr)>>(std::bind(&CabotCanNode::subscribeVibratorData, this, std::placeholders::_1, 1)));
     vibrator_3_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator3", 10, static_cast<std::function<void(std_msgs::msg::UInt8::SharedPtr)>>(std::bind(&CabotCanNode::subscribeVibratorData, this, std::placeholders::_1, 3)));
     vibrator_4_sub_ = this->create_subscription<std_msgs::msg::UInt8>("vibrator4", 10, static_cast<std::function<void(std_msgs::msg::UInt8::SharedPtr)>>(std::bind(&CabotCanNode::subscribeVibratorData, this, std::placeholders::_1, 4)));
@@ -205,52 +201,23 @@ private:
   void timerPubCallback() {
     struct can_frame frame;
     int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
-    diagnostic_msgs::msg::DiagnosticArray diag_array;
-    diag_array.header.stamp = this->get_clock()->now();
     if (nbytes > 0) {
-      diagnostic_updater::Updater diagnostic_updater(this->shared_from_this());
-      diagnostic_updater.setHardwareID("CAN_Device");
       switch (frame.can_id) {
         case CanId::BME_CAN_ID:
           publishBmeData(frame);
-          diagnostic_updater.add("Temperature and Pressure Sensor Status", [frame](diagnostic_updater::DiagnosticStatusWrapper& status) {
-            status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Temperature and Pressure is functioning correctly");
-            status.add("CAN ID", frame.can_id);
-          });
-          diagnostic_updater.force_update();
           break;
         case CanId::TACT_CAN_ID:
           publishTactData(frame);
-          diagnostic_updater.add("TACT Sensor Status", [frame](diagnostic_updater::DiagnosticStatusWrapper& status) {
-            status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "TACT Sensor is functioning correctly");
-            status.add("CAN ID", frame.can_id);
-          });
-          diagnostic_updater.force_update();
           break;
         case CanId::TOUCH_CAN_ID:
           publishTouchData(frame);
-          diagnostic_updater.add("TOUCH Sensor Status", [frame](diagnostic_updater::DiagnosticStatusWrapper& status) {
-            status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "TOUCH Sensor is functioning correctly");
-            status.add("CAN ID", frame.can_id);
-          });
-          diagnostic_updater.force_update();
           break;
         case CanId::SERVO_POS_CAN_ID:
           publishServoPosData(frame);
-          diagnostic_updater.add("SERVO Position Status", [frame](diagnostic_updater::DiagnosticStatusWrapper& status) {
-            status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Servo position data received");
-            status.add("CAN ID", frame.can_id);
-          });
-          diagnostic_updater.force_update();
           break;
         default:
           if (frame.can_id >= CanId::TEMPERATURE_1_CAN_ID && frame.can_id <= CanId::TEMPERATURE_5_CAN_ID) {
             publishTemperatureData(frame);
-            diagnostic_updater.add("Temperature Sensor Status", [frame](diagnostic_updater::DiagnosticStatusWrapper& status) {
-              status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Temperature data received");
-              status.add("CAN ID", frame.can_id);
-            });
-            diagnostic_updater.force_update();
           }
           else if (frame.can_id >= CanId::WIFI_CAN_ID_1 && frame.can_id <= CanId::WIFI_CAN_ID_5) {
             publishWifiData(frame);
@@ -260,11 +227,6 @@ private:
           }
           else if (frame.can_id >= CanId::IMU_LINEAR_CAN_ID && frame.can_id <= CanId::IMU_ORIENTATION_CAN_ID) {
             publishImuData(frame);
-            diagnostic_updater.add("IMU Data Status", [frame](diagnostic_updater::DiagnosticStatusWrapper& status) {
-              status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "IMU data received");
-              status.add("CAN ID", frame.can_id);
-            });
-            diagnostic_updater.force_update();
           }
           break;
       }
@@ -311,7 +273,7 @@ private:
       }
       is_read_calibration_3 = true;
     }
-    if (is_read_calibration_1 && is_read_calibration_2 && is_read_calibration_3) {  
+    if (is_read_calibration_1 && is_read_calibration_2 && is_read_calibration_3) {
       std_msgs::msg::Int32MultiArray calibration_msg;
       calibration_msg.data = calibration_data;
       calibration_pub_->publish(calibration_msg);
@@ -352,7 +314,7 @@ private:
       imu_msg.orientation.y = orientation_y * (1.0 / (1 << 14));
       imu_msg.orientation.z = orientation_z * (1.0 / (1 << 14));
       imu_msg.orientation.w = orientation_w * (1.0 / (1 << 14));
-            imu_msg.header.stamp = this->get_clock()->now();
+      imu_msg.header.stamp = this->get_clock()->now();
       std::string frame_id = this->get_parameter("imu_frame_id").as_string();
       imu_msg.header.frame_id = frame_id;
       imu_pub_->publish(imu_msg);
@@ -411,7 +373,7 @@ private:
                               std::to_string(channel) + "," +
                               std::to_string(rssi) + "," +
                               std::to_string(seconds) + "," +
-                              nanoseconds;  
+                              nanoseconds;
       std_msgs::msg::String msg;
       msg.data = wifi_data;
       wifi_pub_->publish(msg);
@@ -652,7 +614,6 @@ private:
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr tof_touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr servo_pos_pub_;
-  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_1_sub_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_3_sub_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_4_sub_;
