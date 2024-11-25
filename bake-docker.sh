@@ -114,7 +114,10 @@ if [[ -z $(docker buildx ls | grep "mybuilder\*") ]]; then
 fi
 
 # tag option
-tag_option="--set=*.tags=${REGISTRY}/${image_name}:{${tags}}"
+tag_option=
+if [[ -n $tags ]]; then
+    tag_option="--set=*.tags=${REGISTRY}/${image_name}:{${tags}}"
+fi
 
 # platform option
 platform_option=
