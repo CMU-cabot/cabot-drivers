@@ -456,7 +456,7 @@ def generate_launch_description():
             ),
             Node(
                 package='cabot_can',
-                executable='can_all_node',
+                executable='cabot_can_node',
                 namespace='/cabot',
                 name='cabot_can',
                 output=output,

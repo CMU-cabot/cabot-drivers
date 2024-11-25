@@ -1,4 +1,4 @@
-can_all_node:
+cabot_can_node:
   ros__parameters:
     calibration_params : [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     can_interface : "can0"
