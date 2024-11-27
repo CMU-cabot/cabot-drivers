@@ -477,7 +477,7 @@ def generate_launch_description():
                 condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
             ),
             Node(
-                package='power_controller',
+                package='power_controller_kx',
                 executable='power_controller',
                 namespace='/cabot',
                 name='power_controller',
