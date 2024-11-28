@@ -104,8 +104,10 @@ Handle::Handle(
       angularDistanceCallback(msg);
     });
   for (int i = 0; i < 9; ++i) {
-    last_up[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
-    last_dwn[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
+    rclcpp::Time zerotime(0, 0, RCL_ROS_TIME);
+    last_up[i] = zerotime;
+    last_dwn[i] = zerotime;
+    last_holddwn[i] = zerotime;
     up_count[i] = 0;
     btn_dwn[i] = false;
   }
