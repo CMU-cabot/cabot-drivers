@@ -408,7 +408,6 @@ private:
 
   //enum
   enum CanId : uint8_t{
-    power_sequence = 0x03,
     battery_id_1 = 0x05,
     battery_id_2,
     battery_id_3,
