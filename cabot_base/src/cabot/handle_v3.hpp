@@ -94,7 +94,7 @@ static constexpr unsigned int DEVIATION = 50;
 static constexpr unsigned int HAS_ARRIVED = 400;
 static constexpr unsigned int SINGLE_VIBRATION = 400;
 static constexpr unsigned int BUTTON_CLICK = 50;
-static constexpr unsigned int BUTTON_HOLDDOWN = 100;
+static constexpr unsigned int BUTTON_HOLDDOWN = 50;
 static constexpr unsigned int CAUTION = 1000;
 static constexpr unsigned int WAITING = 20;
 }  // namespace Duration
@@ -226,6 +226,7 @@ private:
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr angular_distance_sub_;
   rclcpp::Time last_up[9];
   rclcpp::Time last_dwn[9];
+  rclcpp::Time last_holddwn[9];
   int vibratorType_;
   tf2::Quaternion q_;
   tf2::Matrix3x3 m_;
@@ -250,6 +251,8 @@ private:
   int button[10];
   static const rclcpp::Duration double_click_interval_;
   static const rclcpp::Duration ignore_interval_;
+  static const rclcpp::Duration holddown_min_interval_;
+  static const rclcpp::Duration holddown_max_interval_;
   static const rclcpp::Duration holddown_interval_;
   std::string get_name(int);
   std::vector<Vibration> vibration_queue_;
