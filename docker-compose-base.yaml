@@ -66,11 +66,23 @@ services:
       - ./power_controller:/home/developer/driver_ws/src/power_controller
       - ./wireless_scanner_ros:/home/developer/driver_ws/src/wireless_scanner_ros
       - ./script:/home/developer/driver_ws/script
-  
+
+  driver-dev:
+    extends:
+      service: driver-dev-base
+    volumes:
+      - ./docker/home:/home/developer/
+
   driver-prod-base:
     image: cmucal/cabot-driver      # only for prodimg configuration
     extends:
       service: driver-base
+
+  driver-prod:
+    extends:
+      service: driver-prod-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros
 
   wifi_scan-dev-base:
     extends:
@@ -79,12 +91,24 @@ services:
       - "/launch.sh"
       - "wifi-scan"
 
+  wifi_scan-dev:
+    extends:
+      service: wifi_scan-dev-base
+    volumes:
+      - ./docker/home:/home/developer/
+
   wifi_scan-prod-base:
     extends:
       service: driver-prod-base
     command:
       - "/launch.sh"
       - "wifi-scan"
+
+  wifi_scan-prod:
+    extends:
+      service: wifi_scan-prod-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros
 
   ble_scan-dev-base:
     extends:
@@ -93,9 +117,21 @@ services:
       - "/launch.sh"
       - "ble-scan"
 
+  ble_scan-dev:
+    extends:
+      service: ble_scan-dev-base
+    volumes:
+      - ./docker/home:/home/developer/
+
   ble_scan-prod-base:
     extends:
       service: driver-prod-base
     command:
       - "/launch.sh"
       - "ble-scan"
+
+  ble_scan-prod:
+    extends:
+      service: ble_scan-prod-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros

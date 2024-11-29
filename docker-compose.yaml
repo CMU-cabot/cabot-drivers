@@ -1,21 +1,52 @@
 services:
+  # build
   driver:
     extends:
       file: docker-compose-base.yaml
-      service: driver-dev-base
-    volumes:
-      - ./docker/home:/home/developer/
+      service: driver-dev
+    profiles:
+      - build
 
-  wifi_scan:
+  # dev
+  driver-dev:
     extends:
       file: docker-compose-base.yaml
-      service: wifi_scan-dev-base
-    volumes:
-      - ./docker/home:/home/developer/
+      service: driver-dev
+    profiles:
+      - dev
 
-  ble_scan:
+  wifi_scan-dev:
     extends:
       file: docker-compose-base.yaml
-      service: ble_scan-dev-base
-    volumes:
-      - ./docker/home:/home/developer/
+      service: wifi_scan-dev
+    profiles:
+      - dev
+
+  ble_scan-dev:
+    extends:
+      file: docker-compose-base.yaml
+      service: ble_scan-dev
+    profiles:
+      - dev
+
+  # prodimg
+  driver-prod:
+    extends:
+      file: docker-compose-base.yaml
+      service: driver-prod
+    profiles:
+      - prod
+
+  wifi_scan-prod:
+    extends:
+      file: docker-compose-base.yaml
+      service: wifi_scan-prod
+    profiles:
+      - prod
+
+  ble_scan-prod:
+    extends:
+      file: docker-compose-base.yaml
+      service: ble_scan-prod
+    profiles:
+      - prod
