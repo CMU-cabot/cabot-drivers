@@ -104,8 +104,12 @@ class CabotCanNode : public rclcpp::Node
 {
 public:
   CabotCanNode()
-  : Node("cabot_can_node")
+  : touch_mode_("cap"),
+    tof_touch_threshold_(25),
+    Node("cabot_can_node")
   {
+    declare_parameter("touch_mode", touch_mode_);
+    declare_parameter("tof_touch_threshold", tof_touch_threshold_);
     declare_parameter("publish_rate", 200);
     declare_parameter("can_interface", "can0");
     declare_parameter("imu_frame_id", "imu_frame");
@@ -154,6 +158,30 @@ public:
     imu_msg.orientation_covariance[8] = 0.1;
     std::uint8_t publish_rate = this->get_parameter("publish_rate", publish_rate);
     pub_timer_ = this->create_wall_timer(std::chrono::microseconds(publish_rate), std::bind(&CabotCanNode::timerPubCallback, this));
+
+    callback_handler_ =
+      this->add_on_set_parameters_callback(std::bind(&CabotCanNode::param_set_callback, this, std::placeholders::_1));
+
+  }
+
+  rcl_interfaces::msg::SetParametersResult param_set_callback(
+    const std::vector<rclcpp::Parameter>& params)
+  {
+    for (auto && param : params) {
+      if (!this->has_parameter(param.get_name())) {
+        continue;
+      }
+      if (param.get_name() == "touch_mode") {
+        touch_mode_ = param.as_string();
+      }
+      if (param.get_name() == "tof_touch_threshold") {
+        tof_touch_threshold_ = param.as_int();
+      }
+    }
+
+    rcl_interfaces::msg::SetParametersResult result;
+    result.successful = true;
+    return result;
   }
 
 private:
@@ -445,13 +473,25 @@ private:
       tof_touch_raw_pub_->publish(tof_raw_msg);
       int16_t tof_touch = 0;
       int16_t touch = frame.data[3];
-      if (touch == 0) {
-        if (tof_touch_raw >= 16 && tof_touch_raw <= 25) {
+
+      if (touch_mode_ == "dual") {
+        if (touch == 0) {
+          if (tof_touch_raw <= tof_touch_threshold_) {
+            touch = 1;
+          } else {
+            touch = 0;
+          }
+        }
+      } else if (touch_mode_ == "cap") {
+        // noop
+      } else if (touch_mode_ == "tof") {
+        if (tof_touch_raw <= tof_touch_threshold_) {
           touch = 1;
         } else {
           touch = 0;
         }
       }
+
       if (tof_touch_raw >= 16 && tof_touch_raw <= 25) {
         tof_touch = 1;
       } else {
@@ -627,6 +667,8 @@ private:
   }
 
   sensor_msgs::msg::Imu imu_msg;
+  std::string touch_mode_;
+  int tof_touch_threshold_;
   int can_socket_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_2_pub_;
@@ -653,6 +695,7 @@ private:
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr servo_free_sub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr imu_calibration_srv_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr callback_handler_;
   std::vector<double> imu_accel_bias_;
   std::vector<double> imu_gyro_bias_;
 };
