@@ -362,7 +362,7 @@ private:
     battery_msg.batteryarray[array_num].voltage = convertUnit(data[0]);
     // Converts current units from mA to A
     battery_msg.batteryarray[array_num].current = convertUnit(-data[1]); // Signs are inverted because hexadecimal data is negative.
-    battery_msg.batteryarray[array_num].percentage = data[2] / 100;
+    battery_msg.batteryarray[array_num].percentage = static_cast<float>(data[2]) / 100.0f;
     // Convert absolute temperature to Celsius
     battery_msg.batteryarray[array_num].temperature = convertUnit(data[3], temperature_flag_);
     battery_msg.batteryarray[array_num].location = std::to_string(location);
