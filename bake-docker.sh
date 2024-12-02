@@ -41,7 +41,7 @@ function help {
 
 platform=
 base_name=cabot-base
-image_name=cabot-driver
+service=driver
 local=0
 tags=
 
@@ -115,9 +115,10 @@ fi
 
 # tag option
 tag_option=
-if [[ -n $tags ]]; then
-    tag_option="--set=*.tags=${REGISTRY}/${image_name}:{${tags}}"
+if [[ -z $tags ]]; then
+    tags="latest,$(git rev-parse --abbrev-ref HEAD)"
 fi
+tag_option="--set=${service}.tags=${REGISTRY}/cabot-${service}:{${tags}}"
 
 # platform option
 platform_option=
@@ -126,7 +127,7 @@ if [[ -n $platform ]]; then
 fi
 
 # bake
-com="docker buildx bake -f docker-compose.yaml $platform_option $tag_option driver $@"
+com="docker buildx bake -f docker-compose.yaml $platform_option $tag_option $service"
 export BASE_IMAGE=$base_name
 echo $com
 eval $com
