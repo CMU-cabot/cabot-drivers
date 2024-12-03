@@ -37,3 +37,8 @@ cabot:
     ros__parameters:
       can_interface: can0
       # calibration_params: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+
+  features:
+    ros__parameters:
+      handleside: left,right
+      touchmode: cap,tof,dual

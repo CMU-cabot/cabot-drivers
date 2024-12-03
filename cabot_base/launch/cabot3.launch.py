@@ -603,6 +603,16 @@ def generate_launch_description():
                 ],
                 condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
             ),
+
+            # cabot features
+            Node(
+                package='cabot_base',
+                executable='cabot_features.py',
+                namespace='/cabot',
+                name='features',
+                output=output,
+                parameters=[*param_files]
+            ),
         ],
             condition=LaunchConfigurationNotEquals('model', '')
         ),
