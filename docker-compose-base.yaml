@@ -6,7 +6,7 @@ services:
       additional_contexts:
         - src=./
       args:
-        - BASE_IMAGE=${BASE_IMAGE}
+        - BASE_IMAGE=${BASE_IMAGE:-cabot-base}
       x-bake:
         tags:
           - ${REGISTRY:-cmucal}/cabot-driver
