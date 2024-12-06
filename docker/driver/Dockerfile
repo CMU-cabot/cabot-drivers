@@ -141,3 +141,8 @@ FROM build as final
 
 COPY --from=cache_ws $HOME/driver_ws/install $HOME/driver_ws/install
 COPY --from=cache_ws $HOME/driver_ws/script $HOME/driver_ws/script
+
+# change location of ros base
+COPY ros_entrypoint.sh /ros_entrypoint.sh
+RUN sed -i 's:custom_ws:underlay_ws:' /ros_entrypoint.sh
+RUN chmod +x /ros_entrypoint.sh
