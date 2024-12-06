@@ -23,6 +23,7 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <linux/can.h>
+#include <linux/can/raw.h>
 #include <bits/stdc++.h>
 
 #include "rclcpp/rclcpp.hpp"
@@ -32,44 +33,45 @@
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/int8.hpp"
+#include "sensor_msgs/msg/temperature.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/fluid_pressure.hpp"
 #include "sensor_msgs/msg/temperature.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
-enum CanId : uint8_t
-{
-  IMU_LINEAR_CAN_ID = 0x09,
+#define can_mask_id 0x7F8 
+
+enum CanId : uint16_t{
+  IMU_LINEAR_CAN_ID = 0x010,
   IMU_ANGULAR_CAN_ID,
   IMU_ORIENTATION_CAN_ID,
-  WIFI_CAN_ID_1,
-  WIFI_CAN_ID_2,
-  WIFI_CAN_ID_3,
-  WIFI_CAN_ID_4,
-  WIFI_CAN_ID_5,
-  BME_CAN_ID,
-  TOUCH_CAN_ID,
-  TACT_CAN_ID,
-  VIBRATOR_CAN_ID = 0x1B,
-  SERVO_TARGET_CAN_ID,
-  SERVO_POS_CAN_ID = 0x1F,
-  SERVO_FREE_CAN_ID,
-  TEMPERATURE_1_CAN_ID,
+  BME_CAN_ID = 0x018,
+  TEMPERATURE_1_CAN_ID = 0x021,
   TEMPERATURE_2_CAN_ID,
   TEMPERATURE_3_CAN_ID,
   TEMPERATURE_4_CAN_ID,
   TEMPERATURE_5_CAN_ID,
-  WRITE_IMU_CALIBRATION_ID_1 = 0x31,
+  TOUCH_CAN_ID = 0x080,
+  TACT_CAN_ID = 0x089,
+  VIBRATOR_CAN_ID,
+  SERVO_FREE_CAN_ID = 0x098,
+  SERVO_TARGET_CAN_ID,
+  SERVO_POS_CAN_ID,
+  WIFI_CAN_ID_1 = 0x428,
+  WIFI_CAN_ID_2,
+  WIFI_CAN_ID_3,
+  WIFI_CAN_ID_4,
+  WIFI_CAN_ID_5,  
+  IMU_CALIBRATION_SEND_CAN_ID = 0x430,
+  WRITE_IMU_CALIBRATION_ID_1,
   WRITE_IMU_CALIBRATION_ID_2,
   WRITE_IMU_CALIBRATION_ID_3,
-  READ_IMU_CALIBRATION_ID_1,
+  READ_IMU_CALIBRATION_ID_1 = 0x439,
   READ_IMU_CALIBRATION_ID_2,
   READ_IMU_CALIBRATION_ID_3,
-  IMU_CALIBRATION_SEND_CAN_ID = 0x38,
 };
 
-enum CanDlc : uint8_t
-{
+enum CanDlc : uint8_t{
   IMU_LINEAR_CAN_DLC = 6,
   IMU_ANGULAR_CAN_DLC = 6,
   IMU_ORIENTATION_CAN_DLC = 8,
@@ -82,7 +84,7 @@ enum CanDlc : uint8_t
   BME_CAN_DLC = 8,
   TOUCH_CAN_DLC = 4,
   TACT_CAN_DLC = 1,
-  VIBRATOR_CAN_DLC = 3,
+  VIBRATOR_CAN_DLC = 6,
   SERVO_TARGET_CAN_DLC = 4,
   SERVO_POS_CAN_DLC = 4,
   SERVO_FREE_CAN_DLC = 1,
@@ -95,9 +97,18 @@ enum CanDlc : uint8_t
   WRITE_IMU_CALIBRATION_2_DLC = 8,
   WRITE_IMU_CALIBRATION_3_DLC = 6,
   READ_IMU_CALIBRATION_1_DLC = 8,
-  READ_IMU_CALIBRATION_2_DLC = 8,
+  READ_IMU_CALIBRATION_2_DLC= 8,
   READ_IMU_CALIBRATION_3_DLC = 6,
   IMU_CALIBRATION_SEND_CAN_DLC = 1,
+};
+
+enum CanFilter : uint16_t{
+  IMU_CAN_FILTER = 0x010,
+  BME_CAN_FILTER = 0x018,
+  TEMP_CAN_FILTER = 0x020,
+  SERVO_CAN_FILTER = 0x058,
+  WIFI_CAN_FILTER = 0x228,
+  READ_IMU_CALIBRATION_CAN_FILTER = 0x238,
 };
 
 class CabotCanNode : public rclcpp::Node
@@ -185,22 +196,43 @@ public:
   }
 
 private:
-  int openCanSocket()
-  {
+  int openCanSocket() {
     std::string can_interface = this->get_parameter("can_interface").as_string();
     int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (s < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error while opening socket");
     }
     struct ifreq ifr;
-    strncpy(ifr.ifr_name, can_interface.c_str(), sizeof(ifr.ifr_name));
-    ioctl(s, SIOCGIFINDEX, &ifr);
+    strcpy(ifr.ifr_name, can_interface.c_str());
+    if (ioctl(s, SIOCGIFINDEX, &ifr) < 0) {
+      RCLCPP_ERROR(this->get_logger(), "Error in ioctl");
+      close(s);
+      return -1;
+    }
     struct sockaddr_can addr;
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
     if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error in socket bind");
       close(s);
+    }
+    struct can_filter filters[6];
+    filters[0].can_id = CanFilter::IMU_CAN_FILTER;
+    filters[0].can_mask = can_mask_id;
+    filters[1].can_id = CanFilter::BME_CAN_FILTER;
+    filters[1].can_mask = can_mask_id;
+    filters[2].can_id = CanFilter::TEMP_CAN_FILTER;
+    filters[2].can_mask = can_mask_id;
+    filters[3].can_id = CanFilter::SERVO_CAN_FILTER;
+    filters[3].can_mask = can_mask_id;
+    filters[4].can_id = CanFilter::WIFI_CAN_FILTER;
+    filters[4].can_mask = can_mask_id;
+    filters[5].can_id = CanFilter::READ_IMU_CALIBRATION_CAN_FILTER;
+    filters[5].can_mask = can_mask_id;
+    if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &filters, sizeof(filters)) < 0) {
+      RCLCPP_ERROR(this->get_logger(), "Error in setsockopt for CAN filter");
+      close(s);
+      return -1;
     }
     return s;
   }
@@ -245,35 +277,26 @@ private:
     nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
   }
 
-  void timerPubCallback()
-  {
+  void timerPubCallback() {
     struct can_frame frame;
     int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
     if (nbytes > 0) {
-      switch (frame.can_id) {
-        case CanId::BME_CAN_ID:
-          publishBmeData(frame);
-          break;
-        case CanId::TACT_CAN_ID:
-          publishTactData(frame);
-          break;
-        case CanId::TOUCH_CAN_ID:
-          publishTouchData(frame);
-          break;
-        case CanId::SERVO_POS_CAN_ID:
-          publishServoPosData(frame);
-          break;
-        default:
-          if (frame.can_id >= CanId::TEMPERATURE_1_CAN_ID && frame.can_id <= CanId::TEMPERATURE_5_CAN_ID) {
-            publishTemperatureData(frame);
-          } else if (frame.can_id >= CanId::WIFI_CAN_ID_1 && frame.can_id <= CanId::WIFI_CAN_ID_5) {
-            publishWifiData(frame);
-          } else if (frame.can_id >= CanId::READ_IMU_CALIBRATION_ID_1 && frame.can_id <= CanId::READ_IMU_CALIBRATION_ID_3) {
-            readImuCalibration(frame);
-          } else if (frame.can_id >= CanId::IMU_LINEAR_CAN_ID && frame.can_id <= CanId::IMU_ORIENTATION_CAN_ID) {
-            publishImuData(frame);
-          }
-          break;
+      if (frame.can_id == CanId::BME_CAN_ID) {
+        publishBmeData(frame);
+      } else if (frame.can_id == CanId::TACT_CAN_ID) {
+        publishTactData(frame);
+      } else if (frame.can_id == CanId::TOUCH_CAN_ID) {
+        publishTouchData(frame);
+      } else if (frame.can_id == CanId::SERVO_POS_CAN_ID) {
+        publishServoPosData(frame);
+      } else if (frame.can_id >= CanId::TEMPERATURE_1_CAN_ID && frame.can_id <= CanId::TEMPERATURE_5_CAN_ID) {
+        publishTemperatureData(frame);
+      } else if (frame.can_id >= CanId::WIFI_CAN_ID_1 && frame.can_id <= CanId::WIFI_CAN_ID_5) {
+        publishWifiData(frame);
+      } else if (frame.can_id >= CanId::READ_IMU_CALIBRATION_ID_1 && frame.can_id <= CanId::READ_IMU_CALIBRATION_ID_3) {
+        readImuCalibration(frame);
+      } else if (frame.can_id >= CanId::IMU_LINEAR_CAN_ID && frame.can_id <= CanId::IMU_ORIENTATION_CAN_ID) {
+        publishImuData(frame);
       }
     }
   }
@@ -505,44 +528,6 @@ private:
       touch_pub_->publish(touch_msg);
     }
   }
-
-/*
-  void publishTactData(const struct can_frame &frame) {
-    static uint8_t previous_data = 0;
-    static uint8_t data_count = 0;
-    if (frame.can_id == CanId::TACT_CAN_ID && frame.can_dlc == 1) {
-      if (frame.data[0] == 0) {
-        std_msgs::msg::Int8 tact_msg;
-        tact_msg.data = 0;
-        tact_pub_->publish(tact_msg);
-        data_count = 0;
-        return;
-      }
-      if (frame.data[0] == previous_data) {
-        data_count++;
-      } else {
-        data_count++;
-        previous_data = frame.data[0];
-      }
-      //change the threshold by rewriting data_count
-      if (data_count >= 2) {
-        std_msgs::msg::Int8 tact_msg;
-        uint8_t tact_data = 0;
-        if (frame.data[0] == 1) {
-          tact_data = 8;
-        } else if (frame.data[0] == 2) {
-          tact_data = 4;
-        } else if (frame.data[0] == 4) {
-          tact_data = 1;
-        } else if (frame.data[0] == 8) {
-          tact_data = 2;
-        }
-        tact_msg.data = tact_data;
-        tact_pub_->publish(tact_msg);
-      }
-    }
-  }
-*/
 
   void publishTactData(const struct can_frame & frame)
   {
