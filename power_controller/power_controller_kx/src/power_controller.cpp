@@ -1,22 +1,24 @@
-// Copyright (c) 2024  Miraikan - The National Museum of Emerging Science and Innovation
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
+/*******************************************************************************
+ * Copyright (c) 2024  Miraikan and Carnegie Mellon University
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *******************************************************************************/
 
 //include header file
 #include <cstdio>
@@ -25,6 +27,7 @@
 #include <chrono>
 #include <sys/socket.h>
 #include <linux/can.h>
+#include <linux/can/raw.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <list>
@@ -34,6 +37,7 @@
 // include ROS2
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/battery_state.hpp>
+#include "sensor_msgs/msg/temperature.hpp"
 #include <std_msgs/msg/u_int8.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 #include <std_srvs/srv/empty.hpp>
@@ -44,11 +48,18 @@
 
 // font color
 #define ANSI_COLOR_CYAN   "\x1b[36m"
+
+// define value
 #define PERIOD 0.001s
 #define True_ 0x01
 #define False_ 0x00
-#define KELVIN 2731.0  // KELVIN = 273.1 * 10
+#define KELVIN 2731.0 // KELVIN = 273.1 * 10
 #define DUTY 2.55
+#define HIGHTEMPERATURE 55
+#define LOWTEMPERATURE 25
+#define MAXFAN 100
+#define MINFAN 10
+#define TEMPERATURETOFAN (20 / 11.0)
 
 class PowerController : public rclcpp::Node
 {
@@ -111,11 +122,20 @@ public:
         &PowerController::fanController,
         this,
         std::placeholders::_1));
+    // temperature subscriber
+    sub_temper_  = this->create_subscription<sensor_msgs::msg::Temperature>(
+      "temperature3",
+      10,
+      std::bind(
+	&PowerController::temperatureCallBack,
+	this,
+	std::placeholders::_1));
     // publisher
     state_publisher_ = this->create_publisher<sensor_msgs::msg::BatteryState>("battery_state", 10);
     states_publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_states", 10);
     pub_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::publishPowerStatus, this));
     send_can_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::sendCanMessageIfReceived, this));
+    fan_publisher_ = this->create_publisher<std_msgs::msg::UInt8>("fan_controller", 10);
     // open can socket
     can_socket_ = openCanSocket();
   }
@@ -136,13 +156,23 @@ private:
       return -1;
     }
     struct ifreq ifr;
-    strncpy(ifr.ifr_name, can_interface_.c_str(), sizeof(ifr.ifr_name));
+    strcpy(ifr.ifr_name, can_interface_.c_str());
     ioctl(s, SIOCGIFINDEX, &ifr);
     struct sockaddr_can addr;
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
     if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "bind");
+      close(s);
+      return -1;
+    }
+    struct can_filter filters[2];
+    filters[0].can_id = 0x298;
+    filters[0].can_mask = 0x7f8;
+    filters[1].can_id = 0x2a0;
+    filters[1].can_mask = 0x7f8;
+    if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &filters, sizeof(filters)) < 0) {
+      RCLCPP_ERROR(this->get_logger(), "Error in setsockopt for CAN filter");
       close(s);
       return -1;
     }
@@ -292,6 +322,25 @@ private:
     send_can_value_list_.push_back({id_, send_can_value_});
     mtx_.unlock();
   }
+  void temperatureCallBack(sensor_msgs::msg::Temperature temp_msg)
+  {
+    std_msgs::msg::UInt8 fan_msg;
+    double framos_temperature = temp_msg.temperature;
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "temperature is %f", framos_temperature);
+    if (framos_temperature >= HIGHTEMPERATURE)
+    {
+      fan_msg.data = MAXFAN;
+    }
+    else if (framos_temperature <= LOWTEMPERATURE)
+    {
+      fan_msg.data = MINFAN;
+    }
+    else
+    {
+      fan_msg.data = framos_temperature * TEMPERATURETOFAN;
+    }
+    fan_publisher_->publish(fan_msg);
+  }
   void sendCanMessageIfReceived()
   {
     can_frame frame;
@@ -304,7 +353,7 @@ private:
     frame.can_dlc = 1;
     frame.data[0] = send_can_value_temp.data;
     sendCanFrame(can_socket_, frame);
-    if (!check_send_data_) {
+    if (!check_send_data_){
       RCLCPP_ERROR(this->get_logger(), "can not send data");
       mtx_.unlock();
       return;
@@ -362,7 +411,7 @@ private:
     battery_msg.batteryarray[array_num].voltage = convertUnit(data[0]);
     // Converts current units from mA to A
     battery_msg.batteryarray[array_num].current = convertUnit(-data[1]); // Signs are inverted because hexadecimal data is negative.
-    battery_msg.batteryarray[array_num].percentage = static_cast<float>(data[2]) / 100.0f;
+    battery_msg.batteryarray[array_num].percentage = data[2] / 100;
     // Convert absolute temperature to Celsius
     battery_msg.batteryarray[array_num].temperature = convertUnit(data[3], temperature_flag_);
     battery_msg.batteryarray[array_num].location = std::to_string(location);
@@ -405,26 +454,24 @@ private:
       }
   }
 
-  // enum
-  enum CanId : uint8_t
-  {
-    battery_id_1 = 0x05,
+  //enum
+  enum CanId : uint16_t{
+    battery_id_1 = 0x518,
     battery_id_2,
     battery_id_3,
     battery_id_4,
-    odrive_id = 0x15,
+    odrive_id = 0x108,
     power_id,
     d455_front_id,
     d455_left_id,
     d455_right_id,
-    mcu_id = 0x1a,
-    battery_serial_number = 0x1d,
-    fan_id
+    mcu_id,
+    fan_id,
+    battery_serial_number = 0x520    
   };
 
   // struct
-  struct SendCanValueInfo
-  {
+  struct SendCanValueInfo {
     uint8_t id;
     uint8_t data;
   };
@@ -451,12 +498,14 @@ private:
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_server_reboot_;
   // subscriber
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr subscriber_fan_;
+  rclcpp::Subscription<sensor_msgs::msg::Temperature>::SharedPtr sub_temper_;
   // publisher
+  rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr fan_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr state_publisher_;
   rclcpp::Publisher<power_controller_msgs::msg::BatteryArray>::SharedPtr states_publisher_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
   rclcpp::TimerBase::SharedPtr send_can_timer_;
-  // mutex
+  //mutex
   std::mutex mtx_;
 };
 
