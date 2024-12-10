@@ -1,24 +1,22 @@
-/*******************************************************************************
- * Copyright (c) 2024  Miraikan and Carnegie Mellon University
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *******************************************************************************/
+// Copyright (c) 2024  Miraikan - The National Museum of Emerging Science and Innovation
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
 
 //include header file
 #include <cstdio>
@@ -53,7 +51,7 @@
 #define PERIOD 0.001s
 #define True_ 0x01
 #define False_ 0x00
-#define KELVIN 2731.0 // KELVIN = 273.1 * 10
+#define KELVIN 2731.0  // KELVIN = 273.1 * 10
 #define DUTY 2.55
 #define HIGHTEMPERATURE 55
 #define LOWTEMPERATURE 25
@@ -156,7 +154,7 @@ private:
       return -1;
     }
     struct ifreq ifr;
-    strcpy(ifr.ifr_name, can_interface_.c_str());
+    strncpy(ifr.ifr_name, can_interface_.c_str(), sizeof(ifr.ifr_name));
     ioctl(s, SIOCGIFINDEX, &ifr);
     struct sockaddr_can addr;
     addr.can_family = AF_CAN;
@@ -166,11 +164,9 @@ private:
       close(s);
       return -1;
     }
-    struct can_filter filters[2];
-    filters[0].can_id = 0x298;
-    filters[0].can_mask = 0x7f8;
-    filters[1].can_id = 0x2a0;
-    filters[1].can_mask = 0x7f8;
+    struct can_filter filters[1];
+    filters[0].can_id = 0x100;
+    filters[0].can_mask = 0x1C0;
     if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &filters, sizeof(filters)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error in setsockopt for CAN filter");
       close(s);
@@ -353,7 +349,7 @@ private:
     frame.can_dlc = 1;
     frame.data[0] = send_can_value_temp.data;
     sendCanFrame(can_socket_, frame);
-    if (!check_send_data_){
+    if (!check_send_data_) {
       RCLCPP_ERROR(this->get_logger(), "can not send data");
       mtx_.unlock();
       return;
@@ -411,7 +407,7 @@ private:
     battery_msg.batteryarray[array_num].voltage = convertUnit(data[0]);
     // Converts current units from mA to A
     battery_msg.batteryarray[array_num].current = convertUnit(-data[1]); // Signs are inverted because hexadecimal data is negative.
-    battery_msg.batteryarray[array_num].percentage = data[2] / 100;
+    battery_msg.batteryarray[array_num].percentage = static_cast<float>(data[2]) / 100.0f;;
     // Convert absolute temperature to Celsius
     battery_msg.batteryarray[array_num].temperature = convertUnit(data[3], temperature_flag_);
     battery_msg.batteryarray[array_num].location = std::to_string(location);
@@ -455,7 +451,8 @@ private:
   }
 
   //enum
-  enum CanId : uint16_t{
+  enum CanId : uint16_t
+  {
     battery_id_1 = 0x518,
     battery_id_2,
     battery_id_3,
@@ -471,7 +468,8 @@ private:
   };
 
   // struct
-  struct SendCanValueInfo {
+  struct SendCanValueInfo
+  {
     uint8_t id;
     uint8_t data;
   };
@@ -505,7 +503,7 @@ private:
   rclcpp::Publisher<power_controller_msgs::msg::BatteryArray>::SharedPtr states_publisher_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
   rclcpp::TimerBase::SharedPtr send_can_timer_;
-  //mutex
+  // mutex
   std::mutex mtx_;
 };
 
