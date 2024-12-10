@@ -69,12 +69,13 @@ COPY --from=cache $UNDERLAY_WS/install $UNDERLAY_WS/install
 COPY --from=cache /tmp/opt/src $UNDERLAY_WS/src
 
 RUN apt update && apt install -y \
-	libusb-1.0-0 \
-	python3-pip \
-	python3-venv \
+    gosu \
+    libusb-1.0-0 \
+    python3-pip \
+    python3-venv \
     python3-gi \
     python3-dbus \
-	ros-${ROS_DISTRO}-diagnostic-updater \
+    ros-${ROS_DISTRO}-diagnostic-updater \
     ros-${ROS_DISTRO}-joy-linux \
     ros-${ROS_DISTRO}-xacro \
     ros-${ROS_DISTRO}-realsense2-description \
@@ -110,12 +111,14 @@ ARG UID=1000
 RUN useradd -m $USERNAME && \
         echo "$USERNAME:$USERNAME" | chpasswd && \
         usermod --shell /bin/bash $USERNAME && \
-	usermod -aG sudo $USERNAME && \
+        usermod -aG sudo $USERNAME && \
         mkdir -p /etc/sudoers.d/ && \
         echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$USERNAME && \
         chmod 0440 /etc/sudoers.d/$USERNAME && \
         usermod  --uid $UID $USERNAME && \
         groupmod --gid $UID $USERNAME
+
+FROM build as cache_ws
 
 USER $USERNAME
 
@@ -123,21 +126,29 @@ ENV HOME /home/$USERNAME
 
 WORKDIR $HOME/driver_ws
 
-FROM build as cache_ws
-
-COPY --from=src ./cabot-common/cabot_common $HOME/driver_ws/src/cabot_common
-COPY --from=src ./cabot-common/cabot_msgs $HOME/driver_ws/src/cabot_msgs
-COPY --from=src ./cabot-common/docker/humble-custom/people $HOME/driver_ws/src/people
-COPY --from=src ./cabot-description/cabot_description $HOME/driver_ws/src/cabot_description
-COPY --from=src ./cabot_base $HOME/driver_ws/src/cabot_base
-COPY --from=src ./cabot_serial $HOME/driver_ws/src/cabot_serial
-COPY --from=src ./motor_controller $HOME/driver_ws/src/motor_controller
-COPY --from=src ./wireless_scanner_ros $HOME/driver_ws/src/wireless_scanner_ros
-COPY --from=src ./script $HOME/driver_ws/script
+COPY --chown=$USERNAME:$USERNAME --from=src ./cabot-common/cabot_common $HOME/driver_ws/src/cabot_common
+COPY --chown=$USERNAME:$USERNAME --from=src ./cabot-common/cabot_msgs $HOME/driver_ws/src/cabot_msgs
+COPY --chown=$USERNAME:$USERNAME --from=src ./cabot-common/docker/humble-custom/people $HOME/driver_ws/src/people
+COPY --chown=$USERNAME:$USERNAME --from=src ./cabot-description/cabot_description $HOME/driver_ws/src/cabot_description
+COPY --chown=$USERNAME:$USERNAME --from=src ./cabot_base $HOME/driver_ws/src/cabot_base
+COPY --chown=$USERNAME:$USERNAME --from=src ./cabot_serial $HOME/driver_ws/src/cabot_serial
+COPY --chown=$USERNAME:$USERNAME --from=src ./motor_controller $HOME/driver_ws/src/motor_controller
+COPY --chown=$USERNAME:$USERNAME --from=src ./wireless_scanner_ros $HOME/driver_ws/src/wireless_scanner_ros
+COPY --chown=$USERNAME:$USERNAME --from=src ./script $HOME/driver_ws/script
 
 RUN /ros_entrypoint.sh /launch.sh build
 
 FROM build as final
 
-COPY --from=cache_ws $HOME/driver_ws/install $HOME/driver_ws/install
-COPY --from=cache_ws $HOME/driver_ws/script $HOME/driver_ws/script
+# change location of ros base
+COPY ros_entrypoint.sh /ros_entrypoint.sh
+RUN sed -i 's:custom_ws:underlay_ws:' /ros_entrypoint.sh
+
+ENV HOME /home/$USERNAME
+
+WORKDIR $HOME/driver_ws
+
+RUN chown $USERNAME:$USERNAME $HOME/driver_ws
+
+COPY --chown=$USERNAME:$USERNAME --from=cache_ws $HOME/driver_ws/install $HOME/driver_ws/install
+COPY --chown=$USERNAME:$USERNAME --from=cache_ws $HOME/driver_ws/script $HOME/driver_ws/script
