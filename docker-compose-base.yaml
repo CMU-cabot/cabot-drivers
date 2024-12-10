@@ -16,6 +16,9 @@ services:
         output:
           - type=registry
     environment:
+      - HOST_UID
+      - HOST_GID
+      - HOST_TZ
       - ROS_LOG_DIR
       - CABOT_MODEL
       - CABOT_SIDE
