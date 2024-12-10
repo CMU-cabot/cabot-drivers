@@ -99,7 +99,7 @@ class Handle:
                 now - self.lastUp[index] < self.ignore_interval):
             event = {"button": key, "up": False}
             self.btnDwn[index] = True
-            self.lastDwn[index] = now # for holddown detection
+            self.lastDwn[index] = now  # for holddown detection
         # detect change from button down to button up to emit a button up event
         if not msg.data and self.btnDwn[index]:
             event = {"button": key, "up": True}
@@ -117,9 +117,9 @@ class Handle:
             self.upCount[index] = 0
         # detect button hold down to emit a holddown event
         if msg.data and self.btnDwn[index] and \
-           (self.lastDwn[index] is not None and \
+           (self.lastDwn[index] is not None and
            now - self.lastDwn[index] > self.holddown_interval):
-            event = {"holddown":key}
+            event = {"holddown": key}
             # clear lastDwn[index] after holddown event emission to prevent multiple event emissions
             self.lastDwn[index] = None
 

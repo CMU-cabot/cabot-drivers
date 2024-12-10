@@ -1,24 +1,22 @@
-/*******************************************************************************
- * Copyright (c) 2019, 2022  Carnegie Mellon University
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *******************************************************************************/
+// Copyright (c) 2019, 2022  Carnegie Mellon University
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 /*
  * Odriver motor controller adapter
@@ -57,6 +55,7 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
 
   targetRate_(40),
   maxAcc_(0.5),
+  maxDec_(-0.5),
 
   bias_(0),
   wheel_diameter_(0),
@@ -93,10 +92,11 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   pauseControlSub = create_subscription<std_msgs::msg::Bool>(
     pauseControlInput_, 10, std::bind(&ODriverNode::pauseControlCallback, this, _1));
 
-  
+
   imuSub = create_subscription<sensor_msgs::msg::Imu>("/imu", rclcpp::SensorDataQoS(), std::bind(&ODriverNode::imuCallback, this, _1));
 
   maxAcc_ = declare_parameter("max_acc", maxAcc_);
+  maxDec_ = declare_parameter("max_dec", maxDec_);
   targetRate_ = declare_parameter("target_rate", targetRate_);
   motorOutput_ = declare_parameter("motor_topic", motorOutput_);
 
@@ -127,7 +127,8 @@ void ODriverNode::cmdVelLoop(int publishRate)
 
   motorPub = create_publisher<odriver_msgs::msg::MotorTarget>(motorOutput_, 10);
 
-  double minimumStep = maxAcc_ / publishRate;
+  double maxAccStep = maxAcc_ / publishRate;
+  double maxDecStep = maxDec_ / publishRate;
 
   while (rclcpp::ok()) {
     odriver_msgs::msg::MotorTarget target;
@@ -135,15 +136,26 @@ void ODriverNode::cmdVelLoop(int publishRate)
     double targetL = targetSpdLinear_;
     double targetT = targetSpdTurn_;
 
-    // change linear speed by maximum acc rate
-    double lDiff = targetL - currentSpdLinear_;
-    if (fabs(lDiff) < minimumStep) {
-      currentSpdLinear_ = targetL;
+    if (targetL == 0.0) {
+      // change linear speed by maximum dec rate, if the control is zero (maybe not specified)
+      double lDiff = targetL - currentSpdLinear_;
+      if (fabs(lDiff) < fabs(maxDecStep)) {
+        currentSpdLinear_ = targetL;
+      } else {
+        currentSpdLinear_ -= maxDecStep * lDiff / fabs(lDiff);
+      }
     } else {
-      currentSpdLinear_ += minimumStep * lDiff / fabs(lDiff);
+      // change linear speed by maximum acc rate
+      double lDiff = targetL - currentSpdLinear_;
+      if (fabs(lDiff) < maxAccStep) {
+        currentSpdLinear_ = targetL;
+      } else {
+        currentSpdLinear_ += maxAccStep * lDiff / fabs(lDiff);
+      }
     }
 
     // adjust angular speed
+    target.header.stamp = get_clock()->now();
     target.spd_left = currentSpdLinear_ - targetT;
     target.spd_right = currentSpdLinear_ + targetT;
 
@@ -157,11 +169,12 @@ void ODriverNode::cmdVelLoop(int publishRate)
 
     // linear and velocity error feedback
     // apply feedback only when the following conditions are met to prevent integrator error accumulation
-    if (lastOdomTime_ > rclcpp::Time(0, 0, get_clock()->get_clock_type()) // after receiving at least one motorStatus message
-        && get_clock()->now() - lastOdomTime_ < rclcpp::Duration(200ms) // last odometry is almost up-to-date (within 200ms)
-        && target.loop_ctrl  // loop control is on
-        && !(targetSpdLinear_ == 0.0 and targetSpdTurn_ == 0.0)  // command velocity is non-zero
-        ) {
+    if (lastOdomTime_ > rclcpp::Time(0, 0, get_clock()->get_clock_type()) &&  // after receiving at least one motorStatus message
+      get_clock()->now() - lastOdomTime_ < rclcpp::Duration(200ms) &&  // last odometry is almost up-to-date (within 200ms)
+      target.loop_ctrl &&  // loop control is on
+      !(targetSpdLinear_ == 0.0 && targetSpdTurn_ == 0.0)  // command velocity is non-zero
+    )
+    {
       rclcpp::Time now = get_clock()->now();
       double dt = 1.0 / publishRate;
       double fixedMeasuredSpdTurn = measuredSpdTurn_;
@@ -189,10 +202,10 @@ void ODriverNode::cmdVelLoop(int publishRate)
     } else {
       // reduce current speed to zero at maximum acc rate when feedback is disabled
       double lDiff = 0.0 - currentSpdLinear_;
-      if (fabs(lDiff) < minimumStep) {
+      if (fabs(lDiff) < fabs(maxDecStep)) {
         currentSpdLinear_ = 0.0;
       } else {
-        currentSpdLinear_ += minimumStep * lDiff / fabs(lDiff);
+        currentSpdLinear_ -= maxDecStep * lDiff / fabs(lDiff);
       }
 
       // reset integrator when feedback is disabled
@@ -202,7 +215,6 @@ void ODriverNode::cmdVelLoop(int publishRate)
 
     motorPub->publish(target);
 
-    double now = this->get_clock()->now().seconds();
     double errorSpdLinear = currentSpdLinear_ - measuredSpdLinear_;
     double errorSpdTurn = targetSpdTurn_ - measuredSpdTurn_;
 

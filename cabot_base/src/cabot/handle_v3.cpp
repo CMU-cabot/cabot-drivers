@@ -1,25 +1,22 @@
-/*******************************************************************************
- * Copyright (c) 2023  Miraikan and Carnegie Mellon University
- * Copyright (c) 2024  ALPS ALPINE CO., LTD.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *******************************************************************************/
+// Copyright (c) 2023, 2024  Miraikan, Carnegie Mellon University, and ALPS ALPINE CO., LTD.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 #include <vector>
 #include <string>
@@ -34,13 +31,15 @@
 
 using namespace std::chrono_literals;
 static DirectionalIndicator di;
-const std::vector<std::string> Handle::stimuli_names = 
+const std::vector<std::string> Handle::stimuli_names =
 {"unknown", "left_turn", "right_turn", "left_dev", "right_dev", "front",
   "left_about_turn", "right_about_turn", "button_click", "button_holddown",
   "caution", "navigation;event;navigation_start", "navigation_arrived"};
 const rclcpp::Duration Handle::double_click_interval_ = rclcpp::Duration(0, 250000000);
 const rclcpp::Duration Handle::ignore_interval_ = rclcpp::Duration(0, 50000000);
-const rclcpp::Duration Handle::holddown_interval_ = rclcpp::Duration(3, 0);
+const rclcpp::Duration Handle::holddown_min_interval_ = rclcpp::Duration(1, 0);
+const rclcpp::Duration Handle::holddown_max_interval_ = rclcpp::Duration(5, 100000000);  // 5.1 sec (margin=0.1sec)
+const rclcpp::Duration Handle::holddown_interval_ = rclcpp::Duration(1, 0);
 
 std::string Handle::get_name(int stimulus)
 {
@@ -105,8 +104,10 @@ Handle::Handle(
       angularDistanceCallback(msg);
     });
   for (int i = 0; i < 9; ++i) {
-    last_up[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
-    last_dwn[i] = rclcpp::Time(0, 0, RCL_ROS_TIME);
+    rclcpp::Time zerotime(0, 0, RCL_ROS_TIME);
+    last_up[i] = zerotime;
+    last_dwn[i] = zerotime;
+    last_holddwn[i] = zerotime;
     up_count[i] = 0;
     btn_dwn[i] = false;
   }
@@ -186,7 +187,7 @@ float Handle::getWeightedMovingAverage(const std::vector<float> & data)
   float sum_weighted_value = 0.0f;
   float sum_weight = 0.0f;
   float median = getMedian(data);
-  for (float value: data) {
+  for (float value : data) {
     float weight = exp(wma_filter_coef_ * std::abs(value - median));
     sum_weighted_value += value * weight;
     sum_weight += weight;
@@ -273,14 +274,14 @@ void Handle::buttonCheck(std_msgs::msg::Int8::UniquePtr & msg, int index)
   if (btn_push && !btn_dwn[index] &&
     !(last_up[index] != zerotime && now - last_up[index] < ignore_interval_))
   {
-    event.insert(std::pair("button", std::to_string(button_keys(index))));
-    event.insert(std::pair("up", "False"));
+    event.insert(std::pair<std::string, std::string>("button", std::to_string(button_keys(index))));
+    event.insert(std::pair<std::string, std::string>("up", "False"));
     btn_dwn[index] = true;
     last_dwn[index] = now;
   }
   if (!btn_push && btn_dwn[index]) {
-    event.insert(std::pair("button", std::to_string(button_keys(index))));
-    event.insert(std::pair("up", "True"));
+    event.insert(std::pair<std::string, std::string>("button", std::to_string(button_keys(index))));
+    event.insert(std::pair<std::string, std::string>("up", "True"));
     up_count[index]++;
     last_up[index] = now;
     btn_dwn[index] = false;
@@ -289,19 +290,24 @@ void Handle::buttonCheck(std_msgs::msg::Int8::UniquePtr & msg, int index)
     !btn_dwn[index] &&
     now - last_up[index] > double_click_interval_)
   {
-    if (last_dwn[index] != zerotime) {
-      event.insert(std::pair("buttons", std::to_string(button_keys(index))));
-      event.insert(std::pair("count", std::to_string(up_count[index])));
+    if (last_holddwn[index] == zerotime) {
+      event.insert(std::pair<std::string, std::string>("buttons", std::to_string(button_keys(index))));
+      event.insert(std::pair<std::string, std::string>("count", std::to_string(up_count[index])));
     }
     last_up[index] = zerotime;
+    last_holddwn[index] = zerotime;
     up_count[index] = 0;
   }
   if (btn_push && btn_dwn[index] &&
     last_dwn[index] != zerotime &&
-    now - last_dwn[index] > holddown_interval_)
+    (now - last_dwn[index] > holddown_min_interval_ &&
+     now - last_holddwn[index] > holddown_interval_ &&
+     now - last_dwn[index] < holddown_max_interval_))
   {
-    event.insert(std::pair("holddown", std::to_string(button_keys(index))));
-    last_dwn[index] = zerotime;
+    event.insert(std::pair<std::string, std::string>("holddown", std::to_string(button_keys(index))));
+    int duration = (int)(now - last_dwn[index]).seconds();
+    event.insert(std::pair<std::string, std::string>("duration", std::to_string(duration)));
+    last_holddwn[index] = now;
   }
   if (!event.empty()) {
     eventListener_(event);
@@ -335,9 +341,9 @@ void Handle::cmdVelCallback(geometry_msgs::msg::Twist::UniquePtr & msg)
   std::vector<double> linear = {msg->linear.x, msg->linear.y, msg->linear.z};
   std::vector<double> angular = {msg->angular.x, msg->angular.y, msg->angular.z};
   if ((linear == std::vector<double> {0.0, 0.0, 0.0}) && (angular == std::vector<double> {0.0, 0.0, 0.0})) {
-      is_waiting_ = true;
+    is_waiting_ = true;
   } else {
-      is_waiting_ = false;
+    is_waiting_ = false;
   }
 }
 

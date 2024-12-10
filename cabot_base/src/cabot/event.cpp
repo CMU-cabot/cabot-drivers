@@ -1,24 +1,22 @@
-/*******************************************************************************
- * Copyright (c) 2023  Miraikan and Carnegie Mellon University
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *******************************************************************************/
+// Copyright (c) 2023  Miraikan and Carnegie Mellon University
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 #include "event.hpp"
 #include <string>
@@ -147,8 +145,8 @@ BaseEvent * ClickEvent::_parse(const std::string & text, const std::string &)
 
 const char * ClickEvent::TYPE = "click";
 
-HoldDownEvent::HoldDownEvent(int holddown)
-: BaseEvent("holddown"), _holddown(holddown) {}
+HoldDownEvent::HoldDownEvent(int holddown, int duration)
+: BaseEvent("holddown"), _holddown(holddown), _duration(duration) {}
 bool HoldDownEvent::operator==(const HoldDownEvent & other) const
 {
   return getType() == other.getType() && _holddown == other._holddown;
@@ -159,7 +157,7 @@ int HoldDownEvent::get_holddown() const
 }
 std::string HoldDownEvent::toString() const
 {
-  return getType() + "_" + std::to_string(_holddown);
+  return getType() + "_" + std::to_string(_holddown) + "_" + std::to_string(_duration);
 }
 
 const char * HoldDownEvent::TYPE = "holddown";
@@ -170,7 +168,8 @@ BaseEvent * HoldDownEvent::_parse(const std::string & text, const std::string &)
     std::vector<std::string> items;
     boost::split(items, text, boost::is_any_of("_"));
     int holddown = std::stoi(items[1]);
-    return new HoldDownEvent(holddown);
+    int duration = std::stoi(items[2]);
+    return new HoldDownEvent(holddown, duration);
   }
   return nullptr;
 }

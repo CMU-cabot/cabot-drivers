@@ -37,3 +37,7 @@ cabot:
       vel_integrator_gain: 40.0
       motor_bandwidth: 100
       encoder_bandwidth: 100
+
+  features:
+    ros__parameters:
+      handleside: left,right

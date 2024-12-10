@@ -62,6 +62,7 @@ cabot:
       cmd_vel_topic: /cabot/cmd_vel
       pause_control_topic: /cabot/pause_control 
       max_acc: 1.2
+      max_dec: -1.2
       target_rate: 20
       bias: 1.0          # NEED_TO_BE_CONFIGURED
       gain_omega: 1.0    # NEED_TO_BE_CONFIGURED

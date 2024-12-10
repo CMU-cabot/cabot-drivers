@@ -1,0 +1,44 @@
+# config file for cabot3-k2
+
+pointcloud_to_laserscan_node:
+  ros__parameters:
+    angle_min: -2.57  # -M_PI/2 (front) - 1.0 (angle clipping)
+    angle_max: 1.05 # M_PI/2 (rear) - M_PI/6 (rear cover)
+
+cabot:
+  cabot_handle_v2_node:
+    ros__parameters:
+      no_vibration: false
+      buttons:
+        - BUTTON_UP
+        - BUTTON_DOWN
+        - BUTTON_LEFT
+        - BUTTON_RIGHT
+
+  cabot_handle_v3_node:
+    ros__parameters:
+      buttons:
+        - BUTTON_UP
+        - BUTTON_DOWN
+        - BUTTON_LEFT
+        - BUTTON_RIGHT
+
+  cabot_serial:
+    ros__parameters:
+      port: /dev/ttyESP32
+
+  odriver_adapter_node:
+    ros__parameters:
+      bias: 0.14 # same with cabot3-i1
+      gain_omega: 0.0
+      max_acc: 0.6
+
+  cabot_can:
+    ros__parameters:
+      can_interface: can0
+      # calibration_params: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+
+  features:
+    ros__parameters:
+      handleside: left,right
+      touchmode: cap,tof,dual
