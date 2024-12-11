@@ -39,7 +39,7 @@
 #include "sensor_msgs/msg/temperature.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
-#define can_mask_id 0x1C0
+#define CAN_MASK_ID 0x380  // 0b0 111 0000 000
 
 enum CanId : uint16_t
 {
@@ -106,8 +106,8 @@ enum CanDlc : uint8_t
 
 enum CanFilter : uint8_t
 {
-  LARGE_CATEGORY_SENSOR_CAN_FILTER = 0x000,
-  LARGE_CATEGORY_HANDLE_CAN_FILTER = 0x080,
+  LARGE_CATEGORY_SENSOR_CAN_FILTER = 0x000,  // 0b0 000 0000 000
+  LARGE_CATEGORY_HANDLE_CAN_FILTER = 0x080,  // 0b0 001 0000 000
 };
 
 class CabotCanNode : public rclcpp::Node
@@ -195,7 +195,7 @@ public:
   }
 
 private:
-  int openCanSocket() 
+  int openCanSocket()
   {
     std::string can_interface = this->get_parameter("can_interface").as_string();
     int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -218,9 +218,9 @@ private:
     }
     struct can_filter filters[2];
     filters[1].can_id = CanFilter::LARGE_CATEGORY_SENSOR_CAN_FILTER;
-    filters[0].can_mask = can_mask_id;
+    filters[0].can_mask = CAN_MASK_ID;
     filters[0].can_id = CanFilter::LARGE_CATEGORY_HANDLE_CAN_FILTER;
-    filters[1].can_mask = can_mask_id;
+    filters[1].can_mask = CAN_MASK_ID;
     if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &filters, sizeof(filters)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error in setsockopt for CAN filter");
       close(s);
