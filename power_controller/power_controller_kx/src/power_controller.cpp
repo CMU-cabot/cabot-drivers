@@ -58,8 +58,8 @@
 // #define MAXFAN 100
 // #define MINFAN 10
 // #define TEMPERATURETOFAN (20 / 11.0)
-#define CAN_ID 0x100
-#define CAN_MASK_ID 0x380
+#define MAJOR_CATEGORY_BATTERY_CAN_FILTER 0x100
+#define CAN_MAJOR_CATEGORY_MASK 0x380
 
 class PowerController : public rclcpp::Node
 {
@@ -172,8 +172,8 @@ private:
       return -1;
     }
     struct can_filter filters[1];
-    filters[0].can_id = CAN_ID;
-    filters[0].can_mask = CAN_MASK_ID;
+    filters[0].can_id = MAJOR_CATEGORY_BATTERY_CAN_FILTER;
+    filters[0].can_mask = CAN_MAJOR_CATEGORY_MASK;
     if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &filters, sizeof(filters)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error in setsockopt for CAN filter");
       close(s);
