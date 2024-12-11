@@ -53,11 +53,13 @@
 #define False_ 0x00
 #define KELVIN 2731.0  // KELVIN = 273.1 * 10
 #define DUTY 2.55
-#define HIGHTEMPERATURE 50
-#define LOWTEMPERATURE 25
-#define MAXFAN 100
-#define MINFAN 10
-#define TEMPERATURETOFAN (20 / 11.0)
+// #define HIGHTEMPERATURE 50
+// #define LOWTEMPERATURE 25
+// #define MAXFAN 100
+// #define MINFAN 10
+// #define TEMPERATURETOFAN (20 / 11.0)
+#define CAN_ID 0x100
+#define CAN_MASK_ID 0x380
 
 class PowerController : public rclcpp::Node
 {
@@ -69,6 +71,11 @@ public:
     // number of batteries
     this->declare_parameter<int>("number_of_batteries", 4);
     this->declare_parameter<std::string>("can_interface", "can0");
+    this->declare_parameter<int>("LOWTEMPERATURE", 25);
+    this->declare_parameter<int>("HIGHTEMPERATURE", 50);
+    this->declare_parameter<int>("MAXFAN", 100);
+    this->declare_parameter<int>("MINFAN", 10);
+    this->declare_parameter<float>("TEMPERATURETOFAN", (20 / 11.0));
     // service
     service_server_24v_odrive_ = this->create_service<std_srvs::srv::SetBool>(
       "set_24v_power_odrive",
@@ -165,8 +172,8 @@ private:
       return -1;
     }
     struct can_filter filters[1];
-    filters[0].can_id = 0x100;
-    filters[0].can_mask = 0x1C0;
+    filters[0].can_id = CAN_ID;
+    filters[0].can_mask = CAN_MASK_ID;
     if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &filters, sizeof(filters)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error in setsockopt for CAN filter");
       close(s);
@@ -319,10 +326,17 @@ private:
     mtx_.unlock();
   }
   void temperatureCallBack(sensor_msgs::msg::Temperature temp_msg)
-  {
+  {    
     std_msgs::msg::UInt8 fan_msg;
     double framos_temperature = temp_msg.temperature;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "temperature is %f", framos_temperature);
+    int HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
+    float TEMPERATURETOFAN;
+    this->get_parameter("TEMPERATURETOFAN", TEMPERATURETOFAN);
+    this->get_parameter("HIGHTEMPERATURE", HIGHTEMPERATURE);
+    this->get_parameter("LOWTEMPERATURE", LOWTEMPERATURE);
+    this->get_parameter("MINFAN", MINFAN);
+    this->get_parameter("MAXFAN", MAXFAN);
     if (framos_temperature >= HIGHTEMPERATURE) {
       fan_msg.data = MAXFAN;
     }
@@ -404,7 +418,7 @@ private:
     battery_msg.batteryarray[array_num].voltage = convertUnit(data[0]);
     // Converts current units from mA to A
     battery_msg.batteryarray[array_num].current = convertUnit(-data[1]); // Signs are inverted because hexadecimal data is negative.
-    battery_msg.batteryarray[array_num].percentage = static_cast<float>(data[2]) / 100.0f;;
+    battery_msg.batteryarray[array_num].percentage = static_cast<float>(data[2]) / 100.0f;
     // Convert absolute temperature to Celsius
     battery_msg.batteryarray[array_num].temperature = convertUnit(data[3], temperature_flag_);
     battery_msg.batteryarray[array_num].location = std::to_string(location);
@@ -461,7 +475,7 @@ private:
     d455_right_id,
     mcu_id,
     fan_id,
-    battery_serial_number = 0x520    
+    battery_serial_number = 0x520
   };
 
   // struct
