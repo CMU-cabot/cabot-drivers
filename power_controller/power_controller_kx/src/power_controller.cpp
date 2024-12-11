@@ -53,11 +53,6 @@
 #define False_ 0x00
 #define KELVIN 2731.0  // KELVIN = 273.1 * 10
 #define DUTY 2.55
-// #define HIGHTEMPERATURE 50
-// #define LOWTEMPERATURE 25
-// #define MAXFAN 100
-// #define MINFAN 10
-// #define TEMPERATURETOFAN (20 / 11.0)
 #define MAJOR_CATEGORY_BATTERY_CAN_FILTER 0x100
 #define CAN_MAJOR_CATEGORY_MASK 0x380
 
