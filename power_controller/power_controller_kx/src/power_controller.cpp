@@ -66,11 +66,11 @@ public:
     // number of batteries
     this->declare_parameter<int>("number_of_batteries", 4);
     this->declare_parameter<std::string>("can_interface", "can0");
-    this->declare_parameter<int>("LOWTEMPERATURE", 25);
-    this->declare_parameter<int>("HIGHTEMPERATURE", 50);
-    this->declare_parameter<int>("MAXFAN", 100);
-    this->declare_parameter<int>("MINFAN", 10);
-    this->declare_parameter<float>("TEMPERATURETOFAN", (20 / 11.0));
+    this->declare_parameter<int>("low_temperature", 25);
+    this->declare_parameter<int>("high_temperature", 50);
+    this->declare_parameter<int>("max_fan", 100);
+    this->declare_parameter<int>("min_fan", 10);
+    this->declare_parameter<float>("temperature_to_fan", (20 / 11.0));
     // service
     service_server_24v_odrive_ = this->create_service<std_srvs::srv::SetBool>(
       "set_24v_power_odrive",
@@ -327,11 +327,11 @@ private:
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "temperature is %f", framos_temperature);
     int HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
     float TEMPERATURETOFAN;
-    this->get_parameter("TEMPERATURETOFAN", TEMPERATURETOFAN);
-    this->get_parameter("HIGHTEMPERATURE", HIGHTEMPERATURE);
-    this->get_parameter("LOWTEMPERATURE", LOWTEMPERATURE);
-    this->get_parameter("MINFAN", MINFAN);
-    this->get_parameter("MAXFAN", MAXFAN);
+    this->get_parameter("temperature_to_fan", TEMPERATURETOFAN);
+    this->get_parameter("high_temperature", HIGHTEMPERATURE);
+    this->get_parameter("low_temperature", LOWTEMPERATURE);
+    this->get_parameter("min_fan", MINFAN);
+    this->get_parameter("max_fan", MAXFAN);
     if (framos_temperature >= HIGHTEMPERATURE) {
       fan_msg.data = MAXFAN;
     }
