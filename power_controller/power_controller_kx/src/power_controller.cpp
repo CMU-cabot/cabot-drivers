@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//include header file
+// include header file
 #include <cstdio>
 #include <cstdint>
 #include <regex>
@@ -53,7 +53,7 @@
 #define False_ 0x00
 #define KELVIN 2731.0  // KELVIN = 273.1 * 10
 #define DUTY 2.55
-#define HIGHTEMPERATURE 55
+#define HIGHTEMPERATURE 50
 #define LOWTEMPERATURE 25
 #define MAXFAN 100
 #define MINFAN 10
@@ -323,16 +323,13 @@ private:
     std_msgs::msg::UInt8 fan_msg;
     double framos_temperature = temp_msg.temperature;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "temperature is %f", framos_temperature);
-    if (framos_temperature >= HIGHTEMPERATURE)
-    {
+    if (framos_temperature >= HIGHTEMPERATURE) {
       fan_msg.data = MAXFAN;
     }
-    else if (framos_temperature <= LOWTEMPERATURE)
-    {
+    else if (framos_temperature <= LOWTEMPERATURE) {
       fan_msg.data = MINFAN;
     }
-    else
-    {
+    else {
       fan_msg.data = framos_temperature * TEMPERATURETOFAN;
     }
     fan_publisher_->publish(fan_msg);
@@ -360,7 +357,7 @@ private:
   }
   float convertUnit(uint16_t data, bool temperature_flag = false){
     float result;
-    if (temperature_flag){
+    if (temperature_flag) {
       result = (data - KELVIN) / 10.0;
       return result;
     }
@@ -375,7 +372,7 @@ private:
     data[1] = (frame_data[3] << 8) | frame_data[2];
     data[2] = (frame_data[5] << 8) | frame_data[4];
     data[3] = (frame_data[7] << 8) | frame_data[6];
-    if (battery_serial_number_flag){
+    if (battery_serial_number_flag) {
       battery_msg.batteryarray[0].serial_number = std::to_string(data[0]);
       battery_msg.batteryarray[1].serial_number = std::to_string(data[1]);
       battery_msg.batteryarray[2].serial_number = std::to_string(data[2]);
