@@ -364,7 +364,7 @@ private:
     result = static_cast<float>(data) / 1000.0;
     return result;
   }
-  //message & combine bits
+  // message & combine bits
   void conbineBitAndUpdateMessage(
     power_controller_msgs::msg::BatteryArray & battery_msg, int location,
     uint8_t* frame_data, uint16_t data[4], bool battery_serial_number_flag = false){    
@@ -447,7 +447,7 @@ private:
       }
   }
 
-  //enum
+  // enum
   enum CanId : uint16_t
   {
     battery_id_1 = 0x518,
