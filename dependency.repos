@@ -8,3 +8,8 @@ repositories:
     type: git
     url: https://github.com/CMU-cabot/cabot-description
     version: main
+
+  docker/driver/ros_odrive:
+    type: git
+    url: https://github.com/CMU-cabot/ros_odrive.git
+    version: cabot

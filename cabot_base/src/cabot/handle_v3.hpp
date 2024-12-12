@@ -1,29 +1,28 @@
-/*******************************************************************************
- * Copyright (c) 2023  Miraikan and Carnegie Mellon University
- * Copyright (c) 2024  ALPS ALPINE CO., LTD.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *******************************************************************************/
+// Copyright (c) 2023, 2024  Miraikan, Carnegie Mellon University, and ALPS ALPINE CO., LTD.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 #ifndef CABOT__HANDLE_V3_HPP_
 #define CABOT__HANDLE_V3_HPP_
 
+#include <tf2/LinearMath/Matrix3x3.h>
+#include <tf2/LinearMath/Quaternion.h>
 #include <time.h>
 #include <memory>
 #include <vector>
@@ -42,8 +41,6 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <nav_msgs/msg/path.hpp>
-#include <tf2/LinearMath/Matrix3x3.h>
-#include <tf2/LinearMath/Quaternion.h>
 #include "button.hpp"
 #include "cabot_handle_v3_node.hpp"
 
@@ -51,65 +48,78 @@ class CaBotHandleV3Node;
 
 namespace VibConst
 {
-  namespace ERM {
-    namespace Duration {
-      static constexpr unsigned int TURN = 150;
-      static constexpr unsigned int ABOUT_TURN = 400;
-      static constexpr unsigned int DEVIATION = 50;
-      static constexpr unsigned int HAS_ARRIVED = 400;
-      static constexpr unsigned int SINGLE_VIBRATION = 400;
-      static constexpr unsigned int BUTTON_CLICK = 200;
-      static constexpr unsigned int BUTTON_HOLDDOWN = 200;
-      static constexpr unsigned int CAUTION = 1000;
-      static constexpr unsigned int WAITING = 200;
-    }
-    namespace Sleep {
-      static constexpr unsigned int DEFAULT = 150;
-      static constexpr unsigned int CAUTION = 0;
-      static constexpr unsigned int WAITING = 800;
-    }
-    namespace NumVibrations {
-      static constexpr unsigned int TURN = 3;
-      static constexpr unsigned int ABOUT_TURN = 2;
-      static constexpr unsigned int DEVIATION = 2;
-      static constexpr unsigned int HAS_ARRIVED = 1;
-      static constexpr unsigned int CONFIRMATION = 1;
-      static constexpr unsigned int BUTTON_CLICK = 1;
-      static constexpr unsigned int BUTTON_HOLDDOWN = 1;
-      static constexpr unsigned int CAUTION = 1;
-      static constexpr unsigned int WAITING = 1;
-    }
-  }
-  namespace LRA {
-    namespace Duration {
-      static constexpr unsigned int TURN = 150;
-      static constexpr unsigned int ABOUT_TURN = 400;
-      static constexpr unsigned int DEVIATION = 50;
-      static constexpr unsigned int HAS_ARRIVED = 400;
-      static constexpr unsigned int SINGLE_VIBRATION = 400;
-      static constexpr unsigned int BUTTON_CLICK = 50;
-      static constexpr unsigned int BUTTON_HOLDDOWN = 100;
-      static constexpr unsigned int CAUTION = 1000;
-      static constexpr unsigned int WAITING = 20;
-    }
-    namespace Sleep {
-      static constexpr unsigned int DEFAULT = 150;
-      static constexpr unsigned int CAUTION = 0;
-      static constexpr unsigned int WAITING = 980;
-    }
-    namespace NumVibrations {
-      static constexpr unsigned int TURN = 3;
-      static constexpr unsigned int ABOUT_TURN = 2;
-      static constexpr unsigned int DEVIATION = 2;
-      static constexpr unsigned int HAS_ARRIVED = 1;
-      static constexpr unsigned int CONFIRMATION = 1;
-      static constexpr unsigned int BUTTON_CLICK = 1;
-      static constexpr unsigned int BUTTON_HOLDDOWN = 1;
-      static constexpr unsigned int CAUTION = 1;
-      static constexpr unsigned int WAITING = 1;
-    }
-  }
-}
+namespace ERM
+{
+namespace Duration
+{
+static constexpr unsigned int TURN = 150;
+static constexpr unsigned int ABOUT_TURN = 400;
+static constexpr unsigned int DEVIATION = 50;
+static constexpr unsigned int HAS_ARRIVED = 400;
+static constexpr unsigned int SINGLE_VIBRATION = 400;
+static constexpr unsigned int BUTTON_CLICK = 200;
+static constexpr unsigned int BUTTON_HOLDDOWN = 200;
+static constexpr unsigned int CAUTION = 1000;
+static constexpr unsigned int WAITING = 200;
+}  // namespace Duration
+
+namespace Sleep
+{
+static constexpr unsigned int DEFAULT = 150;
+static constexpr unsigned int CAUTION = 0;
+static constexpr unsigned int WAITING = 800;
+}  // namespace Sleep
+
+namespace NumVibrations
+{
+static constexpr unsigned int TURN = 3;
+static constexpr unsigned int ABOUT_TURN = 2;
+static constexpr unsigned int DEVIATION = 2;
+static constexpr unsigned int HAS_ARRIVED = 1;
+static constexpr unsigned int CONFIRMATION = 1;
+static constexpr unsigned int BUTTON_CLICK = 1;
+static constexpr unsigned int BUTTON_HOLDDOWN = 1;
+static constexpr unsigned int CAUTION = 1;
+static constexpr unsigned int WAITING = 1;
+}  // namespace NumVibrations
+}  // namespace ERM
+
+namespace LRA
+{
+namespace Duration
+{
+static constexpr unsigned int TURN = 150;
+static constexpr unsigned int ABOUT_TURN = 400;
+static constexpr unsigned int DEVIATION = 50;
+static constexpr unsigned int HAS_ARRIVED = 400;
+static constexpr unsigned int SINGLE_VIBRATION = 400;
+static constexpr unsigned int BUTTON_CLICK = 50;
+static constexpr unsigned int BUTTON_HOLDDOWN = 50;
+static constexpr unsigned int CAUTION = 1000;
+static constexpr unsigned int WAITING = 20;
+}  // namespace Duration
+
+namespace Sleep
+{
+static constexpr unsigned int DEFAULT = 150;
+static constexpr unsigned int CAUTION = 0;
+static constexpr unsigned int WAITING = 980;
+}  // namespace Sleep
+
+namespace NumVibrations
+{
+static constexpr unsigned int TURN = 3;
+static constexpr unsigned int ABOUT_TURN = 2;
+static constexpr unsigned int DEVIATION = 2;
+static constexpr unsigned int HAS_ARRIVED = 1;
+static constexpr unsigned int CONFIRMATION = 1;
+static constexpr unsigned int BUTTON_CLICK = 1;
+static constexpr unsigned int BUTTON_HOLDDOWN = 1;
+static constexpr unsigned int CAUTION = 1;
+static constexpr unsigned int WAITING = 1;
+}  // namespace NumVibrations
+}  // namespace LRA
+}  // namespace VibConst
 
 typedef struct vibration
 {
@@ -216,6 +226,7 @@ private:
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr angular_distance_sub_;
   rclcpp::Time last_up[9];
   rclcpp::Time last_dwn[9];
+  rclcpp::Time last_holddwn[9];
   int vibratorType_;
   tf2::Quaternion q_;
   tf2::Matrix3x3 m_;
@@ -240,6 +251,8 @@ private:
   int button[10];
   static const rclcpp::Duration double_click_interval_;
   static const rclcpp::Duration ignore_interval_;
+  static const rclcpp::Duration holddown_min_interval_;
+  static const rclcpp::Duration holddown_max_interval_;
   static const rclcpp::Duration holddown_interval_;
   std::string get_name(int);
   std::vector<Vibration> vibration_queue_;

@@ -69,7 +69,7 @@ def generate_launch_description():
         ParameterFile(PathJoinSubstitution([
                 pkg_dir,
                 'config',
-                'cabot2-common-remote.yaml'
+                'cabot-common-remote.yaml'
             ]), allow_substs=True
         ),
         ParameterFile(PathJoinSubstitution([
@@ -133,7 +133,7 @@ def generate_launch_description():
             parameters=[*param_files],
             remappings=[
                 ('/imu', '/cabot/imu/data'),
-                ('/cmd_vel', '/cabot/cmd_vel'), # /cabot/cmd_vel is directly input to motor_adapter in remote mode
+                ('/cmd_vel', '/cabot/cmd_vel'),  # /cabot/cmd_vel is directly input to motor_adapter in remote mode
             ],
         ),
 
@@ -186,7 +186,7 @@ def generate_launch_description():
             package='joy_linux',
             executable='joy_linux_node',
             namespace='cabot',
-            name='joy_node', # keep the node name joy_node to keep using the same parameters
+            name='joy_node',  # keep the node name joy_node to keep using the same parameters
             parameters=[*param_files],
             condition=IfCondition(use_joy_linux),
         ),
