@@ -124,7 +124,6 @@ public:
     wifi_pub_ = this->create_publisher<std_msgs::msg::String>("wifi", 10);
     bme_temperature_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("bme/temperature", 10);
     bme_pressure_pub_ = this->create_publisher<sensor_msgs::msg::FluidPressure>("bme/pressure", 10);
-    pressure_pub_ = this->create_publisher<sensor_msgs::msg::FluidPressure>("pressure", 10);
     calibration_pub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("calibration", 10);
     tact_pub_ = this->create_publisher<std_msgs::msg::Int8>("pushed", 10);
     capacitive_touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("capacitive/touch", 10);
@@ -452,7 +451,6 @@ private:
       pressure_msg.header.stamp = this->get_clock()->now();
       pressure_msg.fluid_pressure = pressure;
       bme_pressure_pub_->publish(pressure_msg);
-      pressure_pub_->publish(pressure_msg);
     }
   }
 
@@ -679,7 +677,6 @@ private:
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr wifi_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr bme_temperature_pub_;
   rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr bme_pressure_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
   rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr calibration_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr tact_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr capacitive_touch_pub_;
