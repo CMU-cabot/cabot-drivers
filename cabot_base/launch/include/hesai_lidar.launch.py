@@ -34,15 +34,16 @@ from launch.substitutions import PathJoinSubstitution
 from launch.substitutions import PythonExpression
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterFile
+from launch.conditions import IfCondition, UnlessCondition
 
 
 def generate_launch_description():
     pkg_dir = get_package_share_directory('cabot_base')
-
     model_name = LaunchConfiguration('model')
     pandar = LaunchConfiguration('pandar')
     pandar_packets = LaunchConfiguration('pandar_packets')
     output = LaunchConfiguration('output')
+    hesai_ros_2_0 = LaunchConfiguration('hesai_ros_2_0')
 
     param_files = [
         ParameterFile(PathJoinSubstitution([
@@ -82,7 +83,11 @@ def generate_launch_description():
             default_value='both',
             description='hesai_lidar node output'
         ),
-
+        DeclareLaunchArgument(
+            'hesai_ros_2_0',
+            default_value=EnvironmentVariable('HESAI_ROS_2_0', default_value='true'),
+            description='if true, cabot use HesaiLidar_ROS_2.0'
+        ),
         Node(
             package='hesai_lidar',
             namespace='',
@@ -98,6 +103,16 @@ def generate_launch_description():
             remappings=[
                 ('pandar', pandar),
                 ('pandar_packets', pandar_packets)
-            ]
-        )
+            ],
+            condition=UnlessCondition(hesai_ros_2_0),
+        ),
+        Node(
+            namespace='hesai_ros_driver',
+            package='hesai_ros_driver',
+            executable='hesai_ros_driver_node',
+            remappings=[
+                ('/lidar_points',  '/velodyne_points')
+            ],
+            condition=IfCondition(hesai_ros_2_0),
+        ),
     ])
