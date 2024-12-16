@@ -341,20 +341,50 @@ def generate_launch_description():
                 condition=IfCondition(AndSubstitution(use_rslidar, NotSubstitution(use_sim_time)))  # if (use_rslidar and (not use_simtime))
             ),
 
-            # launch hesai lidar node
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([
-                    PathJoinSubstitution([
-                        pkg_dir, 'launch', 'include', 'hesai_lidar.launch.py'
-                    ])
-                ]),
-                launch_arguments={
-                    'model': model_name,
-                    'output': output,
-                    'pandar': '/velodyne_points'
-                }.items(),
-                condition=IfCondition(AndSubstitution(use_hesai, NotSubstitution(use_sim_time)))  # if (use_hesai and (not use_simtime))
+
+            Node(
+                namespace='hesai_ros_driver',
+                package='hesai_ros_driver',
+                executable='hesai_ros_driver_node',
+                parameters=[
+                    {'config_path': helios_config_file},
+                    {'rslidar_points': 'pandar'},
+                    {'use_sim_time': use_sim_time}
+                ],
+                remappings=[
+                    ('/lidar_points',  '/velodyne_points')
+                ],
+                condition=IfCondition(AndSubstitution(use_hesai, NotSubstitution(use_sim_time)))  # if (use_rslidar and (not use_simtime))
             ),
+            ## launch hesai 2.0 model
+            #IncludeLaunchDescription(
+            #   PythonLaunchDescriptionSource([
+            #       PathJoinSubstitution([
+            #           pkg_dir, 'launch', 'include', 'start.py'
+            #       ])
+            #   ]),
+            #   launch_arguments={
+            #       'model': model_name,
+            #       'output': output,
+            #       'lidar_points': '/velodyne_points'
+            #   }.items(),
+            #   condition=IfCondition(AndSubstitution(use_hesai, NotSubstitution(use_sim_time)))  # if (use_hesai and (not use_simtime))
+            #),
+
+            ## launch hesai lidar node
+            #IncludeLaunchDescription(
+            #    PythonLaunchDescriptionSource([
+            #        PathJoinSubstitution([
+            #            pkg_dir, 'launch', 'include', 'hesai_lidar.launch.py'
+            #        ])
+            #    ]),
+            #    launch_arguments={
+            #        'model': model_name,
+            #        'output': output,
+            #        'pandar': '/velodyne_points'
+            #    }.items(),
+            #    condition=IfCondition(AndSubstitution(use_hesai, NotSubstitution(use_sim_time)))  # if (use_hesai and (not use_simtime))
+            # ),
 
             # launch lslidar node
             Node(
