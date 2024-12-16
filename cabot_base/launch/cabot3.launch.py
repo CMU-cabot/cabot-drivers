@@ -83,6 +83,7 @@ def generate_launch_description():
     use_directional_indicator = LaunchConfiguration('use_directional_indicator')
     vibrator_type = LaunchConfiguration('vibrator_type')
     default_motor_control = LaunchConfiguration('default_motor_control')
+    hesai_ros_2_0 = LaunchConfiguration('hesai_ros_2_0')
 
     # Define models with their associated flags (without the "use_" prefix)
     model_flags = {
@@ -250,6 +251,11 @@ def generate_launch_description():
             default_value=EnvironmentVariable('ODRIVE_FIRMWARE_VERSION'),
             description='odrive firmware version'
         ),
+        DeclareLaunchArgument(
+            'hesai_ros_2_0',
+            default_value=EnvironmentVariable('HESAI_ROS_2_0',  default_value='true'),
+            description='if true, cabot use HesaiLidar_ROS_2.0'
+        ),
 
         # Kind error message
         LogInfo(
@@ -358,10 +364,11 @@ def generate_launch_description():
                 launch_arguments={
                     'model': model_name,
                     'output': output,
-                    'pandar': '/velodyne_points'
+                    'pandar': '/velodyne_points',
+                    'hesai_ros_2_0': hesai_ros_2_0
                 }.items(),
                 condition=IfCondition(AndSubstitution(use_hesai, NotSubstitution(use_sim_time)))  # if (use_hesai and (not use_simtime))
-            ),
+             ),
 
             # launch lslidar node
             Node(
