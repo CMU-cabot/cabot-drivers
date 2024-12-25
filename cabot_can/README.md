@@ -4,6 +4,9 @@
 ### Services
 - **run_imu_calibration** (std_srvs::srv::Trigger)
     - This service will publish data from '/calibration' by sending the service if all 4 bits of the data received from CAN ID: 037 are equal to 3.
+- **run_capacitive_calibration** (std_srvs::srv::Trigger)    
+    - During calibration, the 2nd bit of CAN ID: 40 will be set to 1
+
 ### Parameters
 - **publish_rate** (int) - default=`200`
     - publish_rate
@@ -13,6 +16,10 @@
     - imu frame id
 - **calibration_params** (int[22]) - default=`(22,0)`
     - Can be set by setting parameters in calibration_params of params.yaml
+- **touch_mode** (string) - default=`touch_mode_`
+    - Selecting Sensors for /touch (ToF Sensors, Capacitive Sensors, or Both)
+- **tof_touch_threshold** (int) - default=`25`
+    - Determine the maximum distance threshold for the ToF sensor
 ### Publishers
 - **/calibration** (int[22]): only publishes values when `/run_imu_calibration` is true
 - **/imu** (sensor_msgs/msg/Imu): IMU data - 100Hz

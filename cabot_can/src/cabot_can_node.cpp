@@ -73,6 +73,9 @@ enum CanId : uint16_t
   CAPACITIVE_TOUCH_STATUS_ID = 0x481,
   CAPACITIVE_TOUCH_CALIBRATION_ID,
   CAPACITIVE_TOUCH_RECALIBRATION_ID,
+  CAPACITIVE_TOUCH_SENSOR_INPUT_ENABLE_ID,
+  CAPACITIVE_TOUCH_NULLIFY_NOISE_ID,
+  CAPACITIVE_TOUCH_BC_OUT_RECALIBRATION,
 };
 
 enum CanDlc : uint8_t
@@ -108,6 +111,9 @@ enum CanDlc : uint8_t
   CAPACITIVE_TOUCH_STATUS_CAN_DLC = 3,
   CAPACITIVE_TOUCH_CALIBRATION_CAN_DLC = 1,
   CAPACITIVE_TOUCH_RECALIBRATION_CAN_DLC = 1,
+  CAPACITIVE_TOUCH_SENSOR_INPUT_ENABLE_DLC = 1,
+  CAPACITIVE_TOUCH_NULLIFY_NOISE_DLC = 1,
+  CAPACITIVE_TOUCH_BC_OUT_RECALIBRATION_DLC = 1,
 };
 
 enum CanFilter : uint8_t
@@ -130,7 +136,6 @@ public:
     declare_parameter("can_interface", "can0");
     declare_parameter("imu_frame_id", "imu_frame");
     declare_parameter("calibration_params", std::vector<int64_t>((CanDlc::WRITE_IMU_CALIBRATION_1_DLC + CanDlc::WRITE_IMU_CALIBRATION_2_DLC + CanDlc::WRITE_IMU_CALIBRATION_3_DLC), 0));
-    // declare_parameter("vibrator_power",100);
     temperature_1_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature1", 10);
     temperature_2_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature2", 10);
     temperature_3_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature3", 10);
@@ -163,20 +168,22 @@ public:
       static_cast<std::function<void(std_msgs::msg::UInt8::SharedPtr)>>(std::bind(&CabotCanNode::subscribeVibratorData, this, std::placeholders::_1, 4)));
     servo_target_sub_ = this->create_subscription<std_msgs::msg::Int16>("servo_target", 10, std::bind(&CabotCanNode::subscribeServoTargetData, this, std::placeholders::_1));
     servo_free_sub_ = this->create_subscription<std_msgs::msg::Bool>("servo_free", 10, std::bind(&CabotCanNode::subServoFree, this, std::placeholders::_1));
-    capacitive_recalibration_sub_ = this->create_subscription<std_msgs::msg::Int16>("capacitive_recalibration", 10, std::bind(&CabotCanNode::subscribeCapacitiveRecalibrationData, this, std::placeholders::_1));
+    capacitive_recalibration_sub_ = this->create_subscription<std_msgs::msg::Int16>("capacitive/recalibration", 10, std::bind(&CabotCanNode::subscribeCapacitiveRecalibrationData, this, std::placeholders::_1));
+    capacitive_bc_out_recalibration_sub_ = this->create_subscription<std_msgs::msg::Int16>("capacitive/bc_out_recalibration", 10, std::bind(&CabotCanNode::subscribeCapacitiveBcOutRecalibration, this, std::placeholders::_1));
     imu_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>("run_imu_calibration", std::bind(&CabotCanNode::readImuServiceCalibration, this, std::placeholders::_1, std::placeholders::_2));
-    capacitive_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>("run_capacitive_calibration", std::bind(&CabotCanNode::CapacitiveServiceCalibration, this, std::placeholders::_1, std::placeholders::_2));
+    capacitive_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>("run_capacitive_calibration", std::bind(&CabotCanNode::capacitiveServiceCalibration, this, std::placeholders::_1, std::placeholders::_2));
+    capacitive_noise_nullify_srv_ = this->create_service<std_srvs::srv::Trigger>("nullify_capacitive_noise", std::bind(&CabotCanNode::nullifyCapacitiveNoise, this, std::placeholders::_1, std::placeholders::_2));
     imu_accel_bias_ = this->declare_parameter("imu_accel_bias", std::vector<double>(3, 0.0));  // parameters for adjusting linear acceleration. default value = [0,0, 0.0, 0.0]
     imu_gyro_bias_ = this->declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0));  // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
     can_socket_ = openCanSocket();
     writeImuCalibration();
+    capacitiveSensorInputEnable();
     // initialize diagonal elements of imu_msg.orientation_covariance
     imu_msg.orientation_covariance[0] = 0.1;
     imu_msg.orientation_covariance[4] = 0.1;
     imu_msg.orientation_covariance[8] = 0.1;
     std::uint8_t publish_rate = this->get_parameter("publish_rate", publish_rate);
     pub_timer_ = this->create_wall_timer(std::chrono::microseconds(publish_rate), std::bind(&CabotCanNode::timerPubCallback, this));
-
     callback_handler_ =
       this->add_on_set_parameters_callback(std::bind(&CabotCanNode::param_set_callback, this, std::placeholders::_1));
 
@@ -196,7 +203,6 @@ public:
         tof_touch_threshold_ = param.as_int();
       }
     }
-
     rcl_interfaces::msg::SetParametersResult result;
     result.successful = true;
     return result;
@@ -277,6 +283,84 @@ private:
     nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
   }
 
+  void capacitiveSensorInputEnable()
+  {
+    struct can_frame frame;
+    std::memset(&frame, 0, sizeof(struct can_frame));
+    frame.can_id = CanId::CAPACITIVE_TOUCH_SENSOR_INPUT_ENABLE_ID;
+    frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_SENSOR_INPUT_ENABLE_DLC;
+    frame.data[0] = 1;
+    int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
+    if (nbytes <= 0) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to send write capacitive sensor input enable frame");
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Write capacitive sensor input enable sent successfully");
+    }
+  }
+
+  void readImuServiceCalibration(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request>/*request*/,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+  {
+    struct can_frame frame;
+    std::memset(&frame, 0, sizeof(struct can_frame));
+    frame.can_id = CanId::IMU_CALIBRATION_SEND_CAN_ID;
+    frame.can_dlc = CanDlc::IMU_CALIBRATION_SEND_CAN_DLC;
+    frame.data[0] = 0x00;
+    int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
+    if (nbytes <= 0) {
+      RCLCPP_ERROR(this->get_logger(), "Error sending read Imu calibration frame");
+      response->success = false;
+      response->message = "Error sending read Imu calibration frame";
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Read Imu calibration sent successfully");
+      response->success = true;
+      response->message = "Read Imu calibration sent successfully";
+    }
+  }
+
+  void capacitiveServiceCalibration(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request>/*request*/,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+  {
+    struct can_frame frame;
+    std::memset(&frame, 0, sizeof(struct can_frame));
+    frame.can_id = CanId::CAPACITIVE_TOUCH_CALIBRATION_ID;
+    frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_CALIBRATION_CAN_DLC;
+    frame.data[0] = 1;
+    int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
+    if (nbytes <= 0) {
+      RCLCPP_ERROR(this->get_logger(), "Error sending capacitive calibration frame");
+      response->success = false;
+      response->message = "Error sending capacitive calibration frame";
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Capacitive calibration sent successfully");
+      response->success = true;
+      response->message = "Capacitive calibration sent successfully";
+    }
+  }
+
+  void nullifyCapacitiveNoise(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request>/*request*/,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+  {
+    struct can_frame frame;
+    std::memset(&frame, 0, sizeof(struct can_frame));
+    frame.can_id = CanId::CAPACITIVE_TOUCH_NULLIFY_NOISE_ID;
+    frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_NULLIFY_NOISE_DLC;
+    frame.data[0] = 10;
+    int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
+    if (nbytes <= 0) {
+      RCLCPP_ERROR(this->get_logger(), "Error sending nullify capacitive noise frame");
+      response->success = false;
+      response->message = "Error sending nullify capacitive noise frame";
+    } else {
+      RCLCPP_INFO(this->get_logger(), "nullify capacitive noise sent successfully");
+      response->success = true;
+      response->message = "nullify capacitive noise sent successfully";
+    }
+  }
+
   void timerPubCallback()
   {
     struct can_frame frame;
@@ -310,47 +394,6 @@ private:
           }
           break;
       }
-    }
-  }
-
-  void readImuServiceCalibration(
-    const std::shared_ptr<std_srvs::srv::Trigger::Request>/*request*/,
-    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
-  {
-    struct can_frame frame;
-    std::memset(&frame, 0, sizeof(struct can_frame));
-    frame.can_id = CanId::IMU_CALIBRATION_SEND_CAN_ID;
-    frame.can_dlc = CanDlc::IMU_CALIBRATION_SEND_CAN_DLC;
-    frame.data[0] = 0x00;
-    int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
-    if (nbytes <= 0) {
-      RCLCPP_ERROR(this->get_logger(), "Error sending read Imu calibration frame");
-      response->success = false;
-      response->message = "Error sending read Imu calibration frame";
-    } else {
-      RCLCPP_INFO(this->get_logger(), "Read Imu calibration sent successfully");
-      response->success = true;
-      response->message = "Read Imu calibration sent successfully";
-    }
-  }
-  void CapacitiveServiceCalibration(
-    const std::shared_ptr<std_srvs::srv::Trigger::Request>/*request*/,
-    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
-  {
-    struct can_frame frame;
-    std::memset(&frame, 0, sizeof(struct can_frame));
-    frame.can_id = CanId::CAPACITIVE_TOUCH_CALIBRATION_ID;
-    frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_CALIBRATION_CAN_DLC;
-    frame.data[0] = 0x01;
-    int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
-    if (nbytes <= 0) {
-      RCLCPP_ERROR(this->get_logger(), "Error sending capacitive calibration frame");
-      response->success = false;
-      response->message = "Error sending capacitive calibration frame";
-    } else {
-      RCLCPP_INFO(this->get_logger(), "Capacitive calibration sent successfully");
-      response->success = true;
-      response->message = "Capacitive calibration sent successfully";
     }
   }
 
@@ -528,7 +571,6 @@ private:
       tof_touch_raw_pub_->publish(tof_raw_msg);
       int16_t tof_touch = 0;
       int16_t touch = frame.data[3];
-
       if (touch_mode_ == "dual") {
         if (touch == 0) {
           if (tof_touch_raw <= tof_touch_threshold_) {
@@ -546,7 +588,6 @@ private:
           touch = 0;
         }
       }
-
       if (tof_touch_raw >= 16 && tof_touch_raw <= 25) {
         tof_touch = 1;
       } else {
@@ -631,6 +672,12 @@ private:
       if (frame.data[2] == 1) {
         RCLCPP_DEBUG(this->get_logger(), "capacitive calibration now");
       }
+      if (frame.data[1] == 32) {
+        RCLCPP_DEBUG(this->get_logger(), "capacitive limit now");
+      }
+      if (frame.data[1] == 64) {
+        RCLCPP_DEBUG(this->get_logger(), "capacitive analog calibration failure now");
+      }      
     }
   }
 
@@ -708,6 +755,19 @@ private:
     }
   }
 
+  void subscribeCapacitiveBcOutRecalibration(const std_msgs::msg::Int16 & msg)
+  {
+    uint16_t configuration2 = msg.data;
+    struct can_frame frame;
+    std::memset(&frame, 0, sizeof(struct can_frame));
+    frame.can_id = CanId::CAPACITIVE_TOUCH_BC_OUT_RECALIBRATION;
+    frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_BC_OUT_RECALIBRATION_DLC;
+    frame.data[0] = configuration2;
+    if (write(can_socket_, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
+      RCLCPP_ERROR(this->get_logger(), "Error sending capacitive bc out recalibration frame");
+    }
+  }
+
   sensor_msgs::msg::Imu imu_msg;
   std::string touch_mode_;
   int tof_touch_threshold_;
@@ -736,8 +796,10 @@ private:
   rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr servo_target_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr servo_free_sub_;
   rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr capacitive_recalibration_sub_;
+  rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr capacitive_bc_out_recalibration_sub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr imu_calibration_srv_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr capacitive_calibration_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr capacitive_noise_nullify_srv_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr callback_handler_;
   std::vector<double> imu_accel_bias_;
