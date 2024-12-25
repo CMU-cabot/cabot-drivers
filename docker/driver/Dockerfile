@@ -80,6 +80,7 @@ RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-xacro \
     ros-${ROS_DISTRO}-realsense2-description \
     ros-${ROS_DISTRO}-pointcloud-to-laserscan \
+    ros-${ROS_DISTRO}-pcl-ros \
     # patch build errors for odrive_ros2_control
     ros-humble-hardware-interface \
     nlohmann-json3-dev \
