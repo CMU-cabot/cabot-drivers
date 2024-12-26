@@ -281,7 +281,7 @@ private:
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
     mtx_.lock();
-    id_ = power_id;
+    id_ = CanId::power_id;
     uint8_t shutdown_ = False_;
     std::memcpy(&send_can_value_, &shutdown_, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
@@ -295,7 +295,7 @@ private:
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
     mtx_.lock();
-    id_ = power_id;
+    id_ = CanId::power_id;
     uint8_t reboot_ = 255;
     std::memcpy(&send_can_value_, &reboot_, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
@@ -312,7 +312,7 @@ private:
       return;
     }
     mtx_.lock();
-    id_ = fan_id;
+    id_ = CanId::fan_id;
     double d_pwm = data_ * DUTY;
     uint8_t pwm = static_cast<uint8_t>(std::round(d_pwm));
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "pwm is %d", pwm);
@@ -476,12 +476,12 @@ private:
   // struct
   struct SendCanValueInfo
   {
-    uint8_t id;
-    uint8_t data;
+    uint16_t id;
+    uint16_t data;
   };
   // value
-  uint8_t send_can_value_;
-  uint8_t id_;
+  uint16_t send_can_value_;
+  uint16_t id_;
   uint8_t power_;
   // flag
   bool check_send_data_;

@@ -54,7 +54,7 @@ enum CanId : uint16_t
   TEMPERATURE_5_CAN_ID,
   TOUCH_CAN_ID = 0x080,
   TACT_CAN_ID = 0x089,
-  VIBRATOR_CAN_ID,
+  VIBRATOR_CAN_ID = 0x090,
   SERVO_FREE_CAN_ID = 0x098,
   SERVO_TARGET_CAN_ID,
   SERVO_POS_CAN_ID,
@@ -92,7 +92,7 @@ enum CanDlc : uint8_t
   BME_CAN_DLC = 8,
   TOUCH_CAN_DLC = 4,
   TACT_CAN_DLC = 1,
-  VIBRATOR_CAN_DLC = 6,
+  VIBRATOR_CAN_DLC = 3,
   SERVO_TARGET_CAN_DLC = 4,
   SERVO_POS_CAN_DLC = 4,
   SERVO_FREE_CAN_DLC = 1,
@@ -686,8 +686,6 @@ private:
     uint8_t vibrator1 = 0;
     uint8_t vibrator3 = 0;
     uint8_t vibrator4 = 0;
-    // std::uint8_t vibrator_power = this->get_parameter("vibrator_power").as_int();
-    // vibrator_power = std::round(vibrator_power *2.55);
     if (vibrator_id == 1) {
       vibrator1 = msg->data;
     } else if (vibrator_id == 3) {
@@ -702,9 +700,6 @@ private:
     frame.data[0] = vibrator1;
     frame.data[1] = vibrator3;
     frame.data[2] = vibrator4;
-    // frame.data[3] = vibrator_power;
-    // frame.data[4] = vibrator_power;
-    // frame.data[5] = vibrator_power;
     if (write(can_socket_, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
       RCLCPP_ERROR(this->get_logger(), "Error sending Vibrator frame");
     }
