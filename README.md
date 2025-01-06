@@ -13,9 +13,27 @@ Hardware interface packages for CaBot
 
 ## Docker environment for test
 
+- if you build docker image, run the script to build image
+
 ```
-./build-docker.sh -p -i -w
-docker compose run --rm driver bash
+./bake-docker.sh -i         # run docker image build for your platform
+```
+
+- if you run in development mode, run the script to build workspaces
+
+```
+./build-workspace.sh        # run workspace build
+./build-workspace.sh -d     # run workspace debug build (symlink-install)
+```
+
+- run tests by following steps
+
+```
+# if you run docker container in production mode
+docker compose run --rm driver-prod bash
+# if you run docker container in development mode
+docker compose run --rm driver-dev bash
+
 # inside docker
 source install/setup.bash
 # run node for test
