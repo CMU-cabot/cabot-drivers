@@ -19,6 +19,7 @@ services:
       - CYCLONEDDS_NETWORK_INTERFACE_AUTODETERMINE # set automatically by launch.sh
       - ODRIVE_MODEL
       - ODRIVE_FIRMWARE_VERSION
+      - HESAI_ROS_2_0
     volumes:
 # device, bluetooth
       - /dev:/dev
