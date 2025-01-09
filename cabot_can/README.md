@@ -3,10 +3,11 @@
 - cabot_can_node
 ### Services
 - **run_imu_calibration** (std_srvs::srv::Trigger)
-    - This service will publish data from '/calibration' by sending the service if all 4 bits of the data received from CAN ID: 037 are equal to 3.
+    - This service will publish data from '/calibration' by sending the service if all 4 bits of the data received from CAN ID: 438 are equal to 3.
 - **run_capacitive_calibration** (std_srvs::srv::Trigger)    
-    - During calibration, the 2nd bit of CAN ID: 40 will be set to 1
-
+    - During calibration, the 2nd bit of CAN ID: 482 will be set to 1
+- **nullify_capacitive_noise** (std_srvs::srv::Trigger)
+    - Determines whether the analog noise filter is enabled. 
 ### Parameters
 - **publish_rate** (int) - default=`200`
     - publish_rate
@@ -41,3 +42,13 @@ TOF Sensor and Capacitive Sensor Integration - 50Hz
     - if you publish a `value`, it vibrates corresponding vibrator for `value` x 10 milliseconds (0 - 2550 milliseconds)
 - **/servo_target** (std_msgs/msg/Int16): if you publish a `value`, it rotates directional indicator (value: -179 ~ +179)
 - **/servo_free** (std_msgs/msg/Bool): `false` -> set free, `true` -> no operation
+- **/capacitive/recalibration** (std_msgs/msg/Int16): 
+    - Bits 4 - 3 - NEG_DELTA_CNT[1:0] - Determines the number of negative delta counts necessary to trigger a digital calibration
+    - ![Alt_text](/home/kufushatec/Pictures/スクリーンショット/Screenshot from 2025-01-06 11-52-12.png)
+- **capacitive/bc_out_recalibration** (std_msgs/msg/Int16): 
+    - Bit 2 - DIS_RF_NOISE - Determines whether the RF noise filter is enabled. Setting this bit disables the feature.
+        - ‘0’ (default) - If RF noise is detected by the analog block, the delta count on the corresponding channel is set to 0. Note that this does not require that Noise Status bits be set.
+        - ‘1’ - A touch is not blocked even if RF noise is detected.
+    - Bit 6 - BC_OUT_RECAL - Controls whether to retry analog calibration when the base count is out of limit for one or more sensor inputs.
+        - ‘0’ - When the BC_OUTx bit is set for a sensor input, the out of limit base count will be used for the sensor input.
+        - ‘1’ (default) - When the BC_OUTx bit is set for a sensor input , analog calibration will be repeated on the sensor input.
