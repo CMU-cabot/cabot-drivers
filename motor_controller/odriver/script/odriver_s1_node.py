@@ -33,6 +33,9 @@ import traceback
 from odriver_msgs.msg import MotorStatus
 from odriver_msgs.msg import MotorTarget
 
+import subprocess
+import os
+from std_msgs.msg import Bool
 
 # import serial
 import odrive
@@ -144,7 +147,9 @@ def find_controller(odrv_index, odrv_serial_number, clear=False, reset_watchdog_
             logger.info("Finding Odrive controller... (Serial Number: " + str(odrv_serial_number)+")")
             logging.basicConfig(level=logging.DEBUG)
             odrvs[odrv_index] = odrive.find_any(timeout=5, serial_number=odrv_serial_number)
-        except:  # noqa: 722
+        except TimeoutError:
+            _reload_xhci()
+        except Exception:  # noqa: 722
             logger.error(traceback.format_exc())
             logger.error("Check Odrive connection: " + str(odrv_serial_number) + " (Serial Number) doesn't exist! ")
             time.sleep(1)
@@ -332,6 +337,14 @@ def _error_recovery(relaunch=True):
         if (_odrv_has_error(odrvs[0]) and relaunch) or (_odrv_has_error(odrvs[1]) and relaunch):
             _relaunch_odrive()
 
+def _reload_xhci():
+    logger.info('re-loading xhci_pci..')
+    subprocess.run("/home/developer/driver_ws/script/reload_xhci.sh", capture_output=True, text=True)
+    pub_ = node.create_publisher(Bool, 'restart_app_server', 10)
+    msg = Bool()
+    msg.data = True
+    pub_.publish(msg)
+
 
 # Refer to https://roboticsbackend.com/ros2-rclpy-parameter-callback/
 def parameters_callback(params):
@@ -515,6 +528,7 @@ def main():
                     "\nErrors of odrv0 \n" + str(format_errors(odrvs[0])) + \
                     "\nErrors of odrv1 \n" + str(format_errors(odrvs[1]))
                 logger.error(odrive_error_str, throttle_duration_sec=1.0)
+                _reload_xhci()
                 time_disconnect = node.get_clock().now()
                 odrv_is_active = False
                 od_writeMode(0)

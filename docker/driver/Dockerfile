@@ -89,6 +89,13 @@ RUN pip3 install --no-cache-dir \
     odrive==0.6.5 \
     pyserial
 
+RUN apt update && \
+        apt install -y --no-install-recommends \
+        kmod \
+        && \
+        apt clean && \
+        rm -rf /var/lib/apt/lists/*
+
 # set up venv for keeping compatibility
 RUN mkdir -p /opt/venv
 # cabot2 venv (odrive==0.5.2.post0)
