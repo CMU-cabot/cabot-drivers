@@ -44,7 +44,6 @@ TOF Sensor and Capacitive Sensor Integration - 50Hz
 - **/servo_free** (std_msgs/msg/Bool): `false` -> set free, `true` -> no operation
 - **/capacitive/recalibration** (std_msgs/msg/Int16): 
     - Bits 4 - 3 - NEG_DELTA_CNT[1:0] - Determines the number of negative delta counts necessary to trigger a digital calibration
-    - ![Alt_text](/home/kufushatec/Pictures/スクリーンショット/Screenshot from 2025-01-06 11-52-12.png)
 - **capacitive/bc_out_recalibration** (std_msgs/msg/Int16): 
     - Bit 2 - DIS_RF_NOISE - Determines whether the RF noise filter is enabled. Setting this bit disables the feature.
         - ‘0’ (default) - If RF noise is detected by the analog block, the delta count on the corresponding channel is set to 0. Note that this does not require that Noise Status bits be set.
