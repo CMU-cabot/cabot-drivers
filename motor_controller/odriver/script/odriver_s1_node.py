@@ -63,7 +63,7 @@ sensorless_estimator_error_code_tup = [(name, value) for name, value in odrive.e
 
 PRINTDEBUG = False
 
-ODRIVE_VERSIONS = [[0, 6, 5], [0, 6, 6], [0, 6, 8], [0, 6, 9]]
+ODRIVE_VERSIONS = [[0, 6, 5], [0, 6, 6], [0, 6, 8], [0, 6, 9], [0, 6, 10]]
 
 '''Parameter'''
 freq = 40  # Hz
