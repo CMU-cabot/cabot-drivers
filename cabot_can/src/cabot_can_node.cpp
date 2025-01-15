@@ -440,6 +440,9 @@ private:
       imu_msg.linear_acceleration.x = linear_x / 100.0;
       imu_msg.linear_acceleration.y = linear_y / 100.0;
       imu_msg.linear_acceleration.z = linear_z / 100.0;
+      imu_msg.linear_acceleration.x -= this->imu_accel_bias_.at(0);
+      imu_msg.linear_acceleration.y -= this->imu_accel_bias_.at(1);
+      imu_msg.linear_acceleration.z -= this->imu_accel_bias_.at(2);
       is_linear = true;
     }
     if (frame.can_id == CanId::IMU_ANGULAR_CAN_ID && frame.can_dlc == CanDlc::IMU_ANGULAR_CAN_DLC && is_linear) {
@@ -449,6 +452,9 @@ private:
       imu_msg.angular_velocity.x = (angular_x / 16.0) * (M_PI / 180.0);
       imu_msg.angular_velocity.y = (angular_y / 16.0) * (M_PI / 180.0);
       imu_msg.angular_velocity.z = (angular_z / 16.0) * (M_PI / 180.0);
+      imu_msg.angular_velocity.x -= this->imu_gyro_bias_.at(0);
+      imu_msg.angular_velocity.y -= this->imu_gyro_bias_.at(1);
+      imu_msg.angular_velocity.z -= this->imu_gyro_bias_.at(2);
       is_angular = true;
     }
     if (frame.can_id == CanId::IMU_ORIENTATION_CAN_ID && frame.can_dlc == CanDlc::IMU_ORIENTATION_CAN_DLC && is_linear && is_angular) {
