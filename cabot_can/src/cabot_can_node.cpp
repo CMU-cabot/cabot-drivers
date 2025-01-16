@@ -291,6 +291,11 @@ private:
     frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_SENSOR_INPUT_ENABLE_DLC;
     frame.data[0] = 1;
     int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
+    usleep(1000);
+    frame.can_id = CanId::CAPACITIVE_TOUCH_CALIBRATION_ID;
+    frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_CALIBRATION_CAN_DLC;
+    frame.data[0] = 1;
+    nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
     if (nbytes <= 0) {
       RCLCPP_ERROR(this->get_logger(), "Failed to send write capacitive sensor input enable frame");
     } else {
