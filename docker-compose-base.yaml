@@ -139,3 +139,37 @@ services:
       service: ble_scan-prod-base
     volumes:
       - ./docker/home/.ros:/home/developer/.ros
+
+  power_controller-dev-base:
+    volumes:
+# for systemctl
+      - /run/systemd/system:/run/systemd/system
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      - /sys/fs/cgroup:/sys/fs/cgroup
+# for jetson
+      - ~/.ssh:/home/developer/.ssh
+    extends:
+      service: driver-dev-base
+
+  power_controller-dev:
+    extends:
+      service: power_controller-dev-base
+    volumes:
+      - ./docker/home:/home/developer/
+
+  power_controller-prod_base:
+    volumes:
+# for systemctl
+      - /run/systemd/system:/run/systemd/system
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      - /sys/fs/cgroup:/sys/fs/cgroup
+# for jetson
+      - ~/.ssh:/home/developer/.ssh
+    extends:
+      service: driver-prod-base
+
+  power_controller-prod:
+    extends:
+      service: power_controller-prod-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros
