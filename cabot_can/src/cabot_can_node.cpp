@@ -30,6 +30,7 @@
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/u_int16.hpp"
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/int8.hpp"
@@ -152,7 +153,7 @@ public:
     tof_touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("tof/touch", 10);
     touch_pub_ = this->create_publisher<std_msgs::msg::Int16>("touch", 10);
     capacitive_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("capacitive/touch_raw", 10);
-    tof_touch_raw_pub_ = this->create_publisher<std_msgs::msg::Int16>("tof/touch_raw", 10);
+    tof_touch_raw_pub_ = this->create_publisher<std_msgs::msg::UInt16>("tof/touch_raw", 10);
     servo_pos_pub_ = this->create_publisher<std_msgs::msg::Int16>("servo_pos", 10);
     vibrator_1_sub_ =
       this->create_subscription<std_msgs::msg::UInt8>(
@@ -571,15 +572,15 @@ private:
       std_msgs::msg::Int16 capacitive_touch_raw_msg;
       capacitive_touch_raw_msg.data = capacitive_touch_raw;
       capacitive_touch_raw_pub_->publish(capacitive_touch_raw_msg);
-      int16_t tof_touch_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
-      std_msgs::msg::Int16 tof_raw_msg;
+      uint16_t tof_touch_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
+      std_msgs::msg::UInt16 tof_raw_msg;
       tof_raw_msg.data = tof_touch_raw;
       tof_touch_raw_pub_->publish(tof_raw_msg);
       int16_t tof_touch = 0;
       int16_t touch = frame.data[3];
       if (touch_mode_ == "dual") {
         if (touch == 0) {
-          if (0 <= tof_touch_raw && tof_touch_raw <= tof_touch_threshold_) {
+          if (tof_touch_raw <= tof_touch_threshold_) {
             touch = 1;
           } else {
             touch = 0;
@@ -588,7 +589,7 @@ private:
       } else if (touch_mode_ == "cap") {
         // noop
       } else if (touch_mode_ == "tof") {
-        if (0 <= tof_touch_raw && tof_touch_raw <= tof_touch_threshold_) {
+        if (tof_touch_raw <= tof_touch_threshold_) {
           touch = 1;
         } else {
           touch = 0;
@@ -787,7 +788,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr tact_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr capacitive_touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr capacitive_touch_raw_pub_;
-  rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr tof_touch_raw_pub_;
+  rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr tof_touch_raw_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr tof_touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr touch_pub_;
   rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr servo_pos_pub_;
