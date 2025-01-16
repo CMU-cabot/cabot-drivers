@@ -579,7 +579,7 @@ private:
       int16_t touch = frame.data[3];
       if (touch_mode_ == "dual") {
         if (touch == 0) {
-          if (tof_touch_raw <= tof_touch_threshold_) {
+          if (0 <= tof_touch_raw && tof_touch_raw <= tof_touch_threshold_) {
             touch = 1;
           } else {
             touch = 0;
@@ -588,7 +588,7 @@ private:
       } else if (touch_mode_ == "cap") {
         // noop
       } else if (touch_mode_ == "tof") {
-        if (tof_touch_raw <= tof_touch_threshold_) {
+        if (0 <= tof_touch_raw && tof_touch_raw <= tof_touch_threshold_) {
           touch = 1;
         } else {
           touch = 0;
