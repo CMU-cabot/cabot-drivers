@@ -140,7 +140,14 @@ services:
     volumes:
       - ./docker/home/.ros:/home/developer/.ros
 
-  power_controller-dev-base:
+  power_controller-base:
+    environment:
+      - CABOT_ACE_BATTERY_PORT
+      - CABOT_ACE_BATTERY_BAUD
+      - CABOT_ID_DIR=/home/developer/.ssh
+      - CABOT_ID_FILE
+    extends:
+      service: driver-dev-base
     volumes:
 # for systemctl
       - /run/systemd/system:/run/systemd/system
@@ -148,28 +155,18 @@ services:
       - /sys/fs/cgroup:/sys/fs/cgroup
 # for jetson
       - ~/.ssh:/home/developer/.ssh
-    extends:
-      service: driver-dev-base
+    command:
+      - "/launch.sh"
+      - "power"
 
   power_controller-dev:
     extends:
-      service: power_controller-dev-base
+      service: power_controller-base
     volumes:
       - ./docker/home:/home/developer/
 
-  power_controller-prod_base:
-    volumes:
-# for systemctl
-      - /run/systemd/system:/run/systemd/system
-      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
-      - /sys/fs/cgroup:/sys/fs/cgroup
-# for jetson
-      - ~/.ssh:/home/developer/.ssh
-    extends:
-      service: driver-prod-base
-
   power_controller-prod:
     extends:
-      service: power_controller-prod-base
+      service: power_controller-base
     volumes:
       - ./docker/home/.ros:/home/developer/.ros
