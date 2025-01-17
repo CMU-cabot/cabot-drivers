@@ -38,7 +38,7 @@
 #include "sensor_msgs/msg/temperature.hpp"
 #include <std_msgs/msg/u_int8.hpp>
 #include <std_srvs/srv/set_bool.hpp>
-#include <std_srvs/srv/empty.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 // include custom msg
 #include "power_controller_msgs/msg/battery_array.hpp"
@@ -101,16 +101,10 @@ public:
         &PowerController::set5vPowerMCU,
         this, std::placeholders::_1,
         std::placeholders::_2));
-    service_server_shutdown_ = this->create_service<std_srvs::srv::Empty>(
+    service_server_shutdown_ = this->create_service<std_srvs::srv::Trigger>(
       "shutdown",
       std::bind(
         &PowerController::shutdownALL,
-        this, std::placeholders::_1,
-        std::placeholders::_2));
-    service_server_reboot_ = this->create_service<std_srvs::srv::Empty>(
-      "reboot",
-      std::bind(
-        &PowerController::rebootALL,
         this, std::placeholders::_1,
         std::placeholders::_2));
     // fan subscriber
@@ -276,8 +270,8 @@ private:
     res->success = true;
   }
   void shutdownALL(
-    const std::shared_ptr<std_srvs::srv::Empty::Request> req,
-    const std::shared_ptr<std_srvs::srv::Empty::Response> res)
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
+    const std::shared_ptr<std_srvs::srv::Trigger::Response> res)
   {
     mtx_.lock();
     id_ = CanId::power_id;
@@ -285,22 +279,8 @@ private:
     std::memcpy(&send_can_value_, &shutdown_, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
     (void)req;
-    (void)res;
+    res->success = true;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "shutdown");
-    mtx_.unlock();
-  }
-  void rebootALL(
-    const std::shared_ptr<std_srvs::srv::Empty::Request> req,
-    const std::shared_ptr<std_srvs::srv::Empty::Response> res)
-  {
-    mtx_.lock();
-    id_ = CanId::power_id;
-    uint8_t reboot_ = 255;
-    std::memcpy(&send_can_value_, &reboot_, sizeof(bool));
-    send_can_value_list_.push_back({id_, send_can_value_});
-    (void)req;
-    (void)res;
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "reboot");
     mtx_.unlock();
   }
   void fanController(std_msgs::msg::UInt8 msg)
@@ -494,8 +474,7 @@ private:
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_left_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_right_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_5v_MCU_;
-  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_server_shutdown_;
-  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_server_reboot_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_server_shutdown_;
   // subscriber
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr subscriber_fan_;
   rclcpp::Subscription<sensor_msgs::msg::Temperature>::SharedPtr sub_temper_;
