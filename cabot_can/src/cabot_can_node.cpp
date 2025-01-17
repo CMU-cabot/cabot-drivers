@@ -671,6 +671,13 @@ private:
   void publishCapacitiveTouchStatus(const struct can_frame & frame)
   {
     if (frame.can_id == CanId::CAPACITIVE_TOUCH_STATUS_ID && frame.can_dlc == CanDlc::CAPACITIVE_TOUCH_STATUS_CAN_DLC) {
+      // for debug purpose
+      std::string debug_string = std::string("CAP12xx") + "," +
+                                 std::to_string(frame.data[0]) + "," +
+                                 std::to_string(frame.data[1]) + "," +
+                                 std::to_string(frame.data[2]);
+      RCLCPP_INFO(this->get_logger(), "%s", debug_string.c_str());
+
       int ACAL_FAIL = 0;
       int BC_OUT = 0;
       int NOISE_FLAG = 0;
