@@ -2,8 +2,9 @@
 
 pointcloud_to_laserscan_node:
   ros__parameters:
-    angle_min: -2.57  # -M_PI/2 (front) - 1.0 (angle clipping)
-    angle_max: 1.05 # M_PI/2 (rear) - M_PI/6 (rear cover)
+    target_frame: lidar_base_link
+    angle_min: -2.615  # -M_PI (back) + M_PI/6 (rear cover)
+    angle_max:  2.615  #  M_PI (back) - M_PI/6 (rear cover)
 
 # substitute these parameters to hesai/hesai_lidar.yaml
 hesai_lidar:
