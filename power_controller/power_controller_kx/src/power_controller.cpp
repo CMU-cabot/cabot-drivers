@@ -19,15 +19,15 @@
 // THE SOFTWARE.
 
 // include header file
-#include <cstdio>
-#include <cstdint>
-#include <regex>
-#include <chrono>
 #include <sys/socket.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <cstdio>
+#include <cstdint>
+#include <regex>
+#include <chrono>
 #include <list>
 #include <mutex>
 #include <atomic>
@@ -123,13 +123,13 @@ public:
         this,
         std::placeholders::_1));
     // temperature subscriber
-    sub_temper_  = this->create_subscription<sensor_msgs::msg::Temperature>(
+    sub_temper_ = this->create_subscription<sensor_msgs::msg::Temperature>(
       "temperature3",
       10,
       std::bind(
-	&PowerController::temperatureCallBack,
-	this,
-	std::placeholders::_1));
+        &PowerController::temperatureCallBack,
+        this,
+        std::placeholders::_1));
     // publisher
     state_publisher_ = this->create_publisher<sensor_msgs::msg::BatteryState>("battery_state", 10);
     states_publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_states", 10);
@@ -321,7 +321,7 @@ private:
     mtx_.unlock();
   }
   void temperatureCallBack(sensor_msgs::msg::Temperature temp_msg)
-  {    
+  {
     std_msgs::msg::UInt8 fan_msg;
     double framos_temperature = temp_msg.temperature;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "temperature is %f", framos_temperature);
@@ -334,11 +334,9 @@ private:
     this->get_parameter("max_fan", MAXFAN);
     if (framos_temperature >= HIGHTEMPERATURE) {
       fan_msg.data = MAXFAN;
-    }
-    else if (framos_temperature <= LOWTEMPERATURE) {
+    } else if (framos_temperature <= LOWTEMPERATURE) {
       fan_msg.data = MINFAN;
-    }
-    else {
+    } else {
       fan_msg.data = framos_temperature * TEMPERATURETOFAN;
     }
     fan_publisher_->publish(fan_msg);
@@ -364,7 +362,8 @@ private:
     mtx_.unlock();
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "send data");
   }
-  float convertUnit(uint16_t data, bool temperature_flag = false){
+  float convertUnit(uint16_t data, bool temperature_flag = false)
+  {
     float result;
     if (temperature_flag) {
       result = (data - KELVIN) / 10.0;
@@ -376,7 +375,8 @@ private:
   // message & combine bits
   void conbineBitAndUpdateMessage(
     power_controller_msgs::msg::BatteryArray & battery_msg, int location,
-    uint8_t* frame_data, uint16_t data[4], bool battery_serial_number_flag = false){    
+    uint8_t * frame_data, uint16_t data[4], bool battery_serial_number_flag = false)
+  {
     data[0] = (frame_data[1] << 8) | frame_data[0];
     data[1] = (frame_data[3] << 8) | frame_data[2];
     data[2] = (frame_data[5] << 8) | frame_data[4];
@@ -394,11 +394,11 @@ private:
       average_battery_msg.serial_number = '0';
       average_battery_msg.location = '0';
       float percentage_sum = 0, voltage_sum = 0, current_sum = 0, temperature_sum = 0;
-      for(int i=0; i<static_cast<int>(battery_msg.batteryarray.size()); i++) {
+      for (int i = 0; i < static_cast<int>(battery_msg.batteryarray.size()); i++) {
         percentage_sum += battery_msg.batteryarray[i].percentage;
         voltage_sum += battery_msg.batteryarray[i].voltage;
         current_sum += battery_msg.batteryarray[i].current;
-	temperature_sum += battery_msg.batteryarray[i].temperature;
+        temperature_sum += battery_msg.batteryarray[i].temperature;
       }
       average_battery_msg.percentage = percentage_sum / battery_msg.batteryarray.size();
       average_battery_msg.voltage = voltage_sum / battery_msg.batteryarray.size();
@@ -412,7 +412,7 @@ private:
     // Converts voltage units from mV to V
     battery_msg.batteryarray[array_num].voltage = convertUnit(data[0]);
     // Converts current units from mA to A
-    battery_msg.batteryarray[array_num].current = convertUnit(-data[1]); // Signs are inverted because hexadecimal data is negative.
+    battery_msg.batteryarray[array_num].current = convertUnit(-data[1]);  // Signs are inverted because hexadecimal data is negative.
     battery_msg.batteryarray[array_num].percentage = static_cast<float>(data[2]) / 100.0f;
     // Convert absolute temperature to Celsius
     battery_msg.batteryarray[array_num].temperature = convertUnit(data[3], temperature_flag_);
@@ -431,29 +431,29 @@ private:
       return;
     }
     switch (frame.can_id) {
-       case CanId::battery_id_1:  // Battery 1 Info
-	 location_ = 1;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-	 break;
-       case CanId::battery_id_2:  // Battery 2 Info
-	 location_ = 2;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-	 break;
-       case CanId::battery_id_3:  // Battery 3 Info
-	 location_ = 3;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-	 break;
-       case CanId::battery_id_4:  // Battery 4 Info
-	 location_ = 4;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-	 break;
-       case CanId::battery_serial_number: // Serial Number
-	 location_ = 0;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_, battery_serial_number_flag_);
-	 break;
-       default:
-	 break;
-      }
+      case CanId::battery_id_1:   // Battery 1 Info
+        location_ = 1;
+        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        break;
+      case CanId::battery_id_2:   // Battery 2 Info
+        location_ = 2;
+        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        break;
+      case CanId::battery_id_3:   // Battery 3 Info
+        location_ = 3;
+        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        break;
+      case CanId::battery_id_4:   // Battery 4 Info
+        location_ = 4;
+        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        break;
+      case CanId::battery_serial_number:  // Serial Number
+        location_ = 0;
+        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_, battery_serial_number_flag_);
+        break;
+      default:
+        break;
+    }
   }
 
   // enum
