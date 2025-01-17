@@ -67,11 +67,10 @@ public:
     // number of batteries
     this->declare_parameter<int>("number_of_batteries", 4);
     this->declare_parameter<std::string>("can_interface", "can0");
-    this->declare_parameter<int>("low_temperature", 25);
-    this->declare_parameter<int>("high_temperature", 50);
-    this->declare_parameter<int>("max_fan", 100);
-    this->declare_parameter<int>("min_fan", 10);
-    this->declare_parameter<float>("temperature_to_fan", (20 / 11.0));
+    this->declare_parameter<float>("low_temperature", 25.0);
+    this->declare_parameter<float>("high_temperature", 50.0);
+    this->declare_parameter<float>("max_fan", 100.0);
+    this->declare_parameter<float>("min_fan", 40.0);
     // service
     service_server_24v_odrive_ = this->create_service<std_srvs::srv::SetBool>(
       "set_24v_power_odrive",
@@ -309,7 +308,7 @@ private:
     id_ = CanId::fan_id;
     double d_pwm = data_ * DUTY;
     uint8_t pwm = static_cast<uint8_t>(std::round(d_pwm));
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("pwm is %d"), pwm);
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("pwm is %d %% (0x%x)"), data_, pwm);
     std::memcpy(&send_can_value_, &pwm, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
     mtx_.unlock();
@@ -319,9 +318,7 @@ private:
     std_msgs::msg::UInt8 fan_msg;
     double framos_temperature = temp_msg.temperature;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("temperature is %f"), framos_temperature);
-    int HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
-    float TEMPERATURETOFAN;
-    this->get_parameter("temperature_to_fan", TEMPERATURETOFAN);
+    float HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
     this->get_parameter("high_temperature", HIGHTEMPERATURE);
     this->get_parameter("low_temperature", LOWTEMPERATURE);
     this->get_parameter("min_fan", MINFAN);
@@ -331,7 +328,8 @@ private:
     } else if (framos_temperature <= LOWTEMPERATURE) {
       fan_msg.data = MINFAN;
     } else {
-      fan_msg.data = framos_temperature * TEMPERATURETOFAN;
+      // linear mapping
+      fan_msg.data = (framos_temperature - LOWTEMPERATURE) / (HIGHTEMPERATURE - LOWTEMPERATURE) * (MAXFAN - MINFAN) + MINFAN;
     }
     fan_publisher_->publish(fan_msg);
   }
