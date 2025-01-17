@@ -10,15 +10,12 @@ find_package(ament_cmake REQUIRED)
 find_package(rclpy REQUIRED)
 
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_copyright REQUIRED)
+  find_package(ament_cmake_flake8 REQUIRED)
+
+  set(MAX_LINE_LENGTH 200)
+  ament_copyright()
+  ament_flake8(MAX_LINE_LENGTH ${MAX_LINE_LENGTH})
 endif()
 
 # Install Python modules
