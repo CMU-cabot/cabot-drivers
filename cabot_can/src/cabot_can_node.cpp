@@ -668,7 +668,7 @@ private:
     }
   }
 
-  void publishCapacitiveTouchStatus(const can_frame & frame)
+  void publishCapacitiveTouchStatus(const struct can_frame & frame)
   {
     if (frame.can_id == CanId::CAPACITIVE_TOUCH_STATUS_ID && frame.can_dlc == CanDlc::CAPACITIVE_TOUCH_STATUS_CAN_DLC) {
       int ACAL_FAIL = 0;
