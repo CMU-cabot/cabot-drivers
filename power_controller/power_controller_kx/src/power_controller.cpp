@@ -308,7 +308,7 @@ private:
     id_ = CanId::fan_id;
     double d_pwm = data_ * DUTY;
     uint8_t pwm = static_cast<uint8_t>(std::round(d_pwm));
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("pwm is %d"), pwm);
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("pwm is %d %% (0x%x)"), data_, pwm);
     std::memcpy(&send_can_value_, &pwm, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
     mtx_.unlock();
@@ -317,8 +317,8 @@ private:
   {
     std_msgs::msg::UInt8 fan_msg;
     double framos_temperature = temp_msg.temperature;
-    float TEMPERATURETOFAN, HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("temperature is %f"), framos_temperature);
+    float HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
     this->get_parameter("high_temperature", HIGHTEMPERATURE);
     this->get_parameter("low_temperature", LOWTEMPERATURE);
     this->get_parameter("min_fan", MINFAN);
