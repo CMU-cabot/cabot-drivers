@@ -171,14 +171,14 @@ private:
     // Set the socket to non-blocking mode
     int flags = fcntl(s, F_GETFL, 0);
     if (flags < 0) {
-        perror("fcntl GETFL failed");
-        close(s);
-        return -1;
+      perror("fcntl GETFL failed");
+      close(s);
+      return -1;
     }
     if (fcntl(s, F_SETFL, flags | O_NONBLOCK) < 0) {
-        perror("fcntl SETFL failed");
-        close(s);
-        return -1;
+      perror("fcntl SETFL failed");
+      close(s);
+      return -1;
     }
     RCLCPP_INFO(this->get_logger(), "Success open CAN %s (%d)", can_interface_.c_str(), s);
     return s;
@@ -454,7 +454,8 @@ private:
         break;
     }
   }
-  void shutdown() {
+  void shutdown()
+  {
     RCLCPP_INFO(get_logger(), "shutting down");
     int ret_code = std::system("sudo systemctl poweroff");
   }
