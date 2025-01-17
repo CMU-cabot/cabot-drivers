@@ -18,15 +18,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//include header file
+// include header file
+#include <sys/socket.h>
+#include <linux/can.h>
+#include <linux/can/raw.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 #include <cstdio>
 #include <cstdint>
 #include <regex>
 #include <chrono>
-#include <sys/socket.h>
-#include <linux/can.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
 #include <list>
 #include <mutex>
 #include <atomic>
@@ -34,6 +35,7 @@
 // include ROS2
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/battery_state.hpp>
+#include "sensor_msgs/msg/temperature.hpp"
 #include <std_msgs/msg/u_int8.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 #include <std_srvs/srv/empty.hpp>
@@ -44,11 +46,15 @@
 
 // font color
 #define ANSI_COLOR_CYAN   "\x1b[36m"
+
+// define value
 #define PERIOD 0.001s
 #define True_ 0x01
 #define False_ 0x00
 #define KELVIN 2731.0  // KELVIN = 273.1 * 10
 #define DUTY 2.55
+#define MAJOR_CATEGORY_BATTERY_CAN_FILTER 0x100
+#define CAN_MAJOR_CATEGORY_MASK 0x380
 
 class PowerController : public rclcpp::Node
 {
@@ -60,6 +66,11 @@ public:
     // number of batteries
     this->declare_parameter<int>("number_of_batteries", 4);
     this->declare_parameter<std::string>("can_interface", "can0");
+    this->declare_parameter<int>("low_temperature", 25);
+    this->declare_parameter<int>("high_temperature", 50);
+    this->declare_parameter<int>("max_fan", 100);
+    this->declare_parameter<int>("min_fan", 10);
+    this->declare_parameter<float>("temperature_to_fan", (20 / 11.0));
     // service
     service_server_24v_odrive_ = this->create_service<std_srvs::srv::SetBool>(
       "set_24v_power_odrive",
@@ -111,11 +122,20 @@ public:
         &PowerController::fanController,
         this,
         std::placeholders::_1));
+    // temperature subscriber
+    sub_temper_ = this->create_subscription<sensor_msgs::msg::Temperature>(
+      "temperature3",
+      10,
+      std::bind(
+        &PowerController::temperatureCallBack,
+        this,
+        std::placeholders::_1));
     // publisher
     state_publisher_ = this->create_publisher<sensor_msgs::msg::BatteryState>("battery_state", 10);
     states_publisher_ = this->create_publisher<power_controller_msgs::msg::BatteryArray>("battery_states", 10);
     pub_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::publishPowerStatus, this));
     send_can_timer_ = this->create_wall_timer(PERIOD, std::bind(&PowerController::sendCanMessageIfReceived, this));
+    fan_publisher_ = this->create_publisher<std_msgs::msg::UInt8>("fan_controller", 10);
     // open can socket
     can_socket_ = openCanSocket();
   }
@@ -143,6 +163,14 @@ private:
     addr.can_ifindex = ifr.ifr_ifindex;
     if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "bind");
+      close(s);
+      return -1;
+    }
+    struct can_filter filters[1];
+    filters[0].can_id = MAJOR_CATEGORY_BATTERY_CAN_FILTER;
+    filters[0].can_mask = CAN_MAJOR_CATEGORY_MASK;
+    if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &filters, sizeof(filters)) < 0) {
+      RCLCPP_ERROR(this->get_logger(), "Error in setsockopt for CAN filter");
       close(s);
       return -1;
     }
@@ -253,7 +281,7 @@ private:
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
     mtx_.lock();
-    id_ = power_id;
+    id_ = CanId::power_id;
     uint8_t shutdown_ = False_;
     std::memcpy(&send_can_value_, &shutdown_, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
@@ -267,7 +295,7 @@ private:
     const std::shared_ptr<std_srvs::srv::Empty::Response> res)
   {
     mtx_.lock();
-    id_ = power_id;
+    id_ = CanId::power_id;
     uint8_t reboot_ = 255;
     std::memcpy(&send_can_value_, &reboot_, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
@@ -284,13 +312,34 @@ private:
       return;
     }
     mtx_.lock();
-    id_ = fan_id;
+    id_ = CanId::fan_id;
     double d_pwm = data_ * DUTY;
     uint8_t pwm = static_cast<uint8_t>(std::round(d_pwm));
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "pwm is %d", pwm);
     std::memcpy(&send_can_value_, &pwm, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
     mtx_.unlock();
+  }
+  void temperatureCallBack(sensor_msgs::msg::Temperature temp_msg)
+  {
+    std_msgs::msg::UInt8 fan_msg;
+    double framos_temperature = temp_msg.temperature;
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "temperature is %f", framos_temperature);
+    int HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
+    float TEMPERATURETOFAN;
+    this->get_parameter("temperature_to_fan", TEMPERATURETOFAN);
+    this->get_parameter("high_temperature", HIGHTEMPERATURE);
+    this->get_parameter("low_temperature", LOWTEMPERATURE);
+    this->get_parameter("min_fan", MINFAN);
+    this->get_parameter("max_fan", MAXFAN);
+    if (framos_temperature >= HIGHTEMPERATURE) {
+      fan_msg.data = MAXFAN;
+    } else if (framos_temperature <= LOWTEMPERATURE) {
+      fan_msg.data = MINFAN;
+    } else {
+      fan_msg.data = framos_temperature * TEMPERATURETOFAN;
+    }
+    fan_publisher_->publish(fan_msg);
   }
   void sendCanMessageIfReceived()
   {
@@ -313,24 +362,26 @@ private:
     mtx_.unlock();
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "send data");
   }
-  float convertUnit(uint16_t data, bool temperature_flag = false){
+  float convertUnit(uint16_t data, bool temperature_flag = false)
+  {
     float result;
-    if (temperature_flag){
+    if (temperature_flag) {
       result = (data - KELVIN) / 10.0;
       return result;
     }
     result = static_cast<float>(data) / 1000.0;
     return result;
   }
-  //message & combine bits
+  // message & combine bits
   void conbineBitAndUpdateMessage(
     power_controller_msgs::msg::BatteryArray & battery_msg, int location,
-    uint8_t* frame_data, uint16_t data[4], bool battery_serial_number_flag = false){    
+    uint8_t * frame_data, uint16_t data[4], bool battery_serial_number_flag = false)
+  {
     data[0] = (frame_data[1] << 8) | frame_data[0];
     data[1] = (frame_data[3] << 8) | frame_data[2];
     data[2] = (frame_data[5] << 8) | frame_data[4];
     data[3] = (frame_data[7] << 8) | frame_data[6];
-    if (battery_serial_number_flag){
+    if (battery_serial_number_flag) {
       battery_msg.batteryarray[0].serial_number = std::to_string(data[0]);
       battery_msg.batteryarray[1].serial_number = std::to_string(data[1]);
       battery_msg.batteryarray[2].serial_number = std::to_string(data[2]);
@@ -343,11 +394,11 @@ private:
       average_battery_msg.serial_number = '0';
       average_battery_msg.location = '0';
       float percentage_sum = 0, voltage_sum = 0, current_sum = 0, temperature_sum = 0;
-      for(int i=0; i<static_cast<int>(battery_msg.batteryarray.size()); i++) {
+      for (int i = 0; i < static_cast<int>(battery_msg.batteryarray.size()); i++) {
         percentage_sum += battery_msg.batteryarray[i].percentage;
         voltage_sum += battery_msg.batteryarray[i].voltage;
         current_sum += battery_msg.batteryarray[i].current;
-	temperature_sum += battery_msg.batteryarray[i].temperature;
+        temperature_sum += battery_msg.batteryarray[i].temperature;
       }
       average_battery_msg.percentage = percentage_sum / battery_msg.batteryarray.size();
       average_battery_msg.voltage = voltage_sum / battery_msg.batteryarray.size();
@@ -361,7 +412,7 @@ private:
     // Converts voltage units from mV to V
     battery_msg.batteryarray[array_num].voltage = convertUnit(data[0]);
     // Converts current units from mA to A
-    battery_msg.batteryarray[array_num].current = convertUnit(-data[1]); // Signs are inverted because hexadecimal data is negative.
+    battery_msg.batteryarray[array_num].current = convertUnit(-data[1]);  // Signs are inverted because hexadecimal data is negative.
     battery_msg.batteryarray[array_num].percentage = static_cast<float>(data[2]) / 100.0f;
     // Convert absolute temperature to Celsius
     battery_msg.batteryarray[array_num].temperature = convertUnit(data[3], temperature_flag_);
@@ -380,57 +431,57 @@ private:
       return;
     }
     switch (frame.can_id) {
-       case CanId::battery_id_1:  // Battery 1 Info
-	 location_ = 1;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-	 break;
-       case CanId::battery_id_2:  // Battery 2 Info
-	 location_ = 2;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-	 break;
-       case CanId::battery_id_3:  // Battery 3 Info
-	 location_ = 3;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-	 break;
-       case CanId::battery_id_4:  // Battery 4 Info
-	 location_ = 4;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
-	 break;
-       case CanId::battery_serial_number: // Serial Number
-	 location_ = 0;
-	 conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_, battery_serial_number_flag_);
-	 break;
-       default:
-	 break;
-      }
+      case CanId::battery_id_1:   // Battery 1 Info
+        location_ = 1;
+        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        break;
+      case CanId::battery_id_2:   // Battery 2 Info
+        location_ = 2;
+        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        break;
+      case CanId::battery_id_3:   // Battery 3 Info
+        location_ = 3;
+        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        break;
+      case CanId::battery_id_4:   // Battery 4 Info
+        location_ = 4;
+        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        break;
+      case CanId::battery_serial_number:  // Serial Number
+        location_ = 0;
+        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_, battery_serial_number_flag_);
+        break;
+      default:
+        break;
+    }
   }
 
   // enum
-  enum CanId : uint8_t
+  enum CanId : uint16_t
   {
-    battery_id_1 = 0x05,
+    battery_id_1 = 0x518,
     battery_id_2,
     battery_id_3,
     battery_id_4,
-    odrive_id = 0x15,
+    odrive_id = 0x108,
     power_id,
     d455_front_id,
     d455_left_id,
     d455_right_id,
-    mcu_id = 0x1a,
-    battery_serial_number = 0x1d,
-    fan_id
+    mcu_id,
+    fan_id,
+    battery_serial_number = 0x520
   };
 
   // struct
   struct SendCanValueInfo
   {
-    uint8_t id;
-    uint8_t data;
+    uint16_t id;
+    uint16_t data;
   };
   // value
-  uint8_t send_can_value_;
-  uint8_t id_;
+  uint16_t send_can_value_;
+  uint16_t id_;
   uint8_t power_;
   // flag
   bool check_send_data_;
@@ -451,7 +502,9 @@ private:
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_server_reboot_;
   // subscriber
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr subscriber_fan_;
+  rclcpp::Subscription<sensor_msgs::msg::Temperature>::SharedPtr sub_temper_;
   // publisher
+  rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr fan_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr state_publisher_;
   rclcpp::Publisher<power_controller_msgs::msg::BatteryArray>::SharedPtr states_publisher_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
