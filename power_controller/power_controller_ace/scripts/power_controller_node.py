@@ -85,7 +85,7 @@ class BatteryDriverNode(rclpy.node.Node):
         self.battery_thread.join()
 
     def shutdown_callback(self, req, res):
-        self.shutdown()
+        self.driver.shutdown()
         res.success = True
         return res
 
