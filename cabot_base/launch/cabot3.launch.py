@@ -472,7 +472,6 @@ def generate_launch_description():
                 remappings=[
                     ('/cabot/imu', '/cabot/imu/data'),
                     ('/cabot/touch_speed', '/cabot/touch_speed_raw'),
-                    ('/cabot/bme/pressure', '/cabot/pressure')
                 ],
                 condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
             ),
