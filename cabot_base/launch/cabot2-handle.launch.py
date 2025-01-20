@@ -36,7 +36,6 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import GroupAction
-from launch.actions import IncludeLaunchDescription
 from launch.actions import LogInfo
 from launch.actions import SetEnvironmentVariable
 from launch.actions import RegisterEventHandler
@@ -45,24 +44,19 @@ from launch.conditions import UnlessCondition
 from launch.conditions import LaunchConfigurationEquals
 from launch.conditions import LaunchConfigurationNotEquals
 from launch.event_handlers import OnShutdown
-from launch.substitutions import Command
 from launch.substitutions import EnvironmentVariable
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
 from launch.substitutions import PythonExpression
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.actions import LoadComposableNodes
-from launch_ros.actions import Node
 from launch_ros.descriptions import ComposableNode
-from launch_ros.descriptions import ParameterValue
 from launch_ros.descriptions import ParameterFile
 
 from cabot_common.launch import AppendLogDirPrefix
 
 
 def generate_launch_description():
-    output = 'both'
     pkg_dir = get_package_share_directory('cabot_base')
 
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -149,7 +143,7 @@ def generate_launch_description():
                 composable_node_descriptions=[],
             ),
             LoadComposableNodes(
-                target_container= '/cabot_nodes_container',
+                target_container='/cabot_nodes_container',
                 composable_node_descriptions=[
                     # CaBot related
                     ComposableNode(
@@ -162,8 +156,8 @@ def generate_launch_description():
                 ]
             ),
             LoadComposableNodes(
-                target_container= '/cabot_nodes_container',
-                condition=IfCondition(use_sim_time) ,
+                target_container='/cabot_nodes_container',
+                condition=IfCondition(use_sim_time),
                 composable_node_descriptions=[
                     # Microcontroller (Arduino - gt1/gtm or ESP32 - ace)
                     ComposableNode(
@@ -183,8 +177,8 @@ def generate_launch_description():
                 ]
             ),
             LoadComposableNodes(
-                target_container= '/cabot_nodes_container',
-                condition=UnlessCondition(use_sim_time) ,
+                target_container='/cabot_nodes_container',
+                condition=UnlessCondition(use_sim_time),
                 composable_node_descriptions=[
                     ComposableNode(
                         package='cabot_serial',
@@ -203,8 +197,8 @@ def generate_launch_description():
                 ]
             ),
             LoadComposableNodes(
-                target_container= '/cabot_nodes_container',
-                condition=IfCondition(use_standalone_wifi_scanner) ,
+                target_container='/cabot_nodes_container',
+                condition=IfCondition(use_standalone_wifi_scanner),
                 composable_node_descriptions=[
                     # optional wifi scanner with ESP32
                     ComposableNode(
@@ -212,7 +206,7 @@ def generate_launch_description():
                         plugin='CaBotSerialNode',
                         namespace='/cabot',
                         name='serial_esp32_wifi_scanner',
-                        parameters=[*param_files,{'use_sim_time': use_sim_time}],
+                        parameters=[*param_files, {'use_sim_time': use_sim_time}],
                         remappings=[('wifi_scan_str', '/esp32/wifi_scan_str')],
                     ),
                 ]

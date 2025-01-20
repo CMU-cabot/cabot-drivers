@@ -45,7 +45,7 @@ install(TARGETS power_controller
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}/
-  )
+)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_copyright REQUIRED)
