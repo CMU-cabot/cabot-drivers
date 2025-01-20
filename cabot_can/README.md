@@ -42,9 +42,9 @@ TOF Sensor and Capacitive Sensor Integration - 50Hz
     - if you publish a `value`, it vibrates corresponding vibrator for `value` x 10 milliseconds (0 - 2550 milliseconds)
 - **/servo_target** (std_msgs/msg/Int16): if you publish a `value`, it rotates directional indicator (value: -179 ~ +179)
 - **/servo_free** (std_msgs/msg/Bool): `false` -> set free, `true` -> no operation
-- **/capacitive/recalibration** (std_msgs/msg/Int16): 
+- **/capacitive/recalibration** (std_msgs/msg/UInt8): 
     - Bits 4 - 3 - NEG_DELTA_CNT[1:0] - Determines the number of negative delta counts necessary to trigger a digital calibration
-- **capacitive/bc_out_recalibration** (std_msgs/msg/Int16): 
+- **capacitive/bc_out_recalibration** (std_msgs/msg/UInt8): 
     - Bit 2 - DIS_RF_NOISE - Determines whether the RF noise filter is enabled. Setting this bit disables the feature.
         - ‘0’ (default) - If RF noise is detected by the analog block, the delta count on the corresponding channel is set to 0. Note that this does not require that Noise Status bits be set.
         - ‘1’ - A touch is not blocked even if RF noise is detected.
