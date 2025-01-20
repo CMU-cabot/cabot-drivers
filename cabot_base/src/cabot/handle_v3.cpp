@@ -301,11 +301,11 @@ void Handle::buttonCheck(std_msgs::msg::Int8::UniquePtr & msg, int index)
   if (btn_push && btn_dwn[index] &&
     last_dwn[index] != zerotime &&
     (now - last_dwn[index] > holddown_min_interval_ &&
-     now - last_holddwn[index] > holddown_interval_ &&
-     now - last_dwn[index] < holddown_max_interval_))
+    now - last_holddwn[index] > holddown_interval_ &&
+    now - last_dwn[index] < holddown_max_interval_))
   {
     event.insert(std::pair<std::string, std::string>("holddown", std::to_string(button_keys(index))));
-    int duration = (int)(now - last_dwn[index]).seconds();
+    int duration = static_cast<int>((now - last_dwn[index]).seconds());
     event.insert(std::pair<std::string, std::string>("duration", std::to_string(duration)));
     last_holddwn[index] = now;
   }

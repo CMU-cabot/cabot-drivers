@@ -27,16 +27,15 @@
 #include <bits/stdc++.h>
 
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
-#include "std_msgs/msg/int32_multi_array.hpp"
 #include "std_msgs/msg/bool.hpp"
-#include "std_msgs/msg/u_int16.hpp"
-#include "std_msgs/msg/u_int8.hpp"
 #include "std_msgs/msg/int16.hpp"
+#include "std_msgs/msg/int32_multi_array.hpp"
 #include "std_msgs/msg/int8.hpp"
-#include "sensor_msgs/msg/temperature.hpp"
-#include "sensor_msgs/msg/imu.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/u_int8.hpp"
+#include "std_msgs/msg/u_int16.hpp"
 #include "sensor_msgs/msg/fluid_pressure.hpp"
+#include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/temperature.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
@@ -169,11 +168,15 @@ public:
       static_cast<std::function<void(std_msgs::msg::UInt8::SharedPtr)>>(std::bind(&CabotCanNode::subscribeVibratorData, this, std::placeholders::_1, 4)));
     servo_target_sub_ = this->create_subscription<std_msgs::msg::Int16>("servo_target", 10, std::bind(&CabotCanNode::subscribeServoTargetData, this, std::placeholders::_1));
     servo_free_sub_ = this->create_subscription<std_msgs::msg::Bool>("servo_free", 10, std::bind(&CabotCanNode::subServoFree, this, std::placeholders::_1));
-    capacitive_recalibration_sub_ = this->create_subscription<std_msgs::msg::Int16>("capacitive/recalibration", 10, std::bind(&CabotCanNode::subscribeCapacitiveRecalibrationData, this, std::placeholders::_1));
-    capacitive_bc_out_recalibration_sub_ = this->create_subscription<std_msgs::msg::Int16>("capacitive/bc_out_recalibration", 10, std::bind(&CabotCanNode::subscribeCapacitiveBcOutRecalibration, this, std::placeholders::_1));
+    capacitive_recalibration_sub_ =
+      this->create_subscription<std_msgs::msg::UInt8>("capacitive/recalibration", 10, std::bind(&CabotCanNode::subscribeCapacitiveRecalibrationData, this, std::placeholders::_1));
+    capacitive_bc_out_recalibration_sub_ =
+      this->create_subscription<std_msgs::msg::UInt8>("capacitive/bc_out_recalibration", 10, std::bind(&CabotCanNode::subscribeCapacitiveBcOutRecalibration, this, std::placeholders::_1));
     imu_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>("run_imu_calibration", std::bind(&CabotCanNode::readImuServiceCalibration, this, std::placeholders::_1, std::placeholders::_2));
-    capacitive_calibration_srv_ = this->create_service<std_srvs::srv::Trigger>("run_capacitive_calibration", std::bind(&CabotCanNode::capacitiveServiceCalibration, this, std::placeholders::_1, std::placeholders::_2));
-    capacitive_noise_nullify_srv_ = this->create_service<std_srvs::srv::Trigger>("nullify_capacitive_noise", std::bind(&CabotCanNode::nullifyCapacitiveNoise, this, std::placeholders::_1, std::placeholders::_2));
+    capacitive_calibration_srv_ =
+      this->create_service<std_srvs::srv::Trigger>("run_capacitive_calibration", std::bind(&CabotCanNode::capacitiveServiceCalibration, this, std::placeholders::_1, std::placeholders::_2));
+    capacitive_noise_nullify_srv_ =
+      this->create_service<std_srvs::srv::Trigger>("nullify_capacitive_noise", std::bind(&CabotCanNode::nullifyCapacitiveNoise, this, std::placeholders::_1, std::placeholders::_2));
     imu_accel_bias_ = this->declare_parameter("imu_accel_bias", std::vector<double>(3, 0.0));  // parameters for adjusting linear acceleration. default value = [0,0, 0.0, 0.0]
     imu_gyro_bias_ = this->declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0));  // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
     can_socket_ = openCanSocket();
@@ -187,11 +190,10 @@ public:
     pub_timer_ = this->create_wall_timer(std::chrono::microseconds(publish_rate), std::bind(&CabotCanNode::timerPubCallback, this));
     callback_handler_ =
       this->add_on_set_parameters_callback(std::bind(&CabotCanNode::param_set_callback, this, std::placeholders::_1));
-
   }
 
   rcl_interfaces::msg::SetParametersResult param_set_callback(
-    const std::vector<rclcpp::Parameter>& params)
+    const std::vector<rclcpp::Parameter> & params)
   {
     for (auto && param : params) {
       if (!this->has_parameter(param.get_name())) {
@@ -292,6 +294,11 @@ private:
     frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_SENSOR_INPUT_ENABLE_DLC;
     frame.data[0] = 1;
     int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
+    usleep(1000);
+    frame.can_id = CanId::CAPACITIVE_TOUCH_CALIBRATION_ID;
+    frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_CALIBRATION_CAN_DLC;
+    frame.data[0] = 1;
+    nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
     if (nbytes <= 0) {
       RCLCPP_ERROR(this->get_logger(), "Failed to send write capacitive sensor input enable frame");
     } else {
@@ -673,20 +680,38 @@ private:
   void publishCapacitiveTouchStatus(const struct can_frame & frame)
   {
     if (frame.can_id == CanId::CAPACITIVE_TOUCH_STATUS_ID && frame.can_dlc == CanDlc::CAPACITIVE_TOUCH_STATUS_CAN_DLC) {
-      if (frame.data[1] == 1) {
-        RCLCPP_DEBUG(this->get_logger(), "capacitive noise");
+      // for debug purpose
+      std::string debug_string = std::string("CAP12xx") + "," +
+        std::to_string(frame.data[0]) + "," +
+        std::to_string(frame.data[1]) + "," +
+        std::to_string(frame.data[2]);
+      RCLCPP_INFO(this->get_logger(), "%s", debug_string.c_str());
+
+      int ACAL_FAIL = 0;
+      int BC_OUT = 0;
+      int NOISE_FLAG = 0;
+      int CALIBRATION = 0;
+      if ((frame.data[0] & 32) == 32) {
+        ACAL_FAIL = 32;
       }
-      if (frame.data[2] == 1) {
-        RCLCPP_DEBUG(this->get_logger(), "capacitive calibration now");
+      if ((frame.data[0] & 64) == 64) {
+        BC_OUT = 64;
       }
-      if (frame.data[1] == 32) {
-        RCLCPP_DEBUG(this->get_logger(), "capacitive limit now");
+      if ((frame.data[1] & 1) == 1) {
+        NOISE_FLAG = 1;
       }
-      if (frame.data[1] == 64) {
-        RCLCPP_DEBUG(this->get_logger(), "capacitive analog calibration failure now");
-      }      
+      if ((frame.data[2] & 1) == 1) {
+        CALIBRATION = 1;
+      }
+      std::string status_string = std::string("CAP1203") + "," +
+        std::to_string(ACAL_FAIL) + "," +
+        std::to_string(BC_OUT) + "," +
+        std::to_string(NOISE_FLAG) + "," +
+        std::to_string(CALIBRATION);
+      RCLCPP_INFO(this->get_logger(), "%s", status_string.c_str());
     }
   }
+
 
   void subscribeVibratorData(const std_msgs::msg::UInt8::SharedPtr msg, int vibrator_id)
   {
@@ -744,9 +769,9 @@ private:
     }
   }
 
-  void subscribeCapacitiveRecalibrationData(const std_msgs::msg::Int16 & msg)
+  void subscribeCapacitiveRecalibrationData(const std_msgs::msg::UInt8 & msg)
   {
-    uint16_t recalibration_data = msg.data;
+    uint8_t recalibration_data = msg.data;
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
     frame.can_id = CanId::CAPACITIVE_TOUCH_RECALIBRATION_ID;
@@ -757,9 +782,9 @@ private:
     }
   }
 
-  void subscribeCapacitiveBcOutRecalibration(const std_msgs::msg::Int16 & msg)
+  void subscribeCapacitiveBcOutRecalibration(const std_msgs::msg::UInt8 & msg)
   {
-    uint16_t configuration2 = msg.data;
+    uint8_t configuration2 = msg.data;
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
     frame.can_id = CanId::CAPACITIVE_TOUCH_BC_OUT_RECALIBRATION;
@@ -797,8 +822,8 @@ private:
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr vibrator_4_sub_;
   rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr servo_target_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr servo_free_sub_;
-  rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr capacitive_recalibration_sub_;
-  rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr capacitive_bc_out_recalibration_sub_;
+  rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr capacitive_recalibration_sub_;
+  rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr capacitive_bc_out_recalibration_sub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr imu_calibration_srv_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr capacitive_calibration_srv_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr capacitive_noise_nullify_srv_;

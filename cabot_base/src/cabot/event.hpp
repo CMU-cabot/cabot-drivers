@@ -90,7 +90,7 @@ class HoldDownEvent : public BaseEvent
 {
 public:
   static const char * TYPE;
-  HoldDownEvent(int holddown = 0, int duration = 0);
+  explicit HoldDownEvent(int holddown = 0, int duration = 0);
   bool operator==(const HoldDownEvent & other) const;
   int get_holddown() const;
   std::string toString() const override;
