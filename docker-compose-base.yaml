@@ -1,8 +1,24 @@
 services:
   driver-base:
+    image: cmucal/cabot-driver
     build:
       context: ./docker/driver
+      additional_contexts:
+        - src=./
+      args:
+        - BASE_IMAGE=${BASE_IMAGE:-cabot-base}
+      x-bake:
+        tags:
+          - ${REGISTRY:-cmucal}/cabot-driver
+        platforms:
+          - linux/amd64
+          - linux/arm64
+        output:
+          - type=registry
     environment:
+      - HOST_UID
+      - HOST_GID
+      - HOST_TZ
       - ROS_LOG_DIR
       - CABOT_MODEL
       - CABOT_SIDE
@@ -30,6 +46,19 @@ services:
       - /var/run/dbus:/var/run/dbus
 # bridge - if DDS use shared memory
       - /dev/shm:/dev/shm
+    privileged: true
+    devices:
+      - /dev/dri
+    network_mode: host
+    command:
+      - "/launch.sh"
+      - "-c"
+      - "driver"
+
+  driver-dev-base:
+    extends:
+      service: driver-base
+    volumes:
 # code from dependencies
       - ./cabot-common/cabot_common:/home/developer/driver_ws/src/cabot_common
       - ./cabot-common/cabot_msgs:/home/developer/driver_ws/src/cabot_msgs
@@ -43,25 +72,71 @@ services:
       - ./power_controller:/home/developer/driver_ws/src/power_controller
       - ./wireless_scanner_ros:/home/developer/driver_ws/src/wireless_scanner_ros
       - ./script:/home/developer/driver_ws/script
-    privileged: true
-    devices:
-      - /dev/dri
-    network_mode: host
-    command:
-      - "/launch.sh"
-      - "-c"
-      - "driver"
 
-  wifi_scan-base:
+  driver-dev:
+    extends:
+      service: driver-dev-base
+    volumes:
+      - ./docker/home:/home/developer/
+
+  driver-prod-base:
     extends:
       service: driver-base
+
+  driver-prod:
+    extends:
+      service: driver-prod-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros
+
+  wifi_scan-dev-base:
+    extends:
+      service: driver-dev-base
     command:
       - "/launch.sh"
       - "wifi-scan"
 
-  ble_scan-base:
+  wifi_scan-dev:
     extends:
-      service: driver-base
+      service: wifi_scan-dev-base
+    volumes:
+      - ./docker/home:/home/developer/
+
+  wifi_scan-prod-base:
+    extends:
+      service: driver-prod-base
+    command:
+      - "/launch.sh"
+      - "wifi-scan"
+
+  wifi_scan-prod:
+    extends:
+      service: wifi_scan-prod-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros
+
+  ble_scan-dev-base:
+    extends:
+      service: driver-dev-base
     command:
       - "/launch.sh"
       - "ble-scan"
+
+  ble_scan-dev:
+    extends:
+      service: ble_scan-dev-base
+    volumes:
+      - ./docker/home:/home/developer/
+
+  ble_scan-prod-base:
+    extends:
+      service: driver-prod-base
+    command:
+      - "/launch.sh"
+      - "ble-scan"
+
+  ble_scan-prod:
+    extends:
+      service: ble_scan-prod-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros
