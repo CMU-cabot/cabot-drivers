@@ -1,6 +1,6 @@
 services:
   driver-base:
-    image: cmucal/cabot-driver
+    image: cmucal/cabot-driver:{CABOT_LAUNCH_IMAGE_TAG:-latest}
     build:
       context: ./docker/driver
       additional_contexts:
