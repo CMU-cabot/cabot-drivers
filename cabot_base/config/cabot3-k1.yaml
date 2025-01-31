@@ -2,6 +2,7 @@
 
 pointcloud_to_laserscan_node:
   ros__parameters:
+    # The LiDAR is mounted 90 degrees sideways.
     target_frame: lidar_base_link
     angle_min: -2.615  # -M_PI (back) + M_PI/6 (rear cover)
     angle_max:  2.615  #  M_PI (back) - M_PI/6 (rear cover)
