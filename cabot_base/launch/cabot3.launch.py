@@ -496,6 +496,24 @@ def generate_launch_description():
                 ],
                 condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
             ),
+            # wifi scan converter for cabot_can
+            Node(
+                package='wireless_scanner_ros',
+                executable='esp32_wifi_scan_converter.py',
+                namespace='/cabot',
+                name='esp32_wifi_scan_converter',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {
+                        'use_sim_time': use_sim_time,
+                    }
+                ],
+                remappings=[
+                    ('/esp32/wifi_scan_str', '/cabot/wifi'),
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+            ),
             # optional wifi scanner with ESP32
             Node(
                 package='cabot_serial',
