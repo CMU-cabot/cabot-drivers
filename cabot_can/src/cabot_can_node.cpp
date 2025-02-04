@@ -27,6 +27,8 @@
 #include <bits/stdc++.h>
 
 #include "rclcpp/rclcpp.hpp"
+#include <diagnostic_updater/diagnostic_updater.hpp>
+#include <diagnostic_updater/publisher.hpp>
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/int16.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
@@ -128,7 +130,8 @@ public:
   CabotCanNode()
   : touch_mode_("cap"),
     tof_touch_threshold_(25),
-    Node("cabot_can_node")
+    Node("cabot_can_node"),
+    diagnostic_updater_(this)
   {
     declare_parameter("touch_mode", touch_mode_);
     declare_parameter("tof_touch_threshold", tof_touch_threshold_);
@@ -136,6 +139,8 @@ public:
     declare_parameter("can_interface", "can0");
     declare_parameter("imu_frame_id", "imu_frame");
     declare_parameter("calibration_params", std::vector<int64_t>((CanDlc::WRITE_IMU_CALIBRATION_1_DLC + CanDlc::WRITE_IMU_CALIBRATION_2_DLC + CanDlc::WRITE_IMU_CALIBRATION_3_DLC), 0));
+    declare_parameter("target_imu_fps", 100.0);
+    declare_parameter("target_pressure_fps", 2.0);
     temperature_1_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature1", 10);
     temperature_2_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature2", 10);
     temperature_3_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature3", 10);
@@ -190,6 +195,20 @@ public:
     pub_timer_ = this->create_wall_timer(std::chrono::microseconds(publish_rate), std::bind(&CabotCanNode::timerPubCallback, this));
     callback_handler_ =
       this->add_on_set_parameters_callback(std::bind(&CabotCanNode::param_set_callback, this, std::placeholders::_1));
+
+    // diagnostic updater
+    this->get_parameter("target_imu_fps", target_imu_fps_);
+    this->get_parameter("target_pressure_fps", target_pressure_fps_);
+    std::string deviceName = this->get_name();
+    diagnostic_updater_.setHardwareID(deviceName);
+    diag_imu_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "IMU", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+      &target_imu_fps_, &target_imu_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_pressure_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Pressure", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+      &target_pressure_fps_, &target_pressure_fps_),
+      diagnostic_updater::TimeStampStatusParam());
   }
 
   rcl_interfaces::msg::SetParametersResult param_set_callback(
@@ -478,6 +497,7 @@ private:
       std::string frame_id = this->get_parameter("imu_frame_id").as_string();
       imu_msg.header.frame_id = frame_id;
       imu_pub_->publish(imu_msg);
+      diag_imu_->tick(imu_msg.header.stamp);
     }
   }
 
@@ -565,6 +585,7 @@ private:
       pressure_msg.fluid_pressure = pressure;
       bme_pressure_pub_->publish(pressure_msg);
       pressure_pub_->publish(pressure_msg);
+      diag_pressure_->tick(pressure_msg.header.stamp);
     }
   }
 
@@ -831,6 +852,13 @@ private:
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr callback_handler_;
   std::vector<double> imu_accel_bias_;
   std::vector<double> imu_gyro_bias_;
+
+  // diagnostic
+  diagnostic_updater::Updater diagnostic_updater_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_imu_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_pressure_;
+  double target_imu_fps_;
+  double target_pressure_fps_;
 };
 
 int main(int argc, char * argv[])
