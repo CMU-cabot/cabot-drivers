@@ -1,0 +1,13 @@
+repositories:
+  cabot-common:
+    type: git
+    url: https://github.com/CMU-cabot/cabot-common
+    version: 1d784dce364ad6e7e4b9f1da54baa4c51a8a8254
+  cabot-description:
+    type: git
+    url: https://github.com/CMU-cabot/cabot-description
+    version: 5374b9b5d3a252e8cd174b4b83baca891a671a22
+  docker/driver/ros_odrive:
+    type: git
+    url: https://github.com/CMU-cabot/ros_odrive.git
+    version: 0a3cc6e8e94388eeebb7b80841df6f9e70ceaffd
