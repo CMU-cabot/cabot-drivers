@@ -203,11 +203,11 @@ public:
     diagnostic_updater_.setHardwareID(deviceName);
     diag_imu_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "IMU", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
-      &target_imu_fps_, &target_imu_fps_),
+        &target_imu_fps_, &target_imu_fps_),
       diagnostic_updater::TimeStampStatusParam());
     diag_pressure_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Pressure", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
-      &target_pressure_fps_, &target_pressure_fps_),
+        &target_pressure_fps_, &target_pressure_fps_),
       diagnostic_updater::TimeStampStatusParam());
   }
 
