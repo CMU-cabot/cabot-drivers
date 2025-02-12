@@ -10,11 +10,13 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 find_package(diagnostic_updater REQUIRED)
 add_executable(cabot_can_node
   src/cabot_can_node.cpp
 )
 ament_target_dependencies(cabot_can_node
+  diagnostic_msgs
   diagnostic_updater
   rclcpp
   std_msgs
