@@ -55,8 +55,6 @@
 #define DUTY 2.55
 #define MAJOR_CATEGORY_BATTERY_CAN_FILTER 0x100
 #define CAN_MAJOR_CATEGORY_MASK 0x380
-#define SLOPE 2.4
-#define INTERCEPT -20
 
 class PowerController : public rclcpp::Node
 {
@@ -68,10 +66,10 @@ public:
     // number of batteries
     this->declare_parameter<int>("number_of_batteries", 4);
     this->declare_parameter<std::string>("can_interface", "can0");
-    this->declare_parameter<int>("low_temperature", 25);
-    this->declare_parameter<int>("high_temperature", 50);
-    this->declare_parameter<int>("max_fan", 100);
-    this->declare_parameter<int>("min_fan", 40);
+    this->declare_parameter<float>("low_temperature", 25.0);
+    this->declare_parameter<float>("high_temperature", 50.0);
+    this->declare_parameter<float>("max_fan", 100.0);
+    this->declare_parameter<float>("min_fan", 40.0);
     // service
     service_server_24v_odrive_ = this->create_service<std_srvs::srv::SetBool>(
       "set_24v_power_odrive",
@@ -324,8 +322,7 @@ private:
   {
     std_msgs::msg::UInt8 fan_msg;
     double framos_temperature = temp_msg.temperature;
-    int HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
-    float TEMPERATURETOFAN;
+    float TEMPERATURETOFAN, HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
     this->get_parameter("high_temperature", HIGHTEMPERATURE);
     this->get_parameter("low_temperature", LOWTEMPERATURE);
     this->get_parameter("min_fan", MINFAN);
@@ -335,7 +332,9 @@ private:
     } else if (framos_temperature <= LOWTEMPERATURE) {
       fan_msg.data = MINFAN;
     } else {
-      fan_msg.data = framos_temperature * SLOPE + INTERCEPT;
+      float slope = (MAXFAN - MINFAN) / (HIGHTEMPERATURE - LOWTEMPERATURE);
+      float intercept = MAXFAN - (HIGHTEMPERATURE * slope);
+      fan_msg.data = framos_temperature * slope + intercept;
     }
     fan_publisher_->publish(fan_msg);
   }
