@@ -55,6 +55,8 @@
 #define DUTY 2.55
 #define MAJOR_CATEGORY_BATTERY_CAN_FILTER 0x100
 #define CAN_MAJOR_CATEGORY_MASK 0x380
+#define SLOPE 2.4
+#define INTERCEPT -20
 
 class PowerController : public rclcpp::Node
 {
@@ -69,8 +71,7 @@ public:
     this->declare_parameter<int>("low_temperature", 25);
     this->declare_parameter<int>("high_temperature", 50);
     this->declare_parameter<int>("max_fan", 100);
-    this->declare_parameter<int>("min_fan", 10);
-    this->declare_parameter<float>("temperature_to_fan", (20 / 11.0));
+    this->declare_parameter<int>("min_fan", 40);
     // service
     service_server_24v_odrive_ = this->create_service<std_srvs::srv::SetBool>(
       "set_24v_power_odrive",
@@ -315,7 +316,6 @@ private:
     id_ = CanId::fan_id;
     double d_pwm = data_ * DUTY;
     uint8_t pwm = static_cast<uint8_t>(std::round(d_pwm));
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "pwm is %d", pwm);
     std::memcpy(&send_can_value_, &pwm, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
     mtx_.unlock();
@@ -324,10 +324,8 @@ private:
   {
     std_msgs::msg::UInt8 fan_msg;
     double framos_temperature = temp_msg.temperature;
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "temperature is %f", framos_temperature);
     int HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
     float TEMPERATURETOFAN;
-    this->get_parameter("temperature_to_fan", TEMPERATURETOFAN);
     this->get_parameter("high_temperature", HIGHTEMPERATURE);
     this->get_parameter("low_temperature", LOWTEMPERATURE);
     this->get_parameter("min_fan", MINFAN);
@@ -337,7 +335,7 @@ private:
     } else if (framos_temperature <= LOWTEMPERATURE) {
       fan_msg.data = MINFAN;
     } else {
-      fan_msg.data = framos_temperature * TEMPERATURETOFAN;
+      fan_msg.data = framos_temperature * SLOPE + INTERCEPT;
     }
     fan_publisher_->publish(fan_msg);
   }
@@ -360,7 +358,6 @@ private:
     }
     send_can_value_list_.pop_front();
     mtx_.unlock();
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "send data");
   }
   float convertUnit(uint16_t data, bool temperature_flag = false)
   {
