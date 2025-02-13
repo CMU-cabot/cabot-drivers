@@ -1,4 +1,4 @@
-# config file for cabot3-k1
+# config file for cabot3-k4 (same with cabot3-k1)
 
 pointcloud_to_laserscan_node:
   ros__parameters:
