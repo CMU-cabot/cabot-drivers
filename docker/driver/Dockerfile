@@ -130,7 +130,6 @@ USER $USERNAME
 
 COPY --from=src ./cabot-common/cabot_common $HOME/driver_ws/src/cabot_common
 COPY --from=src ./cabot-common/cabot_msgs $HOME/driver_ws/src/cabot_msgs
-COPY --from=src ./cabot-base/docker/humble-custom/people $HOME/driver_ws/src/people
 COPY --from=src ./cabot-description/cabot_description $HOME/driver_ws/src/cabot_description
 COPY --from=src ./cabot_base $HOME/driver_ws/src/cabot_base
 COPY --from=src ./cabot_serial $HOME/driver_ws/src/cabot_serial

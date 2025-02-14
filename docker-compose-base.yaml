@@ -62,7 +62,6 @@ services:
 # code from dependencies
       - ./cabot-common/cabot_common:/home/developer/driver_ws/src/cabot_common
       - ./cabot-common/cabot_msgs:/home/developer/driver_ws/src/cabot_msgs
-      - ./cabot-base/docker/humble-custom/people:/home/developer/driver_ws/src/people
       - ./cabot-description/cabot_description:/home/developer/driver_ws/src/cabot_description
 # code
       - ./cabot_base:/home/developer/driver_ws/src/cabot_base
