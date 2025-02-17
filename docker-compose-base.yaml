@@ -139,3 +139,34 @@ services:
       service: ble_scan-prod-base
     volumes:
       - ./docker/home/.ros:/home/developer/.ros
+
+  power_controller-base:
+    environment:
+      - CABOT_ACE_BATTERY_PORT
+      - CABOT_ACE_BATTERY_BAUD
+      - CABOT_ID_DIR=/home/developer/.ssh
+      - CABOT_ID_FILE
+    extends:
+      service: driver-dev-base
+    volumes:
+# for systemctl
+      - /run/systemd/system:/run/systemd/system
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      - /sys/fs/cgroup:/sys/fs/cgroup
+# for jetson
+      - ~/.ssh:/home/developer/.ssh
+    command:
+      - "/launch.sh"
+      - "power"
+
+  power_controller-dev:
+    extends:
+      service: power_controller-base
+    volumes:
+      - ./docker/home:/home/developer/
+
+  power_controller-prod:
+    extends:
+      service: power_controller-base
+    volumes:
+      - ./docker/home/.ros:/home/developer/.ros
