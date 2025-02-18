@@ -23,6 +23,7 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <net/if.h>
+#include <fcntl.h>
 #include <sys/ioctl.h>
 #include <cstdio>
 #include <cstdint>
@@ -38,14 +39,14 @@
 #include "sensor_msgs/msg/temperature.hpp"
 #include <std_msgs/msg/u_int8.hpp>
 #include <std_srvs/srv/set_bool.hpp>
-#include <std_srvs/srv/empty.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 // include custom msg
 #include "power_controller_msgs/msg/battery_array.hpp"
 #include "power_controller_msgs/srv/fan_controller.hpp"
 
 // font color
-#define ANSI_COLOR_CYAN   "\x1b[36m"
+#define ANSI_COLOR_CYAN(text)   "\x1b[36m" text "\x1b[0m"
 
 // define value
 #define PERIOD 0.001s
@@ -101,16 +102,10 @@ public:
         &PowerController::set5vPowerMCU,
         this, std::placeholders::_1,
         std::placeholders::_2));
-    service_server_shutdown_ = this->create_service<std_srvs::srv::Empty>(
+    service_server_shutdown_ = this->create_service<std_srvs::srv::Trigger>(
       "shutdown",
       std::bind(
         &PowerController::shutdownALL,
-        this, std::placeholders::_1,
-        std::placeholders::_2));
-    service_server_reboot_ = this->create_service<std_srvs::srv::Empty>(
-      "reboot",
-      std::bind(
-        &PowerController::rebootALL,
         this, std::placeholders::_1,
         std::placeholders::_2));
     // fan subscriber
@@ -173,6 +168,19 @@ private:
       close(s);
       return -1;
     }
+    // Set the socket to non-blocking mode
+    int flags = fcntl(s, F_GETFL, 0);
+    if (flags < 0) {
+      perror("fcntl GETFL failed");
+      close(s);
+      return -1;
+    }
+    if (fcntl(s, F_SETFL, flags | O_NONBLOCK) < 0) {
+      perror("fcntl SETFL failed");
+      close(s);
+      return -1;
+    }
+    RCLCPP_INFO(this->get_logger(), "Success open CAN %s (%d)", can_interface_.c_str(), s);
     return s;
   }
   void sendCanFrame(int can_socket, can_frame & frame)
@@ -192,10 +200,10 @@ private:
     mtx_.lock();
     id_ = CanId::odrive_id;
     if (req->data) {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 24V_odrive");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("turn on 24V_odrive"));
       power_ = True_;
     } else {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 24V_odrive");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("turn off 24V_odrive"));
       power_ = False_;
     }
     std::memcpy(&send_can_value_, &power_, sizeof(bool));
@@ -210,10 +218,10 @@ private:
     mtx_.lock();
     id_ = CanId::d455_front_id;
     if (req->data) {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on front D455");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("turn on front D455"));
       power_ = True_;
     } else {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off front D455");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("turn off front D455"));
       power_ = False_;
     }
     std::memcpy(&send_can_value_, &power_, sizeof(bool));
@@ -228,10 +236,10 @@ private:
     mtx_.lock();
     id_ = CanId::d455_left_id;
     if (req->data) {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on left D455");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("turn on left D455"));
       power_ = True_;
     } else {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off left D455");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("turn off left D455"));
       power_ = False_;
     }
     std::memcpy(&send_can_value_, &power_, sizeof(bool));
@@ -246,10 +254,10 @@ private:
     mtx_.lock();
     id_ = CanId::d455_right_id;
     if (req->data) {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on right  D455");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("turn on right  D455"));
       power_ = True_;
     } else {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off right D455");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("turn off right D455"));
       power_ = False_;
     }
     std::memcpy(&send_can_value_, &power_, sizeof(bool));
@@ -264,10 +272,10 @@ private:
     mtx_.lock();
     id_ = CanId::mcu_id;
     if (req->data) {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn on 5V MCU");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("turn on 5V MCU"));
       power_ = True_;
     } else {
-      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "turn off 5V MCU");
+      RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("turn off 5V MCU"));
       power_ = False_;
     }
     std::memcpy(&send_can_value_, &power_, sizeof(bool));
@@ -276,31 +284,17 @@ private:
     res->success = true;
   }
   void shutdownALL(
-    const std::shared_ptr<std_srvs::srv::Empty::Request> req,
-    const std::shared_ptr<std_srvs::srv::Empty::Response> res)
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
+    const std::shared_ptr<std_srvs::srv::Trigger::Response> res)
   {
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("shutdown service is called"));
     mtx_.lock();
     id_ = CanId::power_id;
     uint8_t shutdown_ = False_;
     std::memcpy(&send_can_value_, &shutdown_, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
     (void)req;
-    (void)res;
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "shutdown");
-    mtx_.unlock();
-  }
-  void rebootALL(
-    const std::shared_ptr<std_srvs::srv::Empty::Request> req,
-    const std::shared_ptr<std_srvs::srv::Empty::Response> res)
-  {
-    mtx_.lock();
-    id_ = CanId::power_id;
-    uint8_t reboot_ = 255;
-    std::memcpy(&send_can_value_, &reboot_, sizeof(bool));
-    send_can_value_list_.push_back({id_, send_can_value_});
-    (void)req;
-    (void)res;
-    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN "reboot");
+    res->success = true;
     mtx_.unlock();
   }
   void fanController(std_msgs::msg::UInt8 msg)
@@ -314,6 +308,7 @@ private:
     id_ = CanId::fan_id;
     double d_pwm = data_ * DUTY;
     uint8_t pwm = static_cast<uint8_t>(std::round(d_pwm));
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("pwm is %d %% (0x%x)"), data_, pwm);
     std::memcpy(&send_can_value_, &pwm, sizeof(bool));
     send_can_value_list_.push_back({id_, send_can_value_});
     mtx_.unlock();
@@ -322,7 +317,8 @@ private:
   {
     std_msgs::msg::UInt8 fan_msg;
     double framos_temperature = temp_msg.temperature;
-    float TEMPERATURETOFAN, HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("temperature is %f"), framos_temperature);
+    float HIGHTEMPERATURE, LOWTEMPERATURE, MINFAN, MAXFAN;
     this->get_parameter("high_temperature", HIGHTEMPERATURE);
     this->get_parameter("low_temperature", LOWTEMPERATURE);
     this->get_parameter("min_fan", MINFAN);
@@ -357,6 +353,7 @@ private:
     }
     send_can_value_list_.pop_front();
     mtx_.unlock();
+    RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("send data"));
   }
   float convertUnit(uint16_t data, bool temperature_flag = false)
   {
@@ -426,6 +423,7 @@ private:
     if (nbytes <= 0) {
       return;
     }
+    RCLCPP_INFO(get_logger(), "received CAN frame %x (%d)", frame.can_id, frame.can_dlc);
     switch (frame.can_id) {
       case CanId::battery_id_1:   // Battery 1 Info
         location_ = 1;
@@ -447,9 +445,19 @@ private:
         location_ = 0;
         conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_, battery_serial_number_flag_);
         break;
+      case CanId::seq_id:
+        if (frame.can_dlc == 1 && frame.data[0] == 0) {
+          shutdown();
+        }
+        break;
       default:
         break;
     }
+  }
+  void shutdown()
+  {
+    RCLCPP_INFO(get_logger(), "shutting down");
+    int ret_code = std::system("sudo systemctl poweroff");
   }
 
   // enum
@@ -459,6 +467,10 @@ private:
     battery_id_2,
     battery_id_3,
     battery_id_4,
+    ems_id = 0x100,
+    stat_id,
+    ind_id,
+    seq_id,
     odrive_id = 0x108,
     power_id,
     d455_front_id,
@@ -494,8 +506,7 @@ private:
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_left_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_12v_D455_right_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_5v_MCU_;
-  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_server_shutdown_;
-  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr service_server_reboot_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_server_shutdown_;
   // subscriber
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr subscriber_fan_;
   rclcpp::Subscription<sensor_msgs::msg::Temperature>::SharedPtr sub_temper_;

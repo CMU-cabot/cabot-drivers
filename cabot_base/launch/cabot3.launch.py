@@ -476,20 +476,6 @@ def generate_launch_description():
                 ],
                 condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
             ),
-            Node(
-                package='power_controller_kx',
-                executable='power_controller',
-                namespace='/cabot',
-                name='power_controller',
-                output=output,
-                parameters=[
-                    *param_files,
-                    {
-                        'use_sim_time': use_sim_time,
-                    }
-                ],
-                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
-            ),
             # optional wifi scanner with ESP32
             Node(
                 package='cabot_serial',
