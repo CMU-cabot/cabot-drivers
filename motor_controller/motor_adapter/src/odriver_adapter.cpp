@@ -69,7 +69,8 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   lastImuTime_(0, 0, get_clock()->get_clock_type()),
   lastImuAngularVelocity_(0),
   imuTimeTolerance_(50ms),
-  pause_control_counter_(0)
+  pause_control_counter_(0),
+  default_motor_control_(true)
 {
   RCLCPP_INFO(get_logger(), "ODriverNode Constructor");
   PIControl_ = declare_parameter("PI_topic", PIControl_);
@@ -109,6 +110,9 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   imuAngularVelocityThreshold_ = declare_parameter("imu_angular_velocity_threshold", 0.01);
   feedbackSpdDeadzone_ = declare_parameter("feedback_speed_deadzone", 0.01);
   imuTimeTolerance_ = rclcpp::Duration(std::chrono::duration<double>(declare_parameter("imu_time_tolerance", 0.05)));
+
+  // parameter to set default loop control
+  default_motor_control_ = declare_parameter("default_motor_control", default_motor_control_);
 
   thread = std::make_shared<std::thread>(&ODriverNode::cmdVelLoop, this, targetRate_);
 
@@ -160,11 +164,13 @@ void ODriverNode::cmdVelLoop(int publishRate)
     target.spd_right = currentSpdLinear_ + targetT;
 
     // set loopCtrl
-    if (pause_control_counter_ > 0) {
+    if (pause_control_counter_ > 0) {  // pause control is set
       target.loop_ctrl = false;
       pause_control_counter_ -= 1;
-    } else {
+    } else if (get_clock()->now() - lastCmdVelTime_ < rclcpp::Duration(200ms)) {  // last cmd_vel is almost up-to-date
       target.loop_ctrl = true;
+    } else {
+      target.loop_ctrl = default_motor_control_;
     }
 
     // linear and velocity error feedback
