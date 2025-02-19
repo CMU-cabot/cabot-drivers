@@ -578,6 +578,7 @@ def generate_launch_description():
                 remappings=[
                     ('/cabot/control_message', '/cabot/control_message_left'),
                     ('/cabot/controller_status', '/cabot/controller_status_left'),
+                    ('/cabot/odrive_status', '/cabot/odrive_status_left'),
                     ('/cabot/request_axis_state', '/cabot/request_axis_state_left')
                 ],
                 condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
@@ -599,6 +600,7 @@ def generate_launch_description():
                 remappings=[
                     ('/cabot/control_message', '/cabot/control_message_right'),
                     ('/cabot/controller_status', '/cabot/controller_status_right'),
+                    ('/cabot/odrive_status', '/cabot/odrive_status_right'),
                     ('/cabot/request_axis_state', '/cabot/request_axis_state_right'),
                 ],
                 condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
