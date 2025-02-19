@@ -245,7 +245,7 @@ void Handle::vib_waiting_timer_callback()
       is_waiting_cnt_++;
     } else {
       setServoFree(true);
-      vibrateWaitingPattern();
+      // vibrateWaitingPattern();
     }
   } else {
     if (is_waiting_cnt_ > 0) {

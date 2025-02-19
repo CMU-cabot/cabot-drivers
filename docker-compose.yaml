@@ -50,3 +50,18 @@ services:
       service: ble_scan-prod
     profiles:
       - prod
+
+  # plugin
+  power_controller-dev:
+    extends:
+      file: docker-compose-base.yaml
+      service: power_controller-dev
+    profiles:
+      - plugin-dev
+
+  power_controller-prod:
+    extends:
+      file: docker-compose-base.yaml
+      service: power_controller-prod
+    profiles:
+      - plugin
