@@ -92,7 +92,9 @@ private:
   double feedbackSpdDeadzone_;
   rclcpp::Duration imuTimeTolerance_;
 
+  // pause control
   int pause_control_counter_;
+  bool default_motor_control_;
 
   rclcpp::Publisher<odriver_msgs::msg::MotorTarget>::SharedPtr motorPub;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPub;

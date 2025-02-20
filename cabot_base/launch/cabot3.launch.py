@@ -82,6 +82,7 @@ def generate_launch_description():
     imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
     use_directional_indicator = LaunchConfiguration('use_directional_indicator')
     vibrator_type = LaunchConfiguration('vibrator_type')
+    default_motor_control = LaunchConfiguration('default_motor_control')
 
     # Define models with their associated flags (without the "use_" prefix)
     model_flags = {
@@ -233,6 +234,11 @@ def generate_launch_description():
             'vibrator_type',
             default_value=EnvironmentVariable('CABOT_VIBRATOR_TYPE', default_value='1'),
             description='1: ERM (Eccentric Rotating Mass), 2: LRA (Linear Resonant Actuator)'
+        ),
+        DeclareLaunchArgument(
+            'default_motor_control',
+            default_value=EnvironmentVariable('CABOT_DEFAULT_MOTOR_CONTROL', default_value='true'),
+            description='If true, wheels are closed-loop controlled when cmd_vel is not published'
         ),
         DeclareLaunchArgument(
             'odrive_model',
@@ -476,6 +482,24 @@ def generate_launch_description():
                 ],
                 condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
             ),
+            # wifi scan converter for cabot_can
+            Node(
+                package='wireless_scanner_ros',
+                executable='esp32_wifi_scan_converter.py',
+                namespace='/cabot',
+                name='esp32_wifi_scan_converter',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {
+                        'use_sim_time': use_sim_time,
+                    }
+                ],
+                remappings=[
+                    ('/esp32/wifi_scan_str', '/cabot/wifi'),
+                ],
+                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+            ),
             # optional wifi scanner with ESP32
             Node(
                 package='cabot_serial',
@@ -496,7 +520,13 @@ def generate_launch_description():
                 namespace='/cabot',
                 name='odriver_adapter_node',
                 output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
+                parameters=[
+                    *param_files,
+                    {
+                        'use_sim_time': use_sim_time,
+                        'default_motor_control': default_motor_control,
+                    }
+                ],
                 remappings=[
                     ('/imu', '/cabot/imu/data')
                 ],
