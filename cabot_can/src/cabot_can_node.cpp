@@ -144,7 +144,7 @@ public:
     declare_parameter("target_pressure_fps", 2.0);
     declare_parameter("target_temp_1_fps", 2.0);
     declare_parameter("target_temp_2_fps", 2.0);
-    declare_parameter("target_temp_3fps", 2.0);
+    declare_parameter("target_temp_3_fps", 2.0);
     declare_parameter("target_temp_4_fps", 2.0);
     declare_parameter("target_temp_5_fps", 2.0);
     declare_parameter("target_bme_temp_fps", 2.0);
@@ -327,6 +327,7 @@ private:
     filters[1].can_mask = CAN_MAJOR_CATEGORY_MASK;
     if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &filters, sizeof(filters)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error in setsockopt for CAN filter");
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Error in setsockopt for CAN filter");
       close(s);
       s = -1;
       return;
