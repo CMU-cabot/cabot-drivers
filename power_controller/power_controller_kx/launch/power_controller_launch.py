@@ -30,6 +30,7 @@ def generate_launch_description():
         package='power_controller_kx',
         executable='power_controller',
         name='power_controller',
+        remappings=[("/temperature3", "/cabot/temperature3")],
         respawn="true"
     )
 
