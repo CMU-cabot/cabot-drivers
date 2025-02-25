@@ -56,3 +56,15 @@ cabot:
   features:
     ros__parameters:
       handleside: left,right
+
+  uwbtag_publisher_1:
+    ros__parameters:
+      serial_port: /dev/ttyUWB0
+    
+  uwbtag_publisher_2:
+    ros__parameters:
+      serial_port: /dev/ttyUWB1
+
+  uwbtag_publisher_3:
+    ros__parameters:
+      serial_port: /dev/ttyUWB2
