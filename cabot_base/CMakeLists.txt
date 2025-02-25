@@ -15,9 +15,6 @@ if(BUILD_TESTING)
   ament_xmllint()
 endif()
 
-# Install Python modules
-ament_python_install_package(${PROJECT_NAME})
-
 # Install Python executables
 install(PROGRAMS
   scripts/cabot_features.py
