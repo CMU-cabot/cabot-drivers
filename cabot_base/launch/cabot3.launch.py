@@ -95,7 +95,7 @@ def generate_launch_description():
         "cabot3-k2":   ["lslidar", "livox", "can"],
         "cabot3-k3":   ["rslidar", "livox", "can"],
         "cabot3-k4":   ["hesai", "livox", "can"],
-        "cabot3-a1":   ["hesai", "serial"],
+        "cabot3-a1":   ["hesai", "serial", "uwb"],
     }
 
     # Helper function to check if a flag applies to the given model
@@ -110,6 +110,7 @@ def generate_launch_description():
     use_livox = has_flag("livox")
     use_serial = has_flag("serial")
     use_can = has_flag("can")
+    use_uwb = has_flag("uwb")
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -175,6 +176,7 @@ def generate_launch_description():
         LogInfo(msg=PythonExpression(["\"          use_livox: ", use_livox, "\""])),
         LogInfo(msg=PythonExpression(["\"         use_serial: ", use_serial, "\""])),
         LogInfo(msg=PythonExpression(["\"            use_can: ", use_can, "\""])),
+        LogInfo(msg=PythonExpression(["\"            use_uwb: ", use_uwb, "\""])),
         DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
@@ -631,6 +633,51 @@ def generate_launch_description():
                 name='features',
                 output=output,
                 parameters=[*param_files]
+            ),
+
+            # UWB tag 
+            Node(
+                package='uwbtag_publisher',
+                executable='uwbtag_publisher',
+                namespace='/',
+                name='uwbtag_publisher_1',
+                output=output,
+                parameters=[
+                    {
+                        'frame_id': 'uwb_tag1_link',
+                    }
+                ],
+                condition=IfCondition(AndSubstitution(use_uwb, NotSubstitution(use_sim_time)))
+            ),
+
+            # UWB tag 
+            Node(
+                package='uwbtag_publisher',
+                executable='uwbtag_publisher',
+                namespace='/',
+                name='uwbtag_publisher_2',
+                output=output,
+                parameters=[
+                    {
+                        'frame_id': 'uwb_tag2_link',
+                    }
+                ],
+                condition=IfCondition(AndSubstitution(use_uwb, NotSubstitution(use_sim_time)))
+            ),
+
+            # UWB tag 
+            Node(
+                package='uwbtag_publisher',
+                executable='uwbtag_publisher',
+                namespace='/',
+                name='uwbtag_publisher_3',
+                output=output,
+                parameters=[
+                    {
+                        'frame_id': 'uwb_tag3_link',
+                    }
+                ],
+                condition=IfCondition(AndSubstitution(use_uwb, NotSubstitution(use_sim_time)))
             ),
         ],
             condition=LaunchConfigurationNotEquals('model', '')

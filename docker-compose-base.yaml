@@ -72,6 +72,8 @@ services:
       - ./power_controller:/home/developer/driver_ws/src/power_controller
       - ./wireless_scanner_ros:/home/developer/driver_ws/src/wireless_scanner_ros
       - ./script:/home/developer/driver_ws/script
+      - ./uwbtag_interfaces:/home/developer/driver_ws/uwbtag_interfaces
+      - ./uwbtag_publisher:/home/developer/driver_ws/uwbtag_publisher
 
   driver-dev:
     extends:
