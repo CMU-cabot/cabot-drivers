@@ -94,6 +94,7 @@ def generate_launch_description():
         "cabot3-k2":   ["lslidar", "livox", "can_sensor", "can_odrive"],
         "cabot3-k3":   ["rslidar", "livox", "can_sensor", "can_odrive"],
         "cabot3-k4":   ["hesai", "livox", "can_odrive"],  # move can_sensor to plugins
+        "cabot3-a1":   ["hesai", "serial"],
     }
 
     # Helper function to check if a flag applies to the given model
