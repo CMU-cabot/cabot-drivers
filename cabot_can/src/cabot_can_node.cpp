@@ -223,7 +223,7 @@ public:
     this->get_parameter("target_servo_pos_fps", target_servo_pos_fps_);
     std::string deviceName = this->get_name();
     diagnostic_updater_.setHardwareID(deviceName);
-    diagnostic_updater_.add("openCanSocket",[this](diagnostic_updater::DiagnosticStatusWrapper& stat) {openCanSocket(stat, can_socket_);});
+    diagnostic_updater_.add("canSocketStatus", std::bind(&CabotCanNode::checkCanSocketStatus, this, std::placeholders::_1, can_socket_));
     diag_imu_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "IMU", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
         &target_imu_fps_, &target_imu_fps_),
@@ -317,6 +317,7 @@ private:
     if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error in socket bind");
       close(s);
+      s = -1;
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Error in socket bind");
       return;
     }
@@ -334,6 +335,14 @@ private:
     }
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Connect CAN socket");
     return;
+  }
+
+  void checkCanSocketStatus(diagnostic_updater::DiagnosticStatusWrapper &stat, int &s){
+    if (s < 0){
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "CAN socket is close");
+    }else{
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "CAN socket is open");
+    }
   }
 
   void writeImuCalibration()
@@ -378,13 +387,14 @@ private:
 
   void capacitiveSensorInputEnable()
   {
+    sleep(2);
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
     frame.can_id = CanId::CAPACITIVE_TOUCH_SENSOR_INPUT_ENABLE_ID;
     frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_SENSOR_INPUT_ENABLE_DLC;
     frame.data[0] = 1;
     int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
-    usleep(1000);
+    usleep(100000);
     frame.can_id = CanId::CAPACITIVE_TOUCH_CALIBRATION_ID;
     frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_CALIBRATION_CAN_DLC;
     frame.data[0] = 1;
