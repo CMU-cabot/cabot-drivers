@@ -195,8 +195,7 @@ public:
       this->create_service<std_srvs::srv::Trigger>("nullify_capacitive_noise", std::bind(&CabotCanNode::nullifyCapacitiveNoise, this, std::placeholders::_1, std::placeholders::_2));
     imu_accel_bias_ = this->declare_parameter("imu_accel_bias", std::vector<double>(3, 0.0));  // parameters for adjusting linear acceleration. default value = [0,0, 0.0, 0.0]
     imu_gyro_bias_ = this->declare_parameter("imu_gyro_bias", std::vector<double>(3, 0.0));  // parameters for adjusting angular velocity. default value = [0,0, 0.0, 0.0]
-    diagnostic_updater::DiagnosticStatusWrapper stat;
-    openCanSocket(stat, can_socket_);
+    can_socket_ = openCanSocket();
     writeImuCalibration();
     capacitiveSensorInputEnable();
 
@@ -294,22 +293,19 @@ public:
   }
 
 private:
-  void openCanSocket(diagnostic_updater::DiagnosticStatusWrapper &stat, int &s)
+  int openCanSocket()
   {
     std::string can_interface = this->get_parameter("can_interface").as_string();
-    s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
+    int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (s < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error while opening socket");
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Error while opening CAN socket");
     }
     struct ifreq ifr;
     strncpy(ifr.ifr_name, can_interface.c_str(), sizeof(ifr.ifr_name));
     if (ioctl(s, SIOCGIFINDEX, &ifr) < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error in ioctl");
       close(s);
-      s = -1;
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Error in ioctl");
-      return;
+      return -1;
     }
     struct sockaddr_can addr;
     addr.can_family = AF_CAN;
@@ -317,9 +313,6 @@ private:
     if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error in socket bind");
       close(s);
-      s = -1;
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Error in socket bind");
-      return;
     }
     struct can_filter filters[2];
     filters[1].can_id = CanFilter::MAJOR_CATEGORY_SENSOR_CAN_FILTER;
@@ -328,13 +321,10 @@ private:
     filters[1].can_mask = CAN_MAJOR_CATEGORY_MASK;
     if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &filters, sizeof(filters)) < 0) {
       RCLCPP_ERROR(this->get_logger(), "Error in setsockopt for CAN filter");
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Error in setsockopt for CAN filter");
       close(s);
-      s = -1;
-      return;
+      return -1;
     }
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Connect CAN socket");
-    return;
+    return s;
   }
 
   void checkCanSocketStatus(diagnostic_updater::DiagnosticStatusWrapper &stat, int &s){
