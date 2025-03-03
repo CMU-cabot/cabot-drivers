@@ -374,6 +374,12 @@ private:
     data[1] = (frame_data[3] << 8) | frame_data[2];
     data[2] = (frame_data[5] << 8) | frame_data[4];
     data[3] = (frame_data[7] << 8) | frame_data[6];
+    for (int i = 0; i < data.size(); i++) {
+      if (data[i] == 0xFFFF) {
+	data[i] = std::nan("");
+	RCLCPP_WARN(this->get_logger(), "%d", data[i]);
+      }
+    }
     if (battery_serial_number_flag) {
       battery_msg.batteryarray[0].serial_number = std::to_string(data[0]);
       battery_msg.batteryarray[1].serial_number = std::to_string(data[1]);
