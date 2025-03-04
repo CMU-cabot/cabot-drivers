@@ -355,29 +355,43 @@ private:
     mtx_.unlock();
     RCLCPP_WARN(this->get_logger(), ANSI_COLOR_CYAN("send data"));
   }
-  float convertUnit(uint16_t data, bool temperature_flag = false)
+  float convertUnit(float data, bool temperature_flag = false)
   {
     float result;
+    if (std::isnan(data)){
+      return data;
+    }
     if (temperature_flag) {
       result = (data - KELVIN) / 10.0;
       return result;
     }
-    result = static_cast<float>(data) / 1000.0;
+    result = data / 1000.0;
     return result;
+  }
+  void checkNotANumber(float data, float& sum, float& count) {
+    if (!std::isnan(data)) {
+      sum += data;
+      return;
+    }
+    count += 1;
+    return;
   }
   // message & combine bits
   void conbineBitAndUpdateMessage(
-    power_controller_msgs::msg::BatteryArray & battery_msg, int location,
-    uint8_t * frame_data, uint16_t data[4], bool battery_serial_number_flag = false)
+    power_controller_msgs::msg::BatteryArray & battery_msg, int num_batteries, int location,
+    uint8_t * frame_data, float data[4], bool battery_serial_number_flag = false)
   {
-    data[0] = (frame_data[1] << 8) | frame_data[0];
-    data[1] = (frame_data[3] << 8) | frame_data[2];
-    data[2] = (frame_data[5] << 8) | frame_data[4];
-    data[3] = (frame_data[7] << 8) | frame_data[6];
-    for (int i = 0; i < data.size(); i++) {
-      if (data[i] == 0xFFFF) {
-	data[i] = std::nan("");
-	RCLCPP_WARN(this->get_logger(), "%d", data[i]);
+    uint16_t conbine_bit_data[4];
+    conbine_bit_data[0] = (frame_data[1] << 8) | frame_data[0];
+    conbine_bit_data[1] = (frame_data[3] << 8) | frame_data[2];
+    conbine_bit_data[2] = (frame_data[5] << 8) | frame_data[4];
+    conbine_bit_data[3] = (frame_data[7] << 8) | frame_data[6];
+    for (int i = 0; i < num_batteries; i++) {
+      if (conbine_bit_data[i] == 0xFFFF) {
+        data[i] = std::nan("");
+      }
+      else {
+        data[i] = static_cast<int16_t>(conbine_bit_data[i]);
       }
     }
     if (battery_serial_number_flag) {
@@ -393,16 +407,17 @@ private:
       average_battery_msg.serial_number = '0';
       average_battery_msg.location = '0';
       float percentage_sum = 0, voltage_sum = 0, current_sum = 0, temperature_sum = 0;
+      float percentage_count = 0, voltage_count = 0, current_count = 0, temperature_count = 0;
       for (int i = 0; i < static_cast<int>(battery_msg.batteryarray.size()); i++) {
-        percentage_sum += battery_msg.batteryarray[i].percentage;
-        voltage_sum += battery_msg.batteryarray[i].voltage;
-        current_sum += battery_msg.batteryarray[i].current;
-        temperature_sum += battery_msg.batteryarray[i].temperature;
+        checkNotANumber(battery_msg.batteryarray[i].percentage, percentage_sum, percentage_count);
+        checkNotANumber(battery_msg.batteryarray[i].voltage, voltage_sum, voltage_count);
+        checkNotANumber(battery_msg.batteryarray[i].current, current_sum, current_count);
+        checkNotANumber(battery_msg.batteryarray[i].temperature, temperature_sum, temperature_count);
       }
-      average_battery_msg.percentage = percentage_sum / battery_msg.batteryarray.size();
-      average_battery_msg.voltage = voltage_sum / battery_msg.batteryarray.size();
-      average_battery_msg.current = current_sum / battery_msg.batteryarray.size();
-      average_battery_msg.temperature = temperature_sum / battery_msg.batteryarray.size();
+      average_battery_msg.percentage = percentage_sum / (battery_msg.batteryarray.size() - percentage_count);
+      average_battery_msg.voltage = voltage_sum / (battery_msg.batteryarray.size() - voltage_count);
+      average_battery_msg.current = current_sum / (battery_msg.batteryarray.size() - current_count);
+      average_battery_msg.temperature = temperature_sum / (battery_msg.batteryarray.size() - temperature_count);
       state_publisher_->publish(average_battery_msg);
       return;
     }
@@ -419,10 +434,10 @@ private:
   }
   void publishPowerStatus()
   {
-    uint16_t data_[4];
+    float data_[4];
     int location_;
-    int num_batteries = this->get_parameter("number_of_batteries").as_int();
-    battery_message_.batteryarray.resize(num_batteries);
+    int num_batteries_ = this->get_parameter("number_of_batteries").as_int();
+    battery_message_.batteryarray.resize(num_batteries_);
     bool battery_serial_number_flag_ = true;
     struct can_frame frame;
     int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
@@ -433,23 +448,23 @@ private:
     switch (frame.can_id) {
       case CanId::battery_id_1:   // Battery 1 Info
         location_ = 1;
-        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        conbineBitAndUpdateMessage(battery_message_, num_batteries_, location_, frame.data, data_);
         break;
       case CanId::battery_id_2:   // Battery 2 Info
         location_ = 2;
-        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        conbineBitAndUpdateMessage(battery_message_, num_batteries_, location_, frame.data, data_);
         break;
       case CanId::battery_id_3:   // Battery 3 Info
         location_ = 3;
-        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        conbineBitAndUpdateMessage(battery_message_, num_batteries_, location_, frame.data, data_);
         break;
       case CanId::battery_id_4:   // Battery 4 Info
         location_ = 4;
-        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_);
+        conbineBitAndUpdateMessage(battery_message_, num_batteries_, location_, frame.data, data_);
         break;
       case CanId::battery_serial_number:  // Serial Number
         location_ = 0;
-        conbineBitAndUpdateMessage(battery_message_, location_, frame.data, data_, battery_serial_number_flag_);
+        conbineBitAndUpdateMessage(battery_message_, num_batteries_, location_, frame.data, data_, battery_serial_number_flag_);
         break;
       case CanId::seq_id:
         if (frame.can_dlc == 1 && frame.data[0] == 0) {
