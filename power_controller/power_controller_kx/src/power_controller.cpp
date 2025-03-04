@@ -378,7 +378,7 @@ private:
       battery_message_.batteryarray[array_num].voltage = static_cast<float>(voltage) / 1000.0f;
     }
     // Converts current units from mA to A
-    if (current == -1) {
+    if (current == 0x7FFF) {  // max value of int16_t as error
       battery_message_.batteryarray[array_num].current = std::nan("");
     } else {
       battery_message_.batteryarray[array_num].current = static_cast<float>(current) / 1000.0f;  // negative is discharging, positive is charging
