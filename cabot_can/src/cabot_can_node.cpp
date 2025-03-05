@@ -256,7 +256,7 @@ public:
         &target_bme_temp_fps_, &target_bme_temp_fps_),
       diagnostic_updater::TimeStampStatusParam());
     diag_cap_touch_raw_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
-    "Touch_cap", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+      "Touch_cap", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
         &target_cap_touch_fps_, &target_cap_touch_fps_),
       diagnostic_updater::TimeStampStatusParam());
     diag_tof_touch_raw_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
@@ -327,10 +327,11 @@ private:
     return s;
   }
 
-  void checkCanSocketStatus(diagnostic_updater::DiagnosticStatusWrapper &stat, int &s){
+  void checkCanSocketStatus(diagnostic_updater::DiagnosticStatusWrapper &stat, int &s)
+  {
     if (s < 0){
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "CAN socket is close");
-    }else{
+     }else{
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "CAN socket is open");
     }
   }
