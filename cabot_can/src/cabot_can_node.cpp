@@ -327,11 +327,11 @@ private:
     return s;
   }
 
-  void checkCanSocketStatus(diagnostic_updater::DiagnosticStatusWrapper &stat, int &s)
+  void checkCanSocketStatus(diagnostic_updater::DiagnosticStatusWrapper & stat, int & s)
   {
     if (s < 0){
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "CAN socket is close");
-     }else{
+    } else {
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "CAN socket is open");
     }
   }
@@ -669,12 +669,12 @@ private:
       std_msgs::msg::Int16 capacitive_touch_msg;
       capacitive_touch_msg.data = capacitive_touch;
       capacitive_touch_pub_->publish(capacitive_touch_msg);
-      diag_tof_touch_raw_ -> tick(this->now());
+      diag_tof_touch_raw_->tick(this->now());
       int16_t capacitive_touch_raw = frame.data[2];
       std_msgs::msg::Int16 capacitive_touch_raw_msg;
       capacitive_touch_raw_msg.data = capacitive_touch_raw;
       capacitive_touch_raw_pub_->publish(capacitive_touch_raw_msg);
-      diag_cap_touch_raw_ -> tick(this->now());
+      diag_cap_touch_raw_->tick(this->now());
       uint16_t tof_touch_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
       std_msgs::msg::UInt16 tof_raw_msg;
       tof_raw_msg.data = tof_touch_raw;
@@ -708,7 +708,7 @@ private:
       tof_touch_pub_->publish(tof_touch_msg);
       std_msgs::msg::Int16 touch_msg;
       touch_msg.data = touch;
-      touch_pub_ -> publish(touch_msg);
+      touch_pub_->publish(touch_msg);
     }
   }
 
@@ -731,7 +731,7 @@ private:
       }
       tact_msg.data = tact_data;
       tact_pub_->publish(tact_msg);
-      diag_push_ -> tick(this->now());
+      diag_push_->tick(this->now());
     }
   }
 
@@ -745,7 +745,7 @@ private:
       std_msgs::msg::Int16 servo_pos_pub_msg;
       servo_pos_pub_msg.data = static_cast<int16_t>(servo_pos);
       servo_pos_pub_->publish(servo_pos_pub_msg);
-      diag_servo_pos_ -> tick(this->now());
+      diag_servo_pos_->tick(this->now());
     }
   }
 
