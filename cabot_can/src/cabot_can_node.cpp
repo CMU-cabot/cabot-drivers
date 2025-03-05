@@ -271,7 +271,7 @@ public:
       "Servo_pos", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
         &target_servo_pos_fps_, &target_servo_pos_fps_),
       diagnostic_updater::TimeStampStatusParam());
-    }
+  }
 
   rcl_interfaces::msg::SetParametersResult param_set_callback(
     const std::vector<rclcpp::Parameter> & params)
@@ -329,7 +329,7 @@ private:
 
   void checkCanSocketStatus(diagnostic_updater::DiagnosticStatusWrapper & stat, int & s)
   {
-    if (s < 0){
+    if (s < 0) {
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "CAN socket is close");
     } else {
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "CAN socket is open");
