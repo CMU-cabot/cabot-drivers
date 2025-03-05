@@ -368,6 +368,8 @@ private:
     uint16_t percentage = (frame_data[5] << 8) | frame_data[4];
     uint16_t temperature = (frame_data[7] << 8) | frame_data[6];
 
+    RCLCPP_INFO(get_logger(), "raw,%d,%d,%d,%d,%d", location, voltage, current, percentage, temperature);
+
     int array_num = location - 1;
     battery_message_.batteryarray[array_num].header.stamp = this->get_clock()->now();
 
@@ -408,9 +410,15 @@ private:
     battery_message_.batteryarray[1].serial_number = to_hex(frame_data[3] << 8 | frame_data[2]);
     battery_message_.batteryarray[2].serial_number = to_hex(frame_data[5] << 8 | frame_data[4]);
     battery_message_.batteryarray[3].serial_number = to_hex(frame_data[7] << 8 | frame_data[6]);
+    RCLCPP_INFO(
+      get_logger(), "sn,%s,%s,%s,%s",
+      battery_message_.batteryarray[0].serial_number.c_str(),
+      battery_message_.batteryarray[1].serial_number.c_str(),
+      battery_message_.batteryarray[2].serial_number.c_str(),
+      battery_message_.batteryarray[3].serial_number.c_str());
     // publish msg
     states_publisher_->publish(battery_message_);
-    RCLCPP_INFO(get_logger(), "publish battery_states");
+    RCLCPP_DEBUG(get_logger(), "publish battery_states");
 
     sensor_msgs::msg::BatteryState average_battery_msg;
     average_battery_msg.header.stamp = this->get_clock()->now();
@@ -428,6 +436,15 @@ private:
         }
       };
     for (int i = 0; i < static_cast<int>(battery_message_.batteryarray.size()); i++) {
+      RCLCPP_INFO(
+        get_logger(), "msg,%s,%s,%.2f,%.2f,%.2f,%.2f",
+        battery_message_.batteryarray[i].location.c_str(),
+        battery_message_.batteryarray[i].serial_number.c_str(),
+        battery_message_.batteryarray[i].voltage,
+        battery_message_.batteryarray[i].current,
+        battery_message_.batteryarray[i].percentage,
+        battery_message_.batteryarray[i].temperature);
+
       checkNotANumber(battery_message_.batteryarray[i].voltage, voltage_sum, valid_voltage_count);
       checkNotANumber(battery_message_.batteryarray[i].current, current_sum, valid_current_count);
       checkNotANumber(battery_message_.batteryarray[i].percentage, percentage_sum, valid_percentage_count);
@@ -438,7 +455,12 @@ private:
     average_battery_msg.percentage = valid_percentage_count > 0 ? percentage_sum / valid_percentage_count : std::nan("");
     average_battery_msg.temperature = valid_temperature_count > 0 ? temperature_sum / valid_temperature_count : std::nan("");
     state_publisher_->publish(average_battery_msg);
-    RCLCPP_INFO(get_logger(), "publish battery_state %f %f %f %f", voltage_sum, current_sum, percentage_sum, temperature_sum);
+    RCLCPP_INFO(
+      get_logger(), "ave,%.2f,%.2f,%.2f,%.2f",
+      average_battery_msg.voltage,
+      average_battery_msg.current,
+      average_battery_msg.percentage,
+      average_battery_msg.temperature);
 
     // clear old data
     battery_message_.batteryarray.clear();
@@ -452,7 +474,7 @@ private:
     if (nbytes <= 0) {
       return;
     }
-    RCLCPP_INFO(get_logger(), "received CAN frame %x (%d)", frame.can_id, frame.can_dlc);
+    RCLCPP_DEBUG(get_logger(), "received CAN frame %x (%d)", frame.can_id, frame.can_dlc);
     switch (frame.can_id) {
       case CanId::battery_id_1:   // Battery 1 Info
         combineBitAndUpdateMessage(1, frame.data);
