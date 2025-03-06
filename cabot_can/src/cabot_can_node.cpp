@@ -463,6 +463,25 @@ private:
   void timerPubCallback()
   {
     struct can_frame frame;
+    fd_set read_fds;
+    struct timeval timeout;
+
+    FD_ZERO(&read_fds);
+    FD_SET(can_socket_, &read_fds);
+
+    // Set timeout to 1 second
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 100000;
+
+    int ret = select(can_socket_ + 1, &read_fds, NULL, NULL, &timeout);
+    if (ret == -1) {
+      RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Error in select");
+      return;
+    } else if (ret == 0) {
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Timeout occurred, no CAN frame received");
+      return;
+    }
+
     int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
     if (nbytes > 0) {
       switch (frame.can_id) {
@@ -788,7 +807,7 @@ private:
         std::to_string(frame.data[0]) + "," +
         std::to_string(frame.data[1]) + "," +
         std::to_string(frame.data[2]);
-      RCLCPP_INFO(this->get_logger(), "%s", debug_string.c_str());
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 100, "%s", debug_string.c_str());
       int ACAL_FAIL = 0;
       int BC_OUT = 0;
       int NOISE_FLAG = 0;
@@ -810,7 +829,7 @@ private:
         std::to_string(BC_OUT) + "," +
         std::to_string(NOISE_FLAG) + "," +
         std::to_string(CALIBRATION);
-      RCLCPP_INFO(this->get_logger(), "%s", status_string.c_str());
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 100, "%s", status_string.c_str());
     }
   }
 
