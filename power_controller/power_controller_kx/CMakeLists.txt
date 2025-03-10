@@ -41,12 +41,6 @@ ament_target_dependencies(
 install(TARGETS power_controller
   DESTINATION lib/${PROJECT_NAME})
 
-# Install launch files.
-install(DIRECTORY
-  launch
-  DESTINATION share/${PROJECT_NAME}/
-)
-
 if(BUILD_TESTING)
   find_package(ament_cmake_copyright REQUIRED)
   find_package(ament_cmake_cpplint REQUIRED)
