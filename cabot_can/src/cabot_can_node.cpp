@@ -124,6 +124,7 @@ enum CanFilter : uint8_t
   MAJOR_CATEGORY_HANDLE_CAN_FILTER = 0x080,  // 0b0 001 0000 000
 };
 
+
 class CabotCanNode : public rclcpp::Node
 {
 public:
@@ -141,6 +142,16 @@ public:
     declare_parameter("calibration_params", std::vector<int64_t>((CanDlc::WRITE_IMU_CALIBRATION_1_DLC + CanDlc::WRITE_IMU_CALIBRATION_2_DLC + CanDlc::WRITE_IMU_CALIBRATION_3_DLC), 0));
     declare_parameter("target_imu_fps", 100.0);
     declare_parameter("target_pressure_fps", 2.0);
+    declare_parameter("target_temp_1_fps", 2.0);
+    declare_parameter("target_temp_2_fps", 2.0);
+    declare_parameter("target_temp_3_fps", 2.0);
+    declare_parameter("target_temp_4_fps", 2.0);
+    declare_parameter("target_temp_5_fps", 2.0);
+    declare_parameter("target_bme_temp_fps", 2.0);
+    declare_parameter("target_cap_touch_fps", 50.0);
+    declare_parameter("target_tof_touch_fps", 50.0);
+    declare_parameter("target_push_fps", 50.0);
+    declare_parameter("target_servo_pos_fps", 50.0);
     temperature_1_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature1", 10);
     temperature_2_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature2", 10);
     temperature_3_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature3", 10);
@@ -187,6 +198,7 @@ public:
     can_socket_ = openCanSocket();
     writeImuCalibration();
     capacitiveSensorInputEnable();
+
     // initialize diagonal elements of imu_msg.orientation_covariance
     imu_msg.orientation_covariance[0] = 0.1;
     imu_msg.orientation_covariance[4] = 0.1;
@@ -195,12 +207,22 @@ public:
     pub_timer_ = this->create_wall_timer(std::chrono::microseconds(publish_rate), std::bind(&CabotCanNode::timerPubCallback, this));
     callback_handler_ =
       this->add_on_set_parameters_callback(std::bind(&CabotCanNode::param_set_callback, this, std::placeholders::_1));
-
     // diagnostic updater
     this->get_parameter("target_imu_fps", target_imu_fps_);
     this->get_parameter("target_pressure_fps", target_pressure_fps_);
+    this->get_parameter("target_temp_1_fps", target_temp_1_fps_);
+    this->get_parameter("target_temp_2_fps", target_temp_2_fps_);
+    this->get_parameter("target_temp_3_fps", target_temp_3_fps_);
+    this->get_parameter("target_temp_4_fps", target_temp_4_fps_);
+    this->get_parameter("target_temp_5_fps", target_temp_5_fps_);
+    this->get_parameter("target_bme_temp_fps", target_bme_temp_fps_);
+    this->get_parameter("target_cap_touch_fps", target_cap_touch_fps_);
+    this->get_parameter("target_tof_touch_fps", target_tof_touch_fps_);
+    this->get_parameter("target_push_fps", target_push_fps_);
+    this->get_parameter("target_servo_pos_fps", target_servo_pos_fps_);
     std::string deviceName = this->get_name();
     diagnostic_updater_.setHardwareID(deviceName);
+    diagnostic_updater_.add("canSocketStatus", std::bind(&CabotCanNode::checkCanSocketStatus, this, std::placeholders::_1, can_socket_));
     diag_imu_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "IMU", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
         &target_imu_fps_, &target_imu_fps_),
@@ -208,6 +230,46 @@ public:
     diag_pressure_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Pressure", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
         &target_pressure_fps_, &target_pressure_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_temp_1_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Temp_1", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+        &target_temp_1_fps_, &target_temp_1_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_temp_2_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Temp_2", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+        &target_temp_2_fps_, &target_temp_2_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_temp_3_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Temp_3", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+        &target_temp_3_fps_, &target_temp_3_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_temp_4_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Temp_4", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+        &target_temp_4_fps_, &target_temp_4_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_temp_5_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Temp_5", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+        &target_temp_5_fps_, &target_temp_5_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_bme_temp_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Temp_bme", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+        &target_bme_temp_fps_, &target_bme_temp_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_cap_touch_raw_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Touch_cap", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+        &target_cap_touch_fps_, &target_cap_touch_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_tof_touch_raw_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Touch_tof", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+        &target_tof_touch_fps_, &target_tof_touch_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_push_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Push", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+        &target_push_fps_, &target_push_fps_),
+      diagnostic_updater::TimeStampStatusParam());
+    diag_servo_pos_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
+      "Servo_pos", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
+        &target_servo_pos_fps_, &target_servo_pos_fps_),
       diagnostic_updater::TimeStampStatusParam());
   }
 
@@ -265,6 +327,15 @@ private:
     return s;
   }
 
+  void checkCanSocketStatus(diagnostic_updater::DiagnosticStatusWrapper & stat, int & s)
+  {
+    if (s < 0) {
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "CAN socket is close");
+    } else {
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "CAN socket is open");
+    }
+  }
+
   void writeImuCalibration()
   {
     std::vector<int64_t> calibration_params = get_parameter("calibration_params").as_integer_array();
@@ -307,13 +378,14 @@ private:
 
   void capacitiveSensorInputEnable()
   {
+    sleep(2);
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
     frame.can_id = CanId::CAPACITIVE_TOUCH_SENSOR_INPUT_ENABLE_ID;
     frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_SENSOR_INPUT_ENABLE_DLC;
     frame.data[0] = 1;
     int nbytes = write(can_socket_, &frame, sizeof(struct can_frame));
-    usleep(1000);
+    usleep(100000);
     frame.can_id = CanId::CAPACITIVE_TOUCH_CALIBRATION_ID;
     frame.can_dlc = CanDlc::CAPACITIVE_TOUCH_CALIBRATION_CAN_DLC;
     frame.data[0] = 1;
@@ -391,6 +463,25 @@ private:
   void timerPubCallback()
   {
     struct can_frame frame;
+    fd_set read_fds;
+    struct timeval timeout;
+
+    FD_ZERO(&read_fds);
+    FD_SET(can_socket_, &read_fds);
+
+    // Set timeout to 1 second
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 100000;
+
+    int ret = select(can_socket_ + 1, &read_fds, NULL, NULL, &timeout);
+    if (ret == -1) {
+      RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Error in select");
+      return;
+    } else if (ret == 0) {
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Timeout occurred, no CAN frame received");
+      return;
+    }
+
     int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
     if (nbytes > 0) {
       switch (frame.can_id) {
@@ -569,12 +660,13 @@ private:
   void publishBmeData(const struct can_frame & frame)
   {
     if (frame.can_id == CanId::BME_CAN_ID && frame.can_dlc == CanDlc::BME_CAN_DLC) {
-      int16_t temperature_raw = ((uint16_t)(frame.data[1] << 8) | ((uint16_t)frame.data[0]));
-      float temperature = temperature_raw / 100.0;
-      sensor_msgs::msg::Temperature temp_msg;
-      temp_msg.header.stamp = this->get_clock()->now();
-      temp_msg.temperature = temperature;
-      bme_temperature_pub_->publish(temp_msg);
+      int16_t bme_temperature_raw = ((uint16_t)(frame.data[1] << 8) | ((uint16_t)frame.data[0]));
+      float bme_temperature = bme_temperature_raw / 100.0;
+      sensor_msgs::msg::Temperature bme_temp_msg;
+      bme_temp_msg.header.stamp = this->get_clock()->now();
+      bme_temp_msg.temperature = bme_temperature;
+      bme_temperature_pub_->publish(bme_temp_msg);
+      diag_bme_temp_->tick(bme_temp_msg.header.stamp);
       int32_t pressure_raw = ((uint32_t)frame.data[7] << 24) |
         ((uint32_t)frame.data[6] << 16) |
         ((uint32_t)frame.data[5] << 8) |
@@ -596,10 +688,12 @@ private:
       std_msgs::msg::Int16 capacitive_touch_msg;
       capacitive_touch_msg.data = capacitive_touch;
       capacitive_touch_pub_->publish(capacitive_touch_msg);
+      diag_tof_touch_raw_->tick(this->now());
       int16_t capacitive_touch_raw = frame.data[2];
       std_msgs::msg::Int16 capacitive_touch_raw_msg;
       capacitive_touch_raw_msg.data = capacitive_touch_raw;
       capacitive_touch_raw_pub_->publish(capacitive_touch_raw_msg);
+      diag_cap_touch_raw_->tick(this->now());
       uint16_t tof_touch_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
       std_msgs::msg::UInt16 tof_raw_msg;
       tof_raw_msg.data = tof_touch_raw;
@@ -656,6 +750,7 @@ private:
       }
       tact_msg.data = tact_data;
       tact_pub_->publish(tact_msg);
+      diag_push_->tick(this->now());
     }
   }
 
@@ -669,6 +764,7 @@ private:
       std_msgs::msg::Int16 servo_pos_pub_msg;
       servo_pos_pub_msg.data = static_cast<int16_t>(servo_pos);
       servo_pos_pub_->publish(servo_pos_pub_msg);
+      diag_servo_pos_->tick(this->now());
     }
   }
 
@@ -676,24 +772,29 @@ private:
   {
     int16_t temperature_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
     float temperature = temperature_raw * 0.0625;
-    sensor_msgs::msg::Temperature msg;
-    msg.header.stamp = this->get_clock()->now();
-    msg.temperature = temperature;
+    sensor_msgs::msg::Temperature temp_msg;
+    temp_msg.header.stamp = this->get_clock()->now();
+    temp_msg.temperature = temperature;
     switch (frame.can_id) {
       case CanId::TEMPERATURE_1_CAN_ID:
-        temperature_1_pub_->publish(msg);
+        temperature_1_pub_->publish(temp_msg);
+        diag_temp_1_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_2_CAN_ID:
-        temperature_2_pub_->publish(msg);
+        temperature_2_pub_->publish(temp_msg);
+        diag_temp_2_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_3_CAN_ID:
-        temperature_3_pub_->publish(msg);
+        temperature_3_pub_->publish(temp_msg);
+        diag_temp_3_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_4_CAN_ID:
-        temperature_4_pub_->publish(msg);
+        temperature_4_pub_->publish(temp_msg);
+        diag_temp_4_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_5_CAN_ID:
-        temperature_5_pub_->publish(msg);
+        temperature_5_pub_->publish(temp_msg);
+        diag_temp_5_->tick(temp_msg.header.stamp);
         break;
     }
   }
@@ -706,8 +807,7 @@ private:
         std::to_string(frame.data[0]) + "," +
         std::to_string(frame.data[1]) + "," +
         std::to_string(frame.data[2]);
-      RCLCPP_INFO(this->get_logger(), "%s", debug_string.c_str());
-
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 100, "%s", debug_string.c_str());
       int ACAL_FAIL = 0;
       int BC_OUT = 0;
       int NOISE_FLAG = 0;
@@ -729,10 +829,9 @@ private:
         std::to_string(BC_OUT) + "," +
         std::to_string(NOISE_FLAG) + "," +
         std::to_string(CALIBRATION);
-      RCLCPP_INFO(this->get_logger(), "%s", status_string.c_str());
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 100, "%s", status_string.c_str());
     }
   }
-
 
   void subscribeVibratorData(const std_msgs::msg::UInt8::SharedPtr msg, int vibrator_id)
   {
@@ -857,8 +956,29 @@ private:
   diagnostic_updater::Updater diagnostic_updater_;
   std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_imu_;
   std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_pressure_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_temp_1_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_temp_2_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_temp_3_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_temp_4_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_temp_5_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_bme_temp_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_cap_touch_raw_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_tof_touch_raw_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_touch_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_push_;
+  std::unique_ptr<diagnostic_updater::TopicDiagnostic> diag_servo_pos_;
   double target_imu_fps_;
   double target_pressure_fps_;
+  double target_temp_1_fps_;
+  double target_temp_2_fps_;
+  double target_temp_3_fps_;
+  double target_temp_4_fps_;
+  double target_temp_5_fps_;
+  double target_bme_temp_fps_;
+  double target_cap_touch_fps_;
+  double target_tof_touch_fps_;
+  double target_push_fps_;
+  double target_servo_pos_fps_;
 };
 
 int main(int argc, char * argv[])
