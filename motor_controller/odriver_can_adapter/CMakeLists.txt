@@ -8,6 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(diagnostic_updater REQUIRED)
 find_package(odriver_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
 
@@ -21,6 +22,7 @@ target_compile_features(odriver_can_adapter_node PUBLIC c_std_99 cxx_std_17)  # 
 ament_target_dependencies(
   odriver_can_adapter_node
   "rclcpp"
+  "diagnostic_updater"
   "odriver_msgs"
   "odrive_can"
 )
