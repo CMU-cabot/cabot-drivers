@@ -253,7 +253,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'hesai_ros_2_0',
-            default_value=EnvironmentVariable('HESAI_ROS_2_0',  default_value='true'),
+            default_value=EnvironmentVariable('HESAI_ROS_2_0',  default_value='false'),
             description='if true, cabot use HesaiLidar_ROS_2.0'
         ),
 
