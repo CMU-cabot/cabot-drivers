@@ -107,9 +107,15 @@ def generate_launch_description():
             condition=UnlessCondition(hesai_ros_2_0),
         ),
         Node(
-            namespace='hesai_ros_driver',
+            namespace='',
             package='hesai_ros_driver',
             executable='hesai_ros_driver_node',
+            output=output,
+            parameters=[
+                {
+                    "config_path": PathJoinSubstitution([pkg_dir, 'config', 'hesai', 'config.yaml']),
+                },
+            ],
             remappings=[
                 ('/lidar_points',  '/velodyne_points')
             ],
