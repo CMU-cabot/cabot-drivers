@@ -153,6 +153,7 @@ private:
     odrive_right_->checkTimeoutServiceResponse(service_timeout_ms_);
 
     if (!odrive_left_->isReady() || !odrive_right_->isReady()) {
+      // do not publish MotorStatus if one of odrives is not ready
       return;
     }
 
@@ -189,9 +190,10 @@ private:
     status.current_measured_left = sign_left * current_measured_left;
     status.current_measured_right = sign_right * current_measured_right;
 
+    updater_.force_update();
     motor_status_pub_->publish(status);
     last_motor_status_time_ = this->get_clock()->now();
-    updater_.force_update();
+
   }
 
   void checkMotorStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)
