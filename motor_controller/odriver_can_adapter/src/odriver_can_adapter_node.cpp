@@ -193,7 +193,6 @@ private:
     updater_.force_update();
     motor_status_pub_->publish(status);
     last_motor_status_time_ = this->get_clock()->now();
-
   }
 
   void checkMotorStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)
