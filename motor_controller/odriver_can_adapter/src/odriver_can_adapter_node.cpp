@@ -190,7 +190,6 @@ private:
     status.current_measured_left = sign_left * current_measured_left;
     status.current_measured_right = sign_right * current_measured_right;
 
-    updater_.force_update();
     motor_status_pub_->publish(status);
     last_motor_status_time_ = this->get_clock()->now();
   }
