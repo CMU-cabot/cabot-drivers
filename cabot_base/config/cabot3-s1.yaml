@@ -7,15 +7,6 @@ pointcloud_to_laserscan_node:
     angle_max: 3.14
 # ------------ vlp16-cabot2-ace.launch.xml
 cabot:
-  cabot_handle_v2_node:
-    ros__parameters:
-      no_vibration: true
-      buttons:
-        - BUTTON_UP
-        - BUTTON_DOWN
-        - BUTTON_LEFT
-        - BUTTON_RIGHT
-
   cabot_serial:
     ros__parameters:
       port: /dev/ttyARDUINO_MEGA
