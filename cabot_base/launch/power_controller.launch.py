@@ -128,6 +128,7 @@ def generate_launch_description():
                 parameters=[
                     *param_files
                 ],
+                remappings=[("/temperature3", "/cabot/temperature3")],
                 condition=IfCondition(use_kx)
             ),
         ],

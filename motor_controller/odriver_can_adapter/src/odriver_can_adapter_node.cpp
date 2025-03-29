@@ -23,6 +23,7 @@
 #include <math.h>
 
 #include <rclcpp/rclcpp.hpp>
+#include <diagnostic_updater/diagnostic_updater.hpp>
 
 #include <odrive_can/msg/control_message.hpp>
 #include <odrive_can/msg/controller_status.hpp>
@@ -45,7 +46,9 @@ class ODriverCanAdapterNode : public rclcpp::Node
 
 public:
   ODriverCanAdapterNode()
-  : Node("odriver_can_adapter_node")
+  : Node("odriver_can_adapter_node"),
+    updater_(this),
+    last_motor_status_time_(this->get_clock()->now())
   {
     using std::placeholders::_1;
 
@@ -61,6 +64,9 @@ public:
 
     this->declare_parameter("service_timeout_ms", 2000);
     service_timeout_ms_ = this->get_parameter("service_timeout_ms").as_int();
+
+    this->declare_parameter("motor_status_timeout_sec", 1.0);
+    motor_status_timeout_sec_ = this->get_parameter("motor_status_timeout_sec").as_double();
 
     double sign_left, sign_right;
     if (is_clockwise_) {
@@ -100,6 +106,9 @@ public:
       std::bind(
         &ODriverCanAdapterNode::timerCallback,
         this));
+
+    updater_.setHardwareID("odriver_can_adapter");
+    updater_.add("Motor Status", this, &ODriverCanAdapterNode::checkMotorStatus);
   }
 
   ~ODriverCanAdapterNode()
@@ -182,6 +191,18 @@ private:
     status.current_measured_right = sign_right * current_measured_right;
 
     motor_status_pub_->publish(status);
+    last_motor_status_time_ = this->get_clock()->now();
+  }
+
+  void checkMotorStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)
+  {
+    rclcpp::Duration diff = this->get_clock()->now() - last_motor_status_time_;
+    if (diff.seconds() < motor_status_timeout_sec_) {
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Motor status is OK.");
+    } else {
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Motor status is ERROR.");
+      stat.add("Time since last message", diff.seconds());
+    }
   }
 
   // refer from: https://github.com/odriverobotics/ros_odrive/blob/5e4dfe9df8e5ef4fb6c692c210eafb713cb41985/odrive_base/include/odrive_enums.h#L43-L58
@@ -198,6 +219,7 @@ private:
   bool is_clockwise_;
   double hz_;
   int service_timeout_ms_;
+  double motor_status_timeout_sec_;
 
   double meter_per_round_;
 
@@ -209,6 +231,9 @@ private:
 
   std::shared_ptr<ODriveManager> odrive_left_;
   std::shared_ptr<ODriveManager> odrive_right_;
+
+  diagnostic_updater::Updater updater_;
+  rclcpp::Time last_motor_status_time_;
 };
 
 int main(int argc, char * argv[])
