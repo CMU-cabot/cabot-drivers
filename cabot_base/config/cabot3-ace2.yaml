@@ -15,15 +15,6 @@ hesai_lidar:
     lidar_correction_file: "$(find-pkg-share hesai_lidar)/config/PandarXT-16.csv"
 
 cabot:
-  cabot_handle_v2_node:
-    ros__parameters:
-      buttons:
-        - BUTTON_UP
-        - BUTTON_DOWN
-        - BUTTON_LEFT
-        - BUTTON_RIGHT
-        - BUTTON_CENTER
-
   cabot_serial:
     ros__parameters:
       port: /dev/ttyESP32
