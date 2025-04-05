@@ -233,27 +233,27 @@ public:
       diagnostic_updater::TimeStampStatusParam());
     diag_temp_1_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Temp_1", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
-        &target_temp_1_fps_, &target_temp_1_fps_),
+	&target_temp_1_fps_, &target_temp_1_fps_, 0.5),
       diagnostic_updater::TimeStampStatusParam());
     diag_temp_2_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Temp_2", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
-        &target_temp_2_fps_, &target_temp_2_fps_),
+        &target_temp_2_fps_, &target_temp_2_fps_, 0.5),
       diagnostic_updater::TimeStampStatusParam());
     diag_temp_3_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Temp_3", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
-        &target_temp_3_fps_, &target_temp_3_fps_),
+        &target_temp_3_fps_, &target_temp_3_fps_, 0.5),
       diagnostic_updater::TimeStampStatusParam());
     diag_temp_4_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Temp_4", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
-        &target_temp_4_fps_, &target_temp_4_fps_),
+        &target_temp_4_fps_, &target_temp_4_fps_, 0.5),
       diagnostic_updater::TimeStampStatusParam());
     diag_temp_5_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Temp_5", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
-        &target_temp_5_fps_, &target_temp_5_fps_),
+        &target_temp_5_fps_, &target_temp_5_fps_, 0.5),
       diagnostic_updater::TimeStampStatusParam());
     diag_bme_temp_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Temp_bme", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
-        &target_bme_temp_fps_, &target_bme_temp_fps_),
+        &target_bme_temp_fps_, &target_bme_temp_fps_, 0.5),
       diagnostic_updater::TimeStampStatusParam());
     diag_cap_touch_raw_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Touch_cap", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
