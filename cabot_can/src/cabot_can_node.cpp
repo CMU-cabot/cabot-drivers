@@ -233,7 +233,7 @@ public:
       diagnostic_updater::TimeStampStatusParam());
     diag_temp_1_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Temp_1", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
-	&target_temp_1_fps_, &target_temp_1_fps_, 0.5),
+        &target_temp_1_fps_, &target_temp_1_fps_, 0.5),
       diagnostic_updater::TimeStampStatusParam());
     diag_temp_2_ = std::make_unique<diagnostic_updater::TopicDiagnostic>(
       "Temp_2", diagnostic_updater_, diagnostic_updater::FrequencyStatusParam(
