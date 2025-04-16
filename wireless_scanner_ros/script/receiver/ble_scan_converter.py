@@ -177,14 +177,19 @@ class BeaconAccumulator:
 is_active = False
 last_active = None
 beacon_num = 0
+no_beacon_timeout = 3.0
+no_beacon_diagnostic_level = 0
 
 
 def check_status(stat):
     global is_active
+    global no_beacon_timeout
+    global no_beacon_diagnostic_level
+
     if last_active is None:
         is_active = False
     else:
-        if (time.time() - last_active) > 3:
+        if (time.time() - last_active) > no_beacon_timeout:
             is_active = False
     if is_active:
         if beacon_num == 0:
@@ -194,7 +199,14 @@ def check_status(stat):
         else:
             stat.summary(DiagnosticStatus.OK, "{} beacons are found".format(beacon_num))
     else:
-        stat.summary(DiagnosticStatus.WARN, "No beacon is found")
+        diagnostic_status = DiagnosticStatus.OK
+        if no_beacon_diagnostic_level == 1:
+            diagnostic_status = DiagnosticStatus.WARN
+        elif no_beacon_diagnostic_level == 2:
+            diagnostic_status = DiagnosticStatus.ERROR
+        elif no_beacon_diagnostic_level >= 3:
+            diagnostic_status = DiagnosticStatus.STALE
+        stat.summary(diagnostic_status, "No beacon is found")
     return stat
 
 
@@ -211,6 +223,8 @@ if __name__ == "__main__":
     node = Node("ble_scan_converter")
 
     rate = node.declare_parameter("rate", 1.0).value  # default = 1.0 Hz
+    no_beacon_timeout = node.declare_parameter("no_beacon_timeout", 3.0).value
+    no_beacon_diagnostic_level = node.declare_parameter("no_beacon_diagnostic_level", 0).value  # OK
 
     pub = node.create_publisher(String, "/wireless/beacons", 100)
 

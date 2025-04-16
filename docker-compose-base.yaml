@@ -27,8 +27,6 @@ services:
       - CABOT_ODRIVER_SERIAL_1
       - CABOT_IMU_ACCEL_BIAS
       - CABOT_IMU_GYRO_BIAS
-      - CABOT_USE_DIRECTIONAL_INDICATOR
-      - CABOT_VIBRATOR_TYPE
       - CABOT_DEFAULT_MOTOR_CONTROL
       - RMW_IMPLEMENTATION
       - ROS_LOCALHOST_ONLY
@@ -38,6 +36,7 @@ services:
       - CYCLONEDDS_NETWORK_INTERFACE_AUTODETERMINE # set automatically by launch.sh
       - ODRIVE_MODEL
       - ODRIVE_FIRMWARE_VERSION
+      - HESAI_ROS_2_0
     volumes:
 # device, bluetooth
       - /dev:/dev
@@ -53,7 +52,7 @@ services:
     network_mode: host
     command:
       - "/launch.sh"
-      - "-c"
+      # - "-c"
       - "driver"
 
   driver-dev-base:

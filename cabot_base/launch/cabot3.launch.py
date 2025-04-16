@@ -80,9 +80,8 @@ def generate_launch_description():
     odrive_right_serial_number = LaunchConfiguration('odrive_right_serial_number')
     imu_accel_bias = LaunchConfiguration('imu_accel_bias')
     imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
-    use_directional_indicator = LaunchConfiguration('use_directional_indicator')
-    vibrator_type = LaunchConfiguration('vibrator_type')
     default_motor_control = LaunchConfiguration('default_motor_control')
+    hesai_ros_2_0 = LaunchConfiguration('hesai_ros_2_0')
 
     # Define models with their associated flags (without the "use_" prefix)
     model_flags = {
@@ -226,16 +225,6 @@ def generate_launch_description():
             description='An array of three values for adjusting imu angular velocity'
         ),
         DeclareLaunchArgument(
-            'use_directional_indicator',
-            default_value=EnvironmentVariable('CABOT_USE_DIRECTIONAL_INDICATOR', default_value='false'),
-            description='If true, the directional indicator on the handle is enabled'
-        ),
-        DeclareLaunchArgument(
-            'vibrator_type',
-            default_value=EnvironmentVariable('CABOT_VIBRATOR_TYPE', default_value='1'),
-            description='1: ERM (Eccentric Rotating Mass), 2: LRA (Linear Resonant Actuator)'
-        ),
-        DeclareLaunchArgument(
             'default_motor_control',
             default_value=EnvironmentVariable('CABOT_DEFAULT_MOTOR_CONTROL', default_value='true'),
             description='If true, wheels are closed-loop controlled when cmd_vel is not published'
@@ -250,6 +239,12 @@ def generate_launch_description():
             default_value=EnvironmentVariable('ODRIVE_FIRMWARE_VERSION'),
             description='odrive firmware version'
         ),
+        DeclareLaunchArgument(
+            'hesai_ros_2_0',
+            default_value=EnvironmentVariable('HESAI_ROS_2_0',  default_value='false'),
+            description='if true, cabot use HesaiLidar_ROS_2.0'
+        ),
+        LogInfo(msg=PythonExpression(["\"      hesai_ros_2_0: ", hesai_ros_2_0, "\""])),
 
         # Kind error message
         LogInfo(
@@ -358,10 +353,11 @@ def generate_launch_description():
                 launch_arguments={
                     'model': model_name,
                     'output': output,
-                    'pandar': '/velodyne_points'
+                    'pandar': '/velodyne_points',
+                    'hesai_ros_2_0': hesai_ros_2_0
                 }.items(),
                 condition=IfCondition(AndSubstitution(use_hesai, NotSubstitution(use_sim_time)))  # if (use_hesai and (not use_simtime))
-            ),
+             ),
 
             # launch lslidar node
             Node(
@@ -394,32 +390,6 @@ def generate_launch_description():
                     'output': output
                 }.items(),
                 condition=IfCondition(AndSubstitution(use_livox, NotSubstitution(use_sim_time)))
-            ),
-
-            # CaBot related
-            Node(
-                package='cabot_base',
-                executable='cabot_handle_v3_node',
-                namespace='/cabot',
-                name='cabot_handle_v3_node',
-                output=output,
-                parameters=[
-                    *param_files,
-                    {
-                        'use_sim_time': use_sim_time,
-                        'vibrator_type': vibrator_type
-                    }
-                ],
-                condition=IfCondition(use_directional_indicator),
-            ),
-            Node(
-                package='cabot_base',
-                executable='cabot_handle_v2_node',
-                namespace='/cabot',
-                name='cabot_handle_v2_node',
-                output=output,
-                parameters=[*param_files, {'use_sim_time': use_sim_time}],
-                condition=UnlessCondition(use_directional_indicator),
             ),
 
             # Microcontroller (Arduino - gt1/gtm or ESP32 - ace)
