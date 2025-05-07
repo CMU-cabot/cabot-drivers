@@ -429,9 +429,11 @@ private:
     float percentage_sum = 0, voltage_sum = 0, current_sum = 0, temperature_sum = 0;
     int valid_percentage_count = 0, valid_voltage_count = 0, valid_current_count = 0, valid_temperature_count = 0;
 
-    void (* checkNotANumber)(float, float &, int &) = [](float data, float & sum, int & count) {
+    void (* checkNotANumber)(float, float &, int &, bool) = [](float data, float & sum, int & count, bool count_only_if_valid) {
         if (!std::isnan(data)) {
           sum += data;
+          count++;
+        } else if (count_only_if_valid == false) {
           count++;
         }
       };
@@ -445,10 +447,10 @@ private:
         battery_message_.batteryarray[i].percentage,
         battery_message_.batteryarray[i].temperature);
 
-      checkNotANumber(battery_message_.batteryarray[i].voltage, voltage_sum, valid_voltage_count);
-      checkNotANumber(battery_message_.batteryarray[i].current, current_sum, valid_current_count);
-      checkNotANumber(battery_message_.batteryarray[i].percentage, percentage_sum, valid_percentage_count);
-      checkNotANumber(battery_message_.batteryarray[i].temperature, temperature_sum, valid_temperature_count);
+      checkNotANumber(battery_message_.batteryarray[i].voltage, voltage_sum, valid_voltage_count, true);
+      checkNotANumber(battery_message_.batteryarray[i].current, current_sum, valid_current_count, true);
+      checkNotANumber(battery_message_.batteryarray[i].percentage, percentage_sum, valid_percentage_count, false);
+      checkNotANumber(battery_message_.batteryarray[i].temperature, temperature_sum, valid_temperature_count, true);
     }
     average_battery_msg.voltage = valid_voltage_count > 0 ? voltage_sum / valid_voltage_count : std::nan("");
     average_battery_msg.current = valid_current_count > 0 ? current_sum / valid_current_count : std::nan("");
