@@ -50,6 +50,8 @@ services:
     devices:
       - /dev/dri
     network_mode: host
+    stop_signal: SIGINT
+    stop_grace_period: 30s
     command:
       - "/launch.sh"
       # - "-c"
