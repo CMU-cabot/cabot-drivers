@@ -60,6 +60,9 @@ services:
   driver-dev-base:
     extends:
       service: driver-base
+    environment: &dev-environment
+      - OVERRIDE_LAUNCH_PROCESS_OUTPUT=screen
+      - RCUTILS_CONSOLE_OUTPUT_FORMAT={time}	[{severity}]	[{file_name}#L{line_number}][{name}]	{message}
     volumes:
 # code from dependencies
       - ./cabot-common/cabot_common:/home/developer/driver_ws/src/cabot_common
@@ -93,6 +96,7 @@ services:
   wifi_scan-dev-base:
     extends:
       service: driver-dev-base
+    environment: *dev-environment
     command:
       - "/launch.sh"
       - "wifi-scan"
@@ -119,6 +123,7 @@ services:
   ble_scan-dev-base:
     extends:
       service: driver-dev-base
+    environment: *dev-environment
     command:
       - "/launch.sh"
       - "ble-scan"
@@ -164,6 +169,7 @@ services:
   power_controller-dev:
     extends:
       service: power_controller-base
+    environment: *dev-environment
     volumes:
       - ./docker/home:/home/developer/
 

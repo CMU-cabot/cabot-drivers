@@ -20,7 +20,7 @@
 
 from launch.logging import launch_config
 from launch import LaunchDescription
-from launch.actions import SetEnvironmentVariable, LogInfo, RegisterEventHandler
+from launch.actions import SetEnvironmentVariable, LogInfo, RegisterEventHandler, DeclareLaunchArgument
 from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -34,6 +34,7 @@ def generate_launch_description():
     pkg_dir = get_package_share_directory('wireless_scanner_ros')
 
     return LaunchDescription([
+        DeclareLaunchArgument('sigterm_timeout', default_value='30'),
         # save all log file in the directory where the launch.log file is saved
         SetEnvironmentVariable('ROS_LOG_DIR', launch_config.log_dir),
 
