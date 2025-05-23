@@ -31,10 +31,11 @@ from cabot_common.launch import AppendLogDirPrefix
 
 
 def generate_launch_description():
+    output = {'stderr': {'log'}}
     pkg_dir = get_package_share_directory('wireless_scanner_ros')
 
     return LaunchDescription([
-        DeclareLaunchArgument('sigterm_timeout', default_value='30'),
+        DeclareLaunchArgument('sigterm_timeout', default_value='15'),
         # save all log file in the directory where the launch.log file is saved
         SetEnvironmentVariable('ROS_LOG_DIR', launch_config.log_dir),
 
@@ -51,7 +52,7 @@ def generate_launch_description():
             package='wireless_scanner_ros',
             executable='dbus_ibeacon_scanner_node.py',
             name='dbus_ibeacon_scanner',
-            output='screen'
+            output=output,
         ),
 
         # Include BLE Receiver launch file

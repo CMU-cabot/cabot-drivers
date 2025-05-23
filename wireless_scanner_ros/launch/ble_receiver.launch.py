@@ -24,6 +24,7 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    output = {'stderr': {'log'}}
     return LaunchDescription([
         # Log information
         LogInfo(msg='Launching BLE Receiver'),
@@ -33,6 +34,6 @@ def generate_launch_description():
             package='wireless_scanner_ros',
             executable='ble_scan_converter.py',
             name='ble_scan_converter',
-            output='screen'
+            output=output,
         ),
     ])

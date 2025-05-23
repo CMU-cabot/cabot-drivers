@@ -32,6 +32,7 @@ from cabot_common.launch import AppendLogDirPrefix
 
 
 def generate_launch_description():
+    output = {'stderr': {'log'}}
     pkg_dir = get_package_share_directory('wireless_scanner_ros')
     port = LaunchConfiguration('port')
     wifi_scan_str = LaunchConfiguration('wifi_scan_str')
@@ -66,7 +67,7 @@ def generate_launch_description():
             package='cabot_serial',
             executable='cabot_serial_node',
             name='rosserial_esp32',
-            output='screen',
+            output=output,
             parameters=[{
                 'baud': 115200,
                 'port': port,

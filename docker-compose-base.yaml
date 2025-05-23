@@ -28,6 +28,7 @@ services:
       - CABOT_IMU_ACCEL_BIAS
       - CABOT_IMU_GYRO_BIAS
       - CABOT_DEFAULT_MOTOR_CONTROL
+      - RCUTILS_LOGGING_USE_STDOUT=1
       - RMW_IMPLEMENTATION
       - ROS_LOCALHOST_ONLY
       - ROS_DOMAIN_ID
@@ -61,8 +62,9 @@ services:
     extends:
       service: driver-base
     environment: &dev-environment
+      - RCUTILS_LOGGING_USE_STDOUT=0
       - OVERRIDE_LAUNCH_PROCESS_OUTPUT=screen
-      - RCUTILS_CONSOLE_OUTPUT_FORMAT={time}	[{severity}]	[{file_name}#L{line_number}][{name}]	{message}
+      - RCUTILS_CONSOLE_OUTPUT_FORMAT=[{severity}]	{time}	[{name}({file_name}#L{line_number})]	{message}
     volumes:
 # code from dependencies
       - ./cabot-common/cabot_common:/home/developer/driver_ws/src/cabot_common

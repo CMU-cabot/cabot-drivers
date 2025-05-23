@@ -23,12 +23,13 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    output = {'stderr': {'log'}}
     return LaunchDescription([
         # ESP32 WiFi Scan Converter Node
         Node(
             package='wireless_scanner_ros',
             executable='esp32_wifi_scan_converter.py',
             name='esp32_wifi_scan_converter',
-            output='screen'
+            output=output,
         ),
     ])
