@@ -28,6 +28,7 @@ services:
       - CABOT_IMU_ACCEL_BIAS
       - CABOT_IMU_GYRO_BIAS
       - CABOT_DEFAULT_MOTOR_CONTROL
+      - RCUTILS_LOGGING_USE_STDOUT=1
       - RMW_IMPLEMENTATION
       - ROS_LOCALHOST_ONLY
       - ROS_DOMAIN_ID
@@ -50,6 +51,8 @@ services:
     devices:
       - /dev/dri
     network_mode: host
+    stop_signal: SIGINT
+    stop_grace_period: 30s
     command:
       - "/launch.sh"
       # - "-c"
@@ -58,6 +61,10 @@ services:
   driver-dev-base:
     extends:
       service: driver-base
+    environment: &dev-environment
+      - RCUTILS_LOGGING_USE_STDOUT=0
+      - OVERRIDE_LAUNCH_PROCESS_OUTPUT=screen
+      - RCUTILS_CONSOLE_OUTPUT_FORMAT=[{severity}]	{time}	[{name}({file_name}#L{line_number})]	{message}
     volumes:
 # code from dependencies
       - ./cabot-common/cabot_common:/home/developer/driver_ws/src/cabot_common
@@ -91,6 +98,7 @@ services:
   wifi_scan-dev-base:
     extends:
       service: driver-dev-base
+    environment: *dev-environment
     command:
       - "/launch.sh"
       - "wifi-scan"
@@ -117,6 +125,7 @@ services:
   ble_scan-dev-base:
     extends:
       service: driver-dev-base
+    environment: *dev-environment
     command:
       - "/launch.sh"
       - "ble-scan"
@@ -162,6 +171,7 @@ services:
   power_controller-dev:
     extends:
       service: power_controller-base
+    environment: *dev-environment
     volumes:
       - ./docker/home:/home/developer/
 

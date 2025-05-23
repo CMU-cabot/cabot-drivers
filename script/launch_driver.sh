@@ -20,6 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+set -m
+
 # change directory to where this script exists
 pwd=`pwd`
 scriptdir=`dirname $0`
@@ -27,7 +29,6 @@ cd $scriptdir
 scriptdir=`pwd`
 
 pids=()
-termpids=()
 checks=()
 
 ## debug
@@ -41,12 +42,13 @@ source $scriptdir/cabot_util.sh
 trap signal INT TERM
 
 function signal() {
-    blue "trap cabot_ros2.sh "
+    blue "trap launch_driver.sh "
 
     # ps -Af
-    kill -INT -1
-    for pid in ${termpids[@]}; do
-	kill -TERM $pid
+    for pid in ${pids[@]}; do
+        echo "send SIGINT to $pid"
+        com="kill -INT $pid"
+        eval $com
     done
     for pid in ${pids[@]}; do
 	count=0
@@ -99,9 +101,10 @@ cabot_major=${CABOT_MODEL:0:6} # cabotN
 venv_path=/opt/venv/$cabot_major/bin/activate
 cabot_launch_py=$cabot_major.launch.py
 
+source $venv_path
+
 blue "bringup $CABOT_MODEL base"
-com="$command_prefix source $venv_path && \
-        ros2 launch cabot_base $cabot_launch_py $command_postfix"
+com="$command_prefix ros2 launch -n cabot_base $cabot_launch_py $command_postfix"
 echo $com
 eval $com
 checks+=($!)
