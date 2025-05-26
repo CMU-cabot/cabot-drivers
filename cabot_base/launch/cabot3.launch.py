@@ -353,7 +353,6 @@ def generate_launch_description():
                 ]),
                 launch_arguments={
                     'model': model_name,
-                    'output': output,
                     'pandar': '/velodyne_points',
                     'hesai_ros_2_0': hesai_ros_2_0
                 }.items(),
@@ -388,7 +387,6 @@ def generate_launch_description():
                     'frame_id': 'livox_link',
                     'xfer_format': '0',
                     'output_topic': '/livox/points',
-                    'output': output
                 }.items(),
                 condition=IfCondition(AndSubstitution(use_livox, NotSubstitution(use_sim_time)))
             ),
