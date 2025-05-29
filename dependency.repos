@@ -14,12 +14,12 @@ repositories:
     url: https://github.com/CMU-cabot/ros_odrive.git
     version: cabot
 
- uwbtag_publisher:
+  uwbtag_publisher:
     type: git
     url: git@github.com:CMU-cabot/uwbtag_publisher.git
     version: main
 
- uwbtag_interfaces:
+  uwbtag_interfaces:
     type: git
     url: git@github.com:CMU-cabot/uwbtag_interfaces.git
     version: main
