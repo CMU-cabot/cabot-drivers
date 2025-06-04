@@ -93,7 +93,7 @@ def generate_launch_description():
         "cabot3-k1":   ["hesai", "livox", "can"],
         "cabot3-k2":   ["lslidar", "livox", "can"],
         "cabot3-k3":   ["rslidar", "livox", "can"],
-        "cabot3-k4":   ["hesai", "livox", "can"],
+        "cabot3-k4":   ["hesai", "livox"],  # move can to plugins
     }
 
     # Helper function to check if a flag applies to the given model

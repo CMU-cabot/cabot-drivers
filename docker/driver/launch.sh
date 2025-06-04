@@ -43,6 +43,9 @@ elif [[ $1 == "wifi-scan" ]]; then
 elif [[ $1 == "ble-scan" ]]; then
     source install/setup.bash
     exec ros2 launch wireless_scanner_ros dbus_ibeacon_scanner.launch.xml
+elif [[ $1 == "can" ]]; then
+    source install/setup.bash
+    exec ros2 launch cabot_can cabot_can.launch.py
 elif [[ $1 == "power" ]]; then
     source install/setup.bash
     exec ros2 launch cabot_base power_controller.launch.py
