@@ -140,6 +140,8 @@ public:
     declare_parameter("can_interface", "can0");
     declare_parameter("imu_frame_id", "imu_frame");
     declare_parameter("calibration_params", std::vector<int64_t>((CanDlc::WRITE_IMU_CALIBRATION_1_DLC + CanDlc::WRITE_IMU_CALIBRATION_2_DLC + CanDlc::WRITE_IMU_CALIBRATION_3_DLC), 0));
+    declare_parameter("publish_imu_raw", publish_imu_raw_);
+    // diagnostic
     declare_parameter("target_imu_fps", 100.0);
     declare_parameter("target_pressure_fps", 2.0);
     declare_parameter("target_temp_1_fps", 2.0);
@@ -289,6 +291,9 @@ public:
       }
       if (param.get_name() == "tof_touch_threshold") {
         tof_touch_threshold_ = param.as_int();
+      }
+      if (param.get_name() == "publish_imu_raw") {
+        publish_imu_raw_ = param.as_bool();
       }
     }
     rcl_interfaces::msg::SetParametersResult result;
@@ -595,7 +600,9 @@ private:
       imu_raw_msg.header.frame_id = frame_id;
       imu_msg.header = imu_raw_msg.header;
       imu_pub_->publish(imu_msg);
-      imu_raw_pub_->publish(imu_raw_msg);
+      if (publish_imu_raw_) {
+        imu_raw_pub_->publish(imu_raw_msg);
+      }
       diag_imu_->tick(imu_msg.header.stamp);
     }
   }
@@ -961,6 +968,7 @@ private:
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr callback_handler_;
   std::vector<double> imu_accel_bias_;
   std::vector<double> imu_gyro_bias_;
+  bool publish_imu_raw_ = true;
 
   // diagnostic
   diagnostic_updater::Updater diagnostic_updater_;
