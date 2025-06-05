@@ -642,7 +642,7 @@ def generate_launch_description():
                 namespace='/',
                 name='uwbtag_publisher_1',
                 output=output,
-                parameters=[
+                parameters=[*param_files,
                     {
                         'frame_id': 'uwb_tag1_link',
                     }
@@ -657,7 +657,7 @@ def generate_launch_description():
                 namespace='/',
                 name='uwbtag_publisher_2',
                 output=output,
-                parameters=[
+                parameters=[*param_files,
                     {
                         'frame_id': 'uwb_tag2_link',
                     }
@@ -672,7 +672,7 @@ def generate_launch_description():
                 namespace='/',
                 name='uwbtag_publisher_3',
                 output=output,
-                parameters=[
+                parameters=[*param_files,
                     {
                         'frame_id': 'uwb_tag3_link',
                     }
