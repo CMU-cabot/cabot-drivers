@@ -777,22 +777,27 @@ private:
     temp_msg.temperature = temperature;
     switch (frame.can_id) {
       case CanId::TEMPERATURE_1_CAN_ID:
+        temp_msg.header.frame_id = "rear";
         temperature_1_pub_->publish(temp_msg);
         diag_temp_1_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_2_CAN_ID:
+        temp_msg.header.frame_id = "top";
         temperature_2_pub_->publish(temp_msg);
         diag_temp_2_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_3_CAN_ID:
+        temp_msg.header.frame_id = "camera";
         temperature_3_pub_->publish(temp_msg);
         diag_temp_3_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_4_CAN_ID:
+        temp_msg.header.frame_id = "center";
         temperature_4_pub_->publish(temp_msg);
         diag_temp_4_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_5_CAN_ID:
+        temp_msg.header.frame_id = "bottom";
         temperature_5_pub_->publish(temp_msg);
         diag_temp_5_->tick(temp_msg.header.stamp);
         break;
