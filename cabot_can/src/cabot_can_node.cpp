@@ -140,6 +140,8 @@ public:
     declare_parameter("can_interface", "can0");
     declare_parameter("imu_frame_id", "imu_frame");
     declare_parameter("calibration_params", std::vector<int64_t>((CanDlc::WRITE_IMU_CALIBRATION_1_DLC + CanDlc::WRITE_IMU_CALIBRATION_2_DLC + CanDlc::WRITE_IMU_CALIBRATION_3_DLC), 0));
+    declare_parameter("publish_imu_raw", publish_imu_raw_);
+    // diagnostic
     declare_parameter("target_imu_fps", 100.0);
     declare_parameter("target_pressure_fps", 2.0);
     declare_parameter("target_temp_1_fps", 2.0);
@@ -158,6 +160,7 @@ public:
     temperature_4_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature4", 10);
     temperature_5_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature5", 10);
     imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu", 10);
+    imu_raw_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu_raw", 10);
     wifi_pub_ = this->create_publisher<std_msgs::msg::String>("wifi", 10);
     bme_temperature_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("bme/temperature", 10);
     bme_pressure_pub_ = this->create_publisher<sensor_msgs::msg::FluidPressure>("bme/pressure", 10);
@@ -203,6 +206,9 @@ public:
     imu_msg.orientation_covariance[0] = 0.1;
     imu_msg.orientation_covariance[4] = 0.1;
     imu_msg.orientation_covariance[8] = 0.1;
+    imu_raw_msg.orientation_covariance[0] = imu_msg.orientation_covariance[0];
+    imu_raw_msg.orientation_covariance[4] = imu_msg.orientation_covariance[4];
+    imu_raw_msg.orientation_covariance[8] = imu_msg.orientation_covariance[8];
     std::uint8_t publish_rate = this->get_parameter("publish_rate", publish_rate);
     pub_timer_ = this->create_wall_timer(std::chrono::microseconds(publish_rate), std::bind(&CabotCanNode::timerPubCallback, this));
     callback_handler_ =
@@ -285,6 +291,9 @@ public:
       }
       if (param.get_name() == "tof_touch_threshold") {
         tof_touch_threshold_ = param.as_int();
+      }
+      if (param.get_name() == "publish_imu_raw") {
+        publish_imu_raw_ = param.as_bool();
       }
     }
     rcl_interfaces::msg::SetParametersResult result;
@@ -555,24 +564,24 @@ private:
       int16_t linear_x = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
       int16_t linear_y = (((uint16_t)frame.data[3]) << 8) | ((uint16_t)frame.data[2]);
       int16_t linear_z = (((uint16_t)frame.data[5]) << 8) | ((uint16_t)frame.data[4]);
-      imu_msg.linear_acceleration.x = linear_x / 100.0;
-      imu_msg.linear_acceleration.y = linear_y / 100.0;
-      imu_msg.linear_acceleration.z = linear_z / 100.0;
-      imu_msg.linear_acceleration.x -= this->imu_accel_bias_.at(0);
-      imu_msg.linear_acceleration.y -= this->imu_accel_bias_.at(1);
-      imu_msg.linear_acceleration.z -= this->imu_accel_bias_.at(2);
+      imu_raw_msg.linear_acceleration.x = linear_x / 100.0;
+      imu_raw_msg.linear_acceleration.y = linear_y / 100.0;
+      imu_raw_msg.linear_acceleration.z = linear_z / 100.0;
+      imu_msg.linear_acceleration.x = imu_raw_msg.linear_acceleration.x - this->imu_accel_bias_.at(0);
+      imu_msg.linear_acceleration.y = imu_raw_msg.linear_acceleration.y - this->imu_accel_bias_.at(1);
+      imu_msg.linear_acceleration.z = imu_raw_msg.linear_acceleration.z - this->imu_accel_bias_.at(2);
       is_linear = true;
     }
     if (frame.can_id == CanId::IMU_ANGULAR_CAN_ID && frame.can_dlc == CanDlc::IMU_ANGULAR_CAN_DLC && is_linear) {
       int16_t angular_x = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
       int16_t angular_y = (((uint16_t)frame.data[3]) << 8) | ((uint16_t)frame.data[2]);
       int16_t angular_z = (((uint16_t)frame.data[5]) << 8) | ((uint16_t)frame.data[4]);
-      imu_msg.angular_velocity.x = (angular_x / 16.0) * (M_PI / 180.0);
-      imu_msg.angular_velocity.y = (angular_y / 16.0) * (M_PI / 180.0);
-      imu_msg.angular_velocity.z = (angular_z / 16.0) * (M_PI / 180.0);
-      imu_msg.angular_velocity.x -= this->imu_gyro_bias_.at(0);
-      imu_msg.angular_velocity.y -= this->imu_gyro_bias_.at(1);
-      imu_msg.angular_velocity.z -= this->imu_gyro_bias_.at(2);
+      imu_raw_msg.angular_velocity.x = (angular_x / 16.0) * (M_PI / 180.0);
+      imu_raw_msg.angular_velocity.y = (angular_y / 16.0) * (M_PI / 180.0);
+      imu_raw_msg.angular_velocity.z = (angular_z / 16.0) * (M_PI / 180.0);
+      imu_msg.angular_velocity.x = imu_raw_msg.angular_velocity.x - this->imu_gyro_bias_.at(0);
+      imu_msg.angular_velocity.y = imu_raw_msg.angular_velocity.y - this->imu_gyro_bias_.at(1);
+      imu_msg.angular_velocity.z = imu_raw_msg.angular_velocity.z - this->imu_gyro_bias_.at(2);
       is_angular = true;
     }
     if (frame.can_id == CanId::IMU_ORIENTATION_CAN_ID && frame.can_dlc == CanDlc::IMU_ORIENTATION_CAN_DLC && is_linear && is_angular) {
@@ -580,14 +589,20 @@ private:
       int16_t orientation_y = (((uint16_t)frame.data[3]) << 8) | ((uint16_t)frame.data[2]);
       int16_t orientation_z = (((uint16_t)frame.data[5]) << 8) | ((uint16_t)frame.data[4]);
       int16_t orientation_w = (((uint16_t)frame.data[7]) << 8) | ((uint16_t)frame.data[6]);
-      imu_msg.orientation.x = orientation_x * (1.0 / (1 << 14));
-      imu_msg.orientation.y = orientation_y * (1.0 / (1 << 14));
-      imu_msg.orientation.z = orientation_z * (1.0 / (1 << 14));
-      imu_msg.orientation.w = orientation_w * (1.0 / (1 << 14));
-      imu_msg.header.stamp = this->get_clock()->now();
+      imu_raw_msg.orientation.x = orientation_x * (1.0 / (1 << 14));
+      imu_raw_msg.orientation.y = orientation_y * (1.0 / (1 << 14));
+      imu_raw_msg.orientation.z = orientation_z * (1.0 / (1 << 14));
+      imu_raw_msg.orientation.w = orientation_w * (1.0 / (1 << 14));
+      imu_msg.orientation = imu_raw_msg.orientation;
+      // header
+      imu_raw_msg.header.stamp = this->get_clock()->now();
       std::string frame_id = this->get_parameter("imu_frame_id").as_string();
-      imu_msg.header.frame_id = frame_id;
+      imu_raw_msg.header.frame_id = frame_id;
+      imu_msg.header = imu_raw_msg.header;
       imu_pub_->publish(imu_msg);
+      if (publish_imu_raw_) {
+        imu_raw_pub_->publish(imu_raw_msg);
+      }
       diag_imu_->tick(imu_msg.header.stamp);
     }
   }
@@ -916,6 +931,7 @@ private:
   }
 
   sensor_msgs::msg::Imu imu_msg;
+  sensor_msgs::msg::Imu imu_raw_msg;
   std::string touch_mode_;
   int tof_touch_threshold_;
   int can_socket_;
@@ -925,6 +941,7 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_4_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_5_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_raw_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr wifi_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr bme_temperature_pub_;
   rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr bme_pressure_pub_;
@@ -951,6 +968,7 @@ private:
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr callback_handler_;
   std::vector<double> imu_accel_bias_;
   std::vector<double> imu_gyro_bias_;
+  bool publish_imu_raw_ = true;
 
   // diagnostic
   diagnostic_updater::Updater diagnostic_updater_;
