@@ -664,6 +664,7 @@ private:
       float bme_temperature = bme_temperature_raw / 100.0;
       sensor_msgs::msg::Temperature bme_temp_msg;
       bme_temp_msg.header.stamp = this->get_clock()->now();
+      bme_temp_msg.header.frame_id = "bme280";
       bme_temp_msg.temperature = bme_temperature;
       bme_temperature_pub_->publish(bme_temp_msg);
       diag_bme_temp_->tick(bme_temp_msg.header.stamp);
@@ -777,27 +778,27 @@ private:
     temp_msg.temperature = temperature;
     switch (frame.can_id) {
       case CanId::TEMPERATURE_1_CAN_ID:
-        temp_msg.header.frame_id = "rear";
+        temp_msg.header.frame_id = "1_rear";
         temperature_1_pub_->publish(temp_msg);
         diag_temp_1_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_2_CAN_ID:
-        temp_msg.header.frame_id = "top";
+        temp_msg.header.frame_id = "2_top";
         temperature_2_pub_->publish(temp_msg);
         diag_temp_2_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_3_CAN_ID:
-        temp_msg.header.frame_id = "camera";
+        temp_msg.header.frame_id = "3_near_camera";
         temperature_3_pub_->publish(temp_msg);
         diag_temp_3_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_4_CAN_ID:
-        temp_msg.header.frame_id = "center";
+        temp_msg.header.frame_id = "4_center";
         temperature_4_pub_->publish(temp_msg);
         diag_temp_4_->tick(temp_msg.header.stamp);
         break;
       case CanId::TEMPERATURE_5_CAN_ID:
-        temp_msg.header.frame_id = "bottom";
+        temp_msg.header.frame_id = "5_bottom";
         temperature_5_pub_->publish(temp_msg);
         diag_temp_5_->tick(temp_msg.header.stamp);
         break;
