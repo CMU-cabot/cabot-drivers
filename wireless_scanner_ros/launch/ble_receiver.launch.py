@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# Copyright (c) 2023  Carnegie Mellon University
+# Copyright (c) 2025  Carnegie Mellon University
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,38 +18,22 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-ulimit -S -c 0
+from launch import LaunchDescription
+from launch.actions import LogInfo
+from launch_ros.actions import Node
 
-while getopts "c" arg; do
-    case $arg in
-        c)
-	    ulimit -c unlimited
-	    echo 1 | sudo tee /proc/sys/kernel/core_uses_pid
-	    echo "/home/developer/core" | sudo tee /proc/sys/kernel/core_pattern
-	    ulimit -s 65536
-	    ;;
-    esac
-done
-shift $((OPTIND-1))
 
-if [[ $1 == "driver" ]]; then
-    shift 1
-    exec ./script/launch_driver.sh $@
-elif [[ $1 == "wifi-scan" ]]; then
-    source install/setup.bash
-    exec ros2 launch wireless_scanner_ros esp32.launch.py
-elif [[ $1 == "ble-scan" ]]; then
-    source install/setup.bash
-    exec ros2 launch wireless_scanner_ros dbus_ibeacon_scanner.launch.py
-elif [[ $1 == "can" ]]; then
-    source install/setup.bash
-    exec ros2 launch cabot_can cabot_can.launch.py
-elif [[ $1 == "power" ]]; then
-    source install/setup.bash
-    exec ros2 launch cabot_base power_controller.launch.py
-elif [[ $1 == "build" ]]; then
-    shift 1
-    exec ./script/build_ws.sh $@
-fi
+def generate_launch_description():
+    output = {'stderr': {'log'}}
+    return LaunchDescription([
+        # Log information
+        LogInfo(msg='Launching BLE Receiver'),
 
-exec bash
+        # BLE Scan Converter Node
+        Node(
+            package='wireless_scanner_ros',
+            executable='ble_scan_converter.py',
+            name='ble_scan_converter',
+            output=output,
+        ),
+    ])
