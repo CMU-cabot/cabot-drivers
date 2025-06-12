@@ -27,18 +27,28 @@ cd $scriptdir
 scriptdir=`pwd`
 
 debug=0
-while getopts "d" arg; do
+sequential=0
+
+while getopts "ds" arg; do
     case $arg in
 	d)
 	    debug=1
+	    ;;
+	s)
+	    sequential=1
 	    ;;
     esac
 done
 shift $((OPTIND-1))
 
 pushd $scriptdir/../
+build_option=
 if [[ $debug -eq 1 ]]; then
-    colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug --symlink-install --executor sequential $@
+    build_option+=" --cmake-args -DCMAKE_BUILD_TYPE=Debug --symlink-install"
 else
-    colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --executor sequential $@
+    build_option+=" --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo"
 fi
+if [[ $sequential -eq 1 ]]; then
+    build_option+=" --executor sequential"
+fi
+colcon build $build_option $@
