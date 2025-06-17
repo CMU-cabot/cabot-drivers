@@ -90,10 +90,10 @@ def generate_launch_description():
         "cabot3-i1":   ["hesai", "livox", "serial"],
         "cabot3-m1":   ["hesai", "livox", "serial"],
         "cabot3-m2":   ["hesai", "livox", "serial"],
-        "cabot3-k1":   ["hesai", "livox", "can"],
-        "cabot3-k2":   ["lslidar", "livox", "can"],
-        "cabot3-k3":   ["rslidar", "livox", "can"],
-        "cabot3-k4":   ["hesai", "livox", "can"],
+        "cabot3-k1":   ["hesai", "livox", "can_sensor", "can_odrive"],
+        "cabot3-k2":   ["lslidar", "livox", "can_sensor", "can_odrive"],
+        "cabot3-k3":   ["rslidar", "livox", "can_sensor", "can_odrive"],
+        "cabot3-k4":   ["hesai", "livox", "can_odrive"],  # move can_sensor to plugins
     }
 
     # Helper function to check if a flag applies to the given model
@@ -107,7 +107,8 @@ def generate_launch_description():
     use_rslidar = has_flag("rslidar")
     use_livox = has_flag("livox")
     use_serial = has_flag("serial")
-    use_can = has_flag("can")
+    use_can_sensor = has_flag("can_sensor")
+    use_can_odrive = has_flag("can_odrive")
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -173,7 +174,8 @@ def generate_launch_description():
         LogInfo(msg=PythonExpression(["\"        use_rslidar: ", use_rslidar, "\""])),
         LogInfo(msg=PythonExpression(["\"          use_livox: ", use_livox, "\""])),
         LogInfo(msg=PythonExpression(["\"         use_serial: ", use_serial, "\""])),
-        LogInfo(msg=PythonExpression(["\"            use_can: ", use_can, "\""])),
+        LogInfo(msg=PythonExpression(["\"     use_can_sensor: ", use_can_sensor, "\""])),
+        LogInfo(msg=PythonExpression(["\"     use_can_odrive: ", use_can_odrive, "\""])),
         DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
@@ -449,7 +451,7 @@ def generate_launch_description():
                     ('/cabot/imu', '/cabot/imu/data'),
                     ('/cabot/touch_speed', '/cabot/touch_speed_raw'),
                 ],
-                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+                condition=IfCondition(AndSubstitution(use_can_sensor, NotSubstitution(use_sim_time)))
             ),
             # wifi scan converter for cabot_can
             Node(
@@ -467,7 +469,7 @@ def generate_launch_description():
                 remappings=[
                     ('/esp32/wifi_scan_str', '/cabot/wifi'),
                 ],
-                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+                condition=IfCondition(AndSubstitution(use_can_sensor, NotSubstitution(use_sim_time)))
             ),
             # optional wifi scanner with ESP32
             Node(
@@ -544,7 +546,7 @@ def generate_launch_description():
                     ('/request_axis_state_left', '/cabot/request_axis_state_left'),
                     ('/request_axis_state_right', '/cabot/request_axis_state_right'),
                 ],
-                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+                condition=IfCondition(AndSubstitution(use_can_odrive, NotSubstitution(use_sim_time)))
             ),
             Node(
                 package='odrive_can',
@@ -566,7 +568,7 @@ def generate_launch_description():
                     ('/cabot/odrive_status', '/cabot/odrive_status_left'),
                     ('/cabot/request_axis_state', '/cabot/request_axis_state_left')
                 ],
-                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+                condition=IfCondition(AndSubstitution(use_can_odrive, NotSubstitution(use_sim_time)))
             ),
             Node(
                 package='odrive_can',
@@ -588,7 +590,7 @@ def generate_launch_description():
                     ('/cabot/odrive_status', '/cabot/odrive_status_right'),
                     ('/cabot/request_axis_state', '/cabot/request_axis_state_right'),
                 ],
-                condition=IfCondition(AndSubstitution(use_can, NotSubstitution(use_sim_time)))
+                condition=IfCondition(AndSubstitution(use_can_odrive, NotSubstitution(use_sim_time)))
             ),
 
             # cabot features
