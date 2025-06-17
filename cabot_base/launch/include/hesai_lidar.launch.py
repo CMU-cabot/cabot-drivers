@@ -38,11 +38,11 @@ from launch.conditions import IfCondition, UnlessCondition
 
 
 def generate_launch_description():
+    output = {'stderr': {'log'}}
     pkg_dir = get_package_share_directory('cabot_base')
     model_name = LaunchConfiguration('model')
     pandar = LaunchConfiguration('pandar')
     pandar_packets = LaunchConfiguration('pandar_packets')
-    output = LaunchConfiguration('output')
     hesai_ros_2_0 = LaunchConfiguration('hesai_ros_2_0')
 
     param_files = [
@@ -77,11 +77,6 @@ def generate_launch_description():
             'pandar_packets',
             default_value='pandar_packets',
             description='Published PandarScan topic'
-        ),
-        DeclareLaunchArgument(
-            'output',
-            default_value='both',
-            description='hesai_lidar node output'
         ),
         DeclareLaunchArgument(
             'hesai_ros_2_0',
