@@ -39,10 +39,10 @@ if [[ $1 == "driver" ]]; then
     exec ./script/launch_driver.sh $@
 elif [[ $1 == "wifi-scan" ]]; then
     source install/setup.bash
-    exec ros2 launch wireless_scanner_ros esp32.launch.xml
+    exec ros2 launch wireless_scanner_ros esp32.launch.py
 elif [[ $1 == "ble-scan" ]]; then
     source install/setup.bash
-    exec ros2 launch wireless_scanner_ros dbus_ibeacon_scanner.launch.xml
+    exec ros2 launch wireless_scanner_ros dbus_ibeacon_scanner.launch.py
 elif [[ $1 == "can" ]]; then
     source install/setup.bash
     exec ros2 launch cabot_can cabot_can.launch.py
