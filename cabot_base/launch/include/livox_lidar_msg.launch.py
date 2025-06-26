@@ -27,6 +27,7 @@ from launch.substitutions import PathJoinSubstitution
 
 
 def generate_launch_description():
+    output = {'stderr': {'log'}}
     pkg_dir = get_package_share_directory('cabot_base')
 
     xfer_format = LaunchConfiguration('xfer_format')
@@ -37,7 +38,6 @@ def generate_launch_description():
     frame_id = LaunchConfiguration('frame_id')
     cmdline_bd_code = LaunchConfiguration('cmdline_bd_code')
     output_topic = LaunchConfiguration('output_topic')
-    output = LaunchConfiguration('output')
 
     user_config_path = PathJoinSubstitution([pkg_dir, 'config', 'livox', 'livox_lidar_return_dual.json'])
 
@@ -81,11 +81,6 @@ def generate_launch_description():
             'output_topic',
             default_value='/livox/points',
             description='output topic name'
-        ),
-        DeclareLaunchArgument(
-            'output',
-            default_value='both',
-            description='livox_lidar_msg node output'
         ),
 
         Node(
