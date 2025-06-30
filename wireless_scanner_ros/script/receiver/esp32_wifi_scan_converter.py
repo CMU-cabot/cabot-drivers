@@ -22,7 +22,6 @@
 # SOFTWARE.
 
 import json
-import time
 import signal
 import sys
 
@@ -39,6 +38,7 @@ class ESP32WiFiScanConverter:
         self.last_active = None
         self.wifi_num = 0
         self.accumulator = ESP32WiFiScanAccumulator()
+        self.clock = node.get_clock()
         self.logger = node.get_logger()
         self.pub = node.create_publisher(String, "/esp32/wifi", 100)
         self.timer = node.create_timer(1, self.publish)
@@ -92,7 +92,8 @@ class ESP32WiFiScanConverter:
 
     def publish(self):
         string = String()
-        scans = self.accumulator.get_latest_scans(time.time())
+        now = self.clock.now().nanoseconds / 1.0e9
+        scans = self.accumulator.get_latest_scans(now)
         if not scans:
             return
 
@@ -101,14 +102,15 @@ class ESP32WiFiScanConverter:
 
         if len(scans['data']) > 0:
             self.is_active = True
-            self.last_active = time.time()
+            self.last_active = now
             self.wifi_num = len(scans['data'])
 
     def check_status(self, stat):
+        now = self.clock.now().nanoseconds / 1.0e9
         if self.last_active is None:
             self.is_active = False
         else:
-            if (time.time() - self.last_active) > 3:
+            if (now - self.last_active) > 3:
                 self.is_active = False
         if self.is_active:
             if self.wifi_num == 0:
