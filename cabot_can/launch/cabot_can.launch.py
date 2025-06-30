@@ -94,4 +94,20 @@ def generate_launch_description():
                 ('/cabot/touch_speed', '/cabot/touch_speed_raw'),
             ],
         ),
+        # wifi scan converter for cabot_can
+        Node(
+            package='wireless_scanner_ros',
+            executable='esp32_wifi_scan_converter.py',
+            namespace='/cabot',
+            name='esp32_wifi_scan_converter',
+            output=output,
+            parameters=[
+                {
+                    'use_sim_time': use_sim_time,
+                }
+            ],
+            remappings=[
+                ('/esp32/wifi_scan_str', '/cabot/wifi'),
+            ],
+        )
     ])
