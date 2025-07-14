@@ -44,12 +44,11 @@ class ESP32WiFiScanConverter:
         self.timer = node.create_timer(1, self.publish)
         pass
 
-    def convert_str(self, string):
+    def convert_str(self, string) -> dict:
         data = string.split(",")
 
         if len(data) != 6:
-            self.logger.error("invalid wifi_scan_str: len(data)="+str(len(data)))
-            self.logger.error(data)
+            self.logger.error(f"invalid wifi_scan_str: len(data)={len(data)}, string={string}")
             return None
 
         bssid = data[0]  # mac
@@ -81,9 +80,14 @@ class ESP32WiFiScanConverter:
 
         return json_object
 
-    def convert(self, msg):
+    def convert(self, msg) -> dict:
         string = msg.data
-        return self.convert_str(string)
+        json_object = None
+        try:
+            json_object = self.convert_str(string)
+        except Exception as e:
+            self.logger.error(f"invalid wifi_scan_str: Exception={e}. string={string}")
+        return json_object
 
     def wifi_scan_str_callback(self, msg):
         json_object = self.convert(msg)
@@ -137,7 +141,7 @@ class ESP32WiFiScanAccumulator:
 
         self.data_list.append(data)
 
-    def get_latest_scans(self, timestamp):
+    def get_latest_scans(self, timestamp) -> dict:
         latest_scans = [elem for elem in self.data_list if timestamp - elem["timestamp"] < self.interval]
 
         latest_scan_obj = {
@@ -174,8 +178,8 @@ def main():
 
     try:
         rclpy.spin(node)
-    except:  # noqa: E722
-        pass
+    except Exception as e:
+        node.get_logger().error(f"{e}")
 
 
 if __name__ == "__main__":
