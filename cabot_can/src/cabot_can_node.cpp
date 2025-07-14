@@ -655,6 +655,7 @@ private:
       int64_t nanoseconds_int = current_time.nanoseconds();
       std::string nanoseconds_str = std::to_string(nanoseconds_int);
       std::string nanoseconds = nanoseconds_str.substr(nanoseconds_str.length() - 9);
+      std::replace(ssid.begin(), ssid.end(), ',', ' ');  // remove comma (,) from ssid by replacing comma with space
       std::string wifi_data = mac_str + "," +
         ssid + "," +
         std::to_string(channel) + "," +
