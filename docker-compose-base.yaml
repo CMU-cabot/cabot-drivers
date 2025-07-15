@@ -47,6 +47,9 @@ services:
       - /var/run/dbus:/var/run/dbus
 # bridge - if DDS use shared memory
       - /dev/shm:/dev/shm
+
+      - ./uwbtag_interfaces:/home/developer/driver_ws/src/uwbtag_interfaces
+      - ./uwbtag_publisher:/home/developer/driver_ws/src/uwbtag_publisher
     privileged: true
     devices:
       - /dev/dri
