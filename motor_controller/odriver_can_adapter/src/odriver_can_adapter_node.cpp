@@ -159,8 +159,8 @@ private:
 
     double sign_left = odrive_left_->getSign();
     double sign_right = odrive_right_->getSign();
-    double dist_left_c = odrive_left_->getDistC();
-    double dist_right_c = odrive_right_->getDistC();
+    double dist_left_c = odrive_left_->getDistCFixed();
+    double dist_right_c = odrive_right_->getDistCFixed();
     double spd_left_c = odrive_left_->getSpdC();
     double spd_right_c = odrive_right_->getSpdC();
     double current_setpoint_left = odrive_left_->getCurrentSetpoint();
@@ -191,7 +191,11 @@ private:
     status.current_measured_right = sign_right * current_measured_right;
 
     motor_status_pub_->publish(status);
-    last_motor_status_time_ = this->get_clock()->now();
+    rclcpp::Time temp = odrive_left_->getLastStatusTime();
+    if (odrive_right_->getLastStatusTime() < temp) {
+      temp = odrive_right_->getLastStatusTime();
+    }
+    last_motor_status_time_ = temp;
   }
 
   void checkMotorStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)

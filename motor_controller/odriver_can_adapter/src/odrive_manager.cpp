@@ -30,13 +30,17 @@
 
 #include "odrive_manager.hpp"
 
+using namespace std::chrono_literals;
+
 ODriveManager::ODriveManager(
   rclcpp::Node * node, const std::string & axis_name,
   double sign, double wheel_diameter_m)
 : node_(node),
   is_ready_axis_state_service_(true),
   axis_name_(axis_name),
+  dist_c_fixed_(0),
   ready_(false),
+  last_status_time_(node->get_clock()->now()),
   sign_(sign),
   wheel_diameter_m_(wheel_diameter_m)
 {
@@ -66,6 +70,17 @@ ODriveManager::~ODriveManager()
 {
 }
 
+double ODriveManager::getDistCFixed() {
+  double temp = dist_c_ - last_dist_c_;
+  auto diff = node_->get_clock()->now() - last_status_time_;
+  last_dist_c_ = dist_c_;
+
+  if (diff < 0.1s) {
+    dist_c_fixed_ += temp;
+  }
+  return dist_c_fixed_;
+}
+
 void ODriveManager::controllerStatusCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg)
 {
   spd_c_ = msg->vel_estimate;
@@ -74,6 +89,7 @@ void ODriveManager::controllerStatusCallback(const odrive_can::msg::ControllerSt
   current_measured_ = msg->iq_measured;
   axis_state_ = msg->axis_state;
   ready_ = true;
+  last_status_time_ = node_->get_clock()->now();
 }
 
 void ODriveManager::callAxisStateService(unsigned int axis_state)
