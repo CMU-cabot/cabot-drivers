@@ -30,13 +30,18 @@
 
 #include "odrive_manager.hpp"
 
+using namespace std::chrono_literals;
+
 ODriveManager::ODriveManager(
   rclcpp::Node * node, const std::string & axis_name,
   double sign, double wheel_diameter_m)
 : node_(node),
   is_ready_axis_state_service_(true),
   axis_name_(axis_name),
+  dist_c_fixed_(0),
+  last_dist_c_(std::numeric_limits<double>::quiet_NaN()),
   ready_(false),
+  last_status_time_(node->get_clock()->now()),
   sign_(sign),
   wheel_diameter_m_(wheel_diameter_m)
 {
@@ -74,6 +79,25 @@ void ODriveManager::controllerStatusCallback(const odrive_can::msg::ControllerSt
   current_measured_ = msg->iq_measured;
   axis_state_ = msg->axis_state;
   ready_ = true;
+  status_time_ = node_->get_clock()->now();
+
+  if (std::isnan(last_dist_c_)) {
+    last_dist_c_ = dist_c_;
+    last_status_time_ = status_time_;
+  }
+  double temp = dist_c_ - last_dist_c_;
+  auto diff = status_time_ - last_status_time_;
+  last_dist_c_ = dist_c_;
+  last_status_time_ = status_time_;
+
+  if (diff < 1.0s) {  // should be enough for 10Hz
+    dist_c_fixed_ += temp;
+  } else {
+    RCLCPP_WARN(
+      node_->get_logger(),
+      "ODriveManager::getDistCFixed: status_time diff is too large: %f sec, %.2f count",
+      diff.seconds(), temp);
+  }
 }
 
 void ODriveManager::callAxisStateService(unsigned int axis_state)

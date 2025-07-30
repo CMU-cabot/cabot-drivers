@@ -38,10 +38,12 @@ public:
   void checkTimeoutServiceResponse(double timeout);
   double getSpdC() {return spd_c_;}
   double getDistC() {return dist_c_;}
+  double getDistCFixed() {return dist_c_fixed_;}
   double getCurrentSetpoint() {return current_setpoint_;}
   double getCurrentMeasured() {return current_measured_;}
   double getSign() {return sign_;}
   bool isReady() {return ready_;}
+  rclcpp::Time getLastStatusTime() {return last_status_time_;}
 
 private:
   rclcpp::Node * node_;
@@ -55,9 +57,14 @@ private:
 
   double spd_c_;
   double dist_c_;
+  double dist_c_fixed_;
+  double last_dist_c_;
   double current_setpoint_;
   double current_measured_;
   bool ready_;
+
+  rclcpp::Time status_time_;
+  rclcpp::Time last_status_time_;
 
   double sign_;
 
