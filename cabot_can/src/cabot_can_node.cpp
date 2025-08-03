@@ -130,12 +130,15 @@ class CabotCanNode : public rclcpp::Node
 public:
   CabotCanNode()
   : touch_mode_("cap"),
-    tof_touch_threshold_(25),
+    tof_touch_threshold_low_(25),
+    tof_touch_threshold_high_(35),
+    tof_touch_(false),
     Node("cabot_can_node"),
     diagnostic_updater_(this)
   {
     declare_parameter("touch_mode", touch_mode_);
-    declare_parameter("tof_touch_threshold", tof_touch_threshold_);
+    tof_touch_threshold_low_ = declare_parameter("tof_touch_threshold_low", tof_touch_threshold_low_);
+    tof_touch_threshold_high_ = declare_parameter("tof_touch_threshold_high", tof_touch_threshold_high_);
     declare_parameter("publish_rate", 200);
     declare_parameter("can_interface", "can0");
     declare_parameter("imu_frame_id", "imu_frame");
@@ -289,8 +292,11 @@ public:
       if (param.get_name() == "touch_mode") {
         touch_mode_ = param.as_string();
       }
-      if (param.get_name() == "tof_touch_threshold") {
-        tof_touch_threshold_ = param.as_int();
+      if (param.get_name() == "tof_touch_threshold_low") {
+        tof_touch_threshold_low_ = this->get_parameter("tof_touch_threshold_low").as_int();
+      }
+      if (param.get_name() == "tof_touch_threshold_high") {
+        tof_touch_threshold_high_ = this->get_parameter("tof_touch_threshold_high").as_int();
       }
       if (param.get_name() == "publish_imu_raw") {
         publish_imu_raw_ = param.as_bool();
@@ -706,41 +712,45 @@ private:
       capacitive_touch_msg.data = capacitive_touch;
       capacitive_touch_pub_->publish(capacitive_touch_msg);
       diag_tof_touch_raw_->tick(this->now());
-      int16_t capacitive_touch_raw = frame.data[2];
+      int8_t capacitive_touch_raw = frame.data[2];
       std_msgs::msg::Int16 capacitive_touch_raw_msg;
       capacitive_touch_raw_msg.data = capacitive_touch_raw;
       capacitive_touch_raw_pub_->publish(capacitive_touch_raw_msg);
       diag_cap_touch_raw_->tick(this->now());
       uint16_t tof_touch_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
-      std_msgs::msg::UInt16 tof_raw_msg;
-      tof_raw_msg.data = tof_touch_raw;
-      tof_touch_raw_pub_->publish(tof_raw_msg);
+      if (tof_touch_raw == 65535) { // out of range}
+        RCLCPP_WARN(this->get_logger(), "TOF touch sensor out of range");
+        return;
+      } else if (tof_touch_raw > 1000) { // ignore out of range
+        RCLCPP_WARN(this->get_logger(), "TOF touch sensor raw value out of range: %d", tof_touch_raw);
+        return;
+      } else {
+        std_msgs::msg::UInt16 tof_raw_msg;
+        tof_raw_msg.data = tof_touch_raw;
+        tof_touch_raw_pub_->publish(tof_raw_msg);
+      }
       int16_t tof_touch = 0;
       int16_t touch = frame.data[3];
+
+      if (tof_touch_raw <= tof_touch_threshold_low_) {
+        tof_touch_ = true;
+      } else {
+        if (tof_touch_raw >= tof_touch_threshold_high_) {
+          tof_touch_ = false;
+        }
+      }
+
       if (touch_mode_ == "dual") {
         if (touch == 0) {
-          if (tof_touch_raw <= tof_touch_threshold_) {
-            touch = 1;
-          } else {
-            touch = 0;
-          }
+          touch = tof_touch_;
         }
       } else if (touch_mode_ == "cap") {
         // noop
       } else if (touch_mode_ == "tof") {
-        if (tof_touch_raw <= tof_touch_threshold_) {
-          touch = 1;
-        } else {
-          touch = 0;
-        }
-      }
-      if (tof_touch_raw >= 16 && tof_touch_raw <= 25) {
-        tof_touch = 1;
-      } else {
-        tof_touch = 0;
+        touch = tof_touch_;
       }
       std_msgs::msg::Int16 tof_touch_msg;
-      tof_touch_msg.data = tof_touch;
+      tof_touch_msg.data = tof_touch_;
       tof_touch_pub_->publish(tof_touch_msg);
       std_msgs::msg::Int16 touch_msg;
       touch_msg.data = touch;
@@ -940,7 +950,9 @@ private:
   sensor_msgs::msg::Imu imu_msg;
   sensor_msgs::msg::Imu imu_raw_msg;
   std::string touch_mode_;
-  int tof_touch_threshold_;
+  int tof_touch_threshold_low_;
+  int tof_touch_threshold_high_;
+  bool tof_touch_;
   int can_socket_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_2_pub_;
