@@ -72,6 +72,7 @@ def generate_launch_description():
                 ('/request_axis_state_right', '/cabot/request_axis_state_right'),
                 ('/odrive_status_left', '/cabot/odrive_status_left'),
                 ('/odrive_status_right', '/cabot/odrive_status_right'),
+                ('/set_odrive_power', '/set_24v_power_odrive'),
             ],
         ),
         Node(

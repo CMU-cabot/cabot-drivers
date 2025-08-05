@@ -30,6 +30,7 @@
 #include <odrive_can/srv/axis_state.hpp>
 #include <odriver_msgs/msg/motor_status.hpp>
 #include <odriver_msgs/msg/motor_target.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 
 #include "odrive_manager.hpp"
 
@@ -48,7 +49,10 @@ public:
   ODriverCanAdapterNode()
   : Node("odriver_can_adapter_node"),
     updater_(this),
-    last_motor_status_time_(this->get_clock()->now())
+    need_power_on_(false),
+    last_motor_status_time_(this->get_clock()->now()),
+    last_motor_armed_time_(this->get_clock()->now()),
+    power_reset_timeout_(rclcpp::Duration::from_seconds(5.0))
   {
     using std::placeholders::_1;
 
@@ -67,6 +71,10 @@ public:
 
     this->declare_parameter("motor_status_timeout_sec", 1.0);
     motor_status_timeout_sec_ = this->get_parameter("motor_status_timeout_sec").as_double();
+
+    this->declare_parameter("power_reset_timeout_sec", 5.0);
+    power_reset_timeout_ = rclcpp::Duration::from_seconds(
+      this->get_parameter("power_reset_timeout_sec").as_double());
 
     double sign_left, sign_right;
     if (is_clockwise_) {
@@ -100,6 +108,9 @@ public:
         &ODriverCanAdapterNode::motorTargetCallback,
         this,
         _1));
+
+    set_odrive_power_client_ = create_client<std_srvs::srv::SetBool>(
+      "/set_odrive_power");
 
     timer_ = create_wall_timer(
       std::chrono::seconds(1) / hz_,
@@ -200,6 +211,26 @@ private:
       temp = odrive_right_->getLastStatusTime();
     }
     last_motor_status_time_ = temp;
+
+    if (this->get_clock()->now() - last_motor_armed_time_ > power_reset_timeout_) {
+      using SetBoolClient = rclcpp::Client<std_srvs::srv::SetBool>;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Power reset timeout exceeded, powering %s", need_power_on_ ? "on" : "off");
+      auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
+      request->data = need_power_on_;
+      if (need_power_on_) {
+        need_power_on_ = false;
+      }
+      SetBoolClient::SharedFutureWithRequestAndRequestId set_odrive_power_future =
+        set_odrive_power_client_->async_send_request(
+        request,
+        [&](SetBoolClient::SharedFutureWithRequest future) {
+          (void) future;
+          need_power_on_ = true;
+          last_motor_armed_time_ = this->get_clock()->now();
+        });
+    }
   }
 
   void checkMotorStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)
@@ -217,6 +248,7 @@ private:
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Motor status is ERROR.");
       return;
     }
+    last_motor_armed_time_ = this->get_clock()->now();
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Motor status is OK.");
   }
 
@@ -235,12 +267,15 @@ private:
   double hz_;
   int service_timeout_ms_;
   double motor_status_timeout_sec_;
+  bool need_power_on_;
 
   double meter_per_round_;
 
   rclcpp::Publisher<odriver_msgs::msg::MotorStatus>::SharedPtr motor_status_pub_;
 
   rclcpp::Subscription<odriver_msgs::msg::MotorTarget>::SharedPtr motor_target_sub_;
+
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr set_odrive_power_client_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 
@@ -249,6 +284,8 @@ private:
 
   diagnostic_updater::Updater updater_;
   rclcpp::Time last_motor_status_time_;
+  rclcpp::Time last_motor_armed_time_;
+  rclcpp::Duration power_reset_timeout_;
 };
 
 int main(int argc, char * argv[])
