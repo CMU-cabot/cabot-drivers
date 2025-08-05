@@ -118,20 +118,24 @@ public:
 private:
   // change odrive axis.controller.config.control_mode
   // closed_loop: true -> CLOSED_LOOP_CONTROL, false -> IDLE
-  void changeAxisState(bool closed_loop)
+  bool changeAxisState(bool closed_loop)
   {
+    bool result = true;
     if (closed_loop && (odrive_left_->getAxisState() == kAxisStateIdle || odrive_right_->getAxisState() == kAxisStateIdle)) {
-      odrive_left_->callAxisStateService(kAxisStateClosedLoopControl);
-      odrive_right_->callAxisStateService(kAxisStateClosedLoopControl);
+      result = result && odrive_left_->callAxisStateService(kAxisStateClosedLoopControl);
+      result = result && odrive_right_->callAxisStateService(kAxisStateClosedLoopControl);
     } else if (!closed_loop && (odrive_left_->getAxisState() == kAxisStateClosedLoopControl || odrive_right_->getAxisState() == kAxisStateClosedLoopControl)) {
-      odrive_left_->callAxisStateService(kAxisStateIdle);
-      odrive_right_->callAxisStateService(kAxisStateIdle);
+      result = result && odrive_left_->callAxisStateService(kAxisStateIdle);
+      result = result && odrive_right_->callAxisStateService(kAxisStateIdle);
     }
+    return result;
   }
 
   void motorTargetCallback(const odriver_msgs::msg::MotorTarget::SharedPtr msg)
   {
-    changeAxisState(msg->loop_ctrl);
+    if (!changeAxisState(msg->loop_ctrl)) {
+      return;
+    }
 
     // !msg->loop_ctrl is IDLE mode
     if (!msg->loop_ctrl) {return;}
@@ -201,12 +205,19 @@ private:
   void checkMotorStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)
   {
     rclcpp::Duration diff = this->get_clock()->now() - last_motor_status_time_;
-    if (diff.seconds() < motor_status_timeout_sec_) {
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Motor status is OK.");
-    } else {
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Motor status is ERROR.");
-      stat.add("Time since last message", diff.seconds());
+    stat.add("Left ODrive Disarm Reason", odrive_left_->getDisarmReason());
+    stat.add("Right ODrive Disarm Reason", odrive_right_->getDisarmReason());
+    stat.add("Time since last message", diff.seconds());
+
+    if ((odrive_left_->getDisarmReason() != 0) || (odrive_right_->getDisarmReason() != 0)) {
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "ODrive is disarmed.");
+      return;
     }
+    if (diff.seconds() > motor_status_timeout_sec_) {
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Motor status is ERROR.");
+      return;
+    }
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Motor status is OK.");
   }
 
   // refer from: https://github.com/odriverobotics/ros_odrive/blob/5e4dfe9df8e5ef4fb6c692c210eafb713cb41985/odrive_base/include/odrive_enums.h#L43-L58

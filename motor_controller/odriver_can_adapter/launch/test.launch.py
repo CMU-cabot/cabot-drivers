@@ -70,6 +70,8 @@ def generate_launch_description():
                 ('/motor_target', '/cabot/motor_target'),
                 ('/request_axis_state_left', '/cabot/request_axis_state_left'),
                 ('/request_axis_state_right', '/cabot/request_axis_state_right'),
+                ('/odrive_status_left', '/cabot/odrive_status_left'),
+                ('/odrive_status_right', '/cabot/odrive_status_right'),
             ],
         ),
         Node(
