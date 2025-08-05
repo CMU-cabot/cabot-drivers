@@ -11,6 +11,7 @@ find_package(rclcpp REQUIRED)
 find_package(diagnostic_updater REQUIRED)
 find_package(odriver_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
+find_package(std_srvs REQUIRED)
 
 add_executable(odriver_can_adapter_node
   src/odriver_can_adapter_node.cpp
@@ -25,6 +26,7 @@ ament_target_dependencies(
   "diagnostic_updater"
   "odriver_msgs"
   "odrive_can"
+  "std_srvs"
 )
 
 include_directories(include)

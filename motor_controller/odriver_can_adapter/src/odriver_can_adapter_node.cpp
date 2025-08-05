@@ -30,6 +30,7 @@
 #include <odrive_can/srv/axis_state.hpp>
 #include <odriver_msgs/msg/motor_status.hpp>
 #include <odriver_msgs/msg/motor_target.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 
 #include "odrive_manager.hpp"
 
@@ -48,7 +49,10 @@ public:
   ODriverCanAdapterNode()
   : Node("odriver_can_adapter_node"),
     updater_(this),
-    last_motor_status_time_(this->get_clock()->now())
+    need_power_on_(false),
+    last_motor_status_time_(this->get_clock()->now()),
+    last_motor_armed_time_(this->get_clock()->now()),
+    power_reset_timeout_(rclcpp::Duration::from_seconds(5.0))
   {
     using std::placeholders::_1;
 
@@ -67,6 +71,10 @@ public:
 
     this->declare_parameter("motor_status_timeout_sec", 1.0);
     motor_status_timeout_sec_ = this->get_parameter("motor_status_timeout_sec").as_double();
+
+    this->declare_parameter("power_reset_timeout_sec", 5.0);
+    power_reset_timeout_ = rclcpp::Duration::from_seconds(
+      this->get_parameter("power_reset_timeout_sec").as_double());
 
     double sign_left, sign_right;
     if (is_clockwise_) {
@@ -101,6 +109,9 @@ public:
         this,
         _1));
 
+    set_odrive_power_client_ = create_client<std_srvs::srv::SetBool>(
+      "/set_odrive_power");
+
     timer_ = create_wall_timer(
       std::chrono::seconds(1) / hz_,
       std::bind(
@@ -118,20 +129,24 @@ public:
 private:
   // change odrive axis.controller.config.control_mode
   // closed_loop: true -> CLOSED_LOOP_CONTROL, false -> IDLE
-  void changeAxisState(bool closed_loop)
+  bool changeAxisState(bool closed_loop)
   {
+    bool result = true;
     if (closed_loop && (odrive_left_->getAxisState() == kAxisStateIdle || odrive_right_->getAxisState() == kAxisStateIdle)) {
-      odrive_left_->callAxisStateService(kAxisStateClosedLoopControl);
-      odrive_right_->callAxisStateService(kAxisStateClosedLoopControl);
+      result = result && odrive_left_->callAxisStateService(kAxisStateClosedLoopControl);
+      result = result && odrive_right_->callAxisStateService(kAxisStateClosedLoopControl);
     } else if (!closed_loop && (odrive_left_->getAxisState() == kAxisStateClosedLoopControl || odrive_right_->getAxisState() == kAxisStateClosedLoopControl)) {
-      odrive_left_->callAxisStateService(kAxisStateIdle);
-      odrive_right_->callAxisStateService(kAxisStateIdle);
+      result = result && odrive_left_->callAxisStateService(kAxisStateIdle);
+      result = result && odrive_right_->callAxisStateService(kAxisStateIdle);
     }
+    return result;
   }
 
   void motorTargetCallback(const odriver_msgs::msg::MotorTarget::SharedPtr msg)
   {
-    changeAxisState(msg->loop_ctrl);
+    if (!changeAxisState(msg->loop_ctrl)) {
+      return;
+    }
 
     // !msg->loop_ctrl is IDLE mode
     if (!msg->loop_ctrl) {return;}
@@ -196,17 +211,47 @@ private:
       temp = odrive_right_->getLastStatusTime();
     }
     last_motor_status_time_ = temp;
+
+    if (this->get_clock()->now() - last_motor_armed_time_ > power_reset_timeout_) {
+      using SetBoolClient = rclcpp::Client<std_srvs::srv::SetBool>;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Power reset timeout exceeded, powering %s", need_power_on_ ? "on" : "off");
+      auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
+      request->data = need_power_on_;
+      if (need_power_on_) {
+        need_power_on_ = false;
+        last_motor_armed_time_ = this->get_clock()->now();
+      }
+      SetBoolClient::SharedFutureWithRequestAndRequestId set_odrive_power_future =
+        set_odrive_power_client_->async_send_request(
+        request,
+        [&](SetBoolClient::SharedFutureWithRequest future) {
+          (void) future;
+          need_power_on_ = true;
+          last_motor_armed_time_ = this->get_clock()->now();
+        });
+    }
   }
 
   void checkMotorStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)
   {
     rclcpp::Duration diff = this->get_clock()->now() - last_motor_status_time_;
-    if (diff.seconds() < motor_status_timeout_sec_) {
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Motor status is OK.");
+    stat.add("Left ODrive Disarm Reason", odrive_left_->getDisarmReason());
+    stat.add("Right ODrive Disarm Reason", odrive_right_->getDisarmReason());
+    stat.add("Time since last message", diff.seconds());
+
+    if ((odrive_left_->getDisarmReason() != 0) || (odrive_right_->getDisarmReason() != 0)) {
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "ODrive is disarmed.");
+      return;
     } else {
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Motor status is ERROR.");
-      stat.add("Time since last message", diff.seconds());
+      last_motor_armed_time_ = this->get_clock()->now();
     }
+    if (diff.seconds() > motor_status_timeout_sec_) {
+      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Motor status is ERROR.");
+      return;
+    }
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Motor status is OK.");
   }
 
   // refer from: https://github.com/odriverobotics/ros_odrive/blob/5e4dfe9df8e5ef4fb6c692c210eafb713cb41985/odrive_base/include/odrive_enums.h#L43-L58
@@ -224,12 +269,15 @@ private:
   double hz_;
   int service_timeout_ms_;
   double motor_status_timeout_sec_;
+  bool need_power_on_;
 
   double meter_per_round_;
 
   rclcpp::Publisher<odriver_msgs::msg::MotorStatus>::SharedPtr motor_status_pub_;
 
   rclcpp::Subscription<odriver_msgs::msg::MotorTarget>::SharedPtr motor_target_sub_;
+
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr set_odrive_power_client_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 
@@ -238,6 +286,8 @@ private:
 
   diagnostic_updater::Updater updater_;
   rclcpp::Time last_motor_status_time_;
+  rclcpp::Time last_motor_armed_time_;
+  rclcpp::Duration power_reset_timeout_;
 };
 
 int main(int argc, char * argv[])
