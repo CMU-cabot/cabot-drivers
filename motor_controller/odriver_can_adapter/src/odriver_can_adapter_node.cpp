@@ -221,6 +221,7 @@ private:
       request->data = need_power_on_;
       if (need_power_on_) {
         need_power_on_ = false;
+        last_motor_armed_time_ = this->get_clock()->now();
       }
       SetBoolClient::SharedFutureWithRequestAndRequestId set_odrive_power_future =
         set_odrive_power_client_->async_send_request(
