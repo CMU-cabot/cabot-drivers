@@ -244,12 +244,13 @@ private:
     if ((odrive_left_->getDisarmReason() != 0) || (odrive_right_->getDisarmReason() != 0)) {
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "ODrive is disarmed.");
       return;
+    } else {
+      last_motor_armed_time_ = this->get_clock()->now();
     }
     if (diff.seconds() > motor_status_timeout_sec_) {
       stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Motor status is ERROR.");
       return;
     }
-    last_motor_armed_time_ = this->get_clock()->now();
     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Motor status is OK.");
   }
 
