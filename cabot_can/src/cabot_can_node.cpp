@@ -719,11 +719,9 @@ private:
       diag_cap_touch_raw_->tick(this->now());
       uint16_t tof_touch_raw = (((uint16_t)frame.data[1]) << 8) | ((uint16_t)frame.data[0]);
       if (tof_touch_raw == 65535) {  // out of range
-        RCLCPP_WARN(this->get_logger(), "TOF touch sensor out of range");
-        return;
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "TOF touch sensor out of range");
       } else if (tof_touch_raw > 1000) {  // ignore out of range
-        RCLCPP_WARN(this->get_logger(), "TOF touch sensor raw value out of range: %d", tof_touch_raw);
-        return;
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "TOF touch sensor raw value out of range: %d", tof_touch_raw);
       } else {
         std_msgs::msg::UInt16 tof_raw_msg;
         tof_raw_msg.data = tof_touch_raw;
