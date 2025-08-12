@@ -181,8 +181,8 @@ void ODriveManager::checkTimeoutServiceResponse(double timeout)
   using std::chrono::system_clock;
 
   double diff_time =
-    std::chrono::duration_cast<Milliseconds>(last_call_time_ - system_clock::now()).count();
-  if (!client_->wait_for_service(Seconds(0)) && diff_time >= timeout) {
+    std::chrono::duration_cast<Milliseconds>(system_clock::now() - last_call_time_).count();
+  if (diff_time >= timeout) {
     client_->prune_pending_requests();
     is_ready_axis_state_service_ = true;
   }
