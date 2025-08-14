@@ -185,7 +185,12 @@ private:
 
     odriver_msgs::msg::MotorStatus status;
 
-    status.header.stamp = this->get_clock()->now();
+    rclcpp::Time temp = odrive_left_->getLastStatusTime();
+    if (temp < odrive_right_->getLastStatusTime()) {
+      temp = odrive_right_->getLastStatusTime();
+    }
+    last_motor_status_time_ = temp;
+    status.header.stamp = temp;
 
     status.dist_left_c = sign_left * dist_left_c;
     status.dist_right_c = sign_right * dist_right_c;
@@ -204,13 +209,7 @@ private:
 
     status.current_measured_left = sign_left * current_measured_left;
     status.current_measured_right = sign_right * current_measured_right;
-
     motor_status_pub_->publish(status);
-    rclcpp::Time temp = odrive_left_->getLastStatusTime();
-    if (odrive_right_->getLastStatusTime() < temp) {
-      temp = odrive_right_->getLastStatusTime();
-    }
-    last_motor_status_time_ = temp;
 
     if (this->get_clock()->now() - last_motor_armed_time_ > power_reset_timeout_) {
       using SetBoolClient = rclcpp::Client<std_srvs::srv::SetBool>;
