@@ -40,6 +40,8 @@ def generate_launch_description():
     # touch_enabled = LaunchConfiguration('touch_enabled')  # TODO not implemented
     imu_accel_bias = LaunchConfiguration('imu_accel_bias')
     imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
+    tof_touch_threshold_low = LaunchConfiguration('tof_touch_threshold_low')
+    tof_touch_threshold_high = LaunchConfiguration('tof_touch_threshold_high')
 
     return LaunchDescription([
         # save all log file in the directory where the launch.log file is saved
@@ -74,6 +76,16 @@ def generate_launch_description():
             default_value=EnvironmentVariable('CABOT_IMU_GYRO_BIAS', default_value='[0.0, 0.0, 0.0]'),
             description='An array of three values for adjusting imu angular velocity'
         ),
+        DeclareLaunchArgument(
+            'tof_touch_threshold_low',
+            default_value=EnvironmentVariable('CABOT_TOF_TOUCH_THRESHOLD_LOW', default_value='25'),
+            description='The distance threshold to enable tof detection'
+        ),
+        DeclareLaunchArgument(
+            'tof_touch_threshold_high',
+            default_value=EnvironmentVariable('CABOT_TOF_TOUCH_THRESHOLD_HIGH', default_value='35'),
+            description='The distance threshold to disable tof detection (after enabling)'
+        ),
         Node(
             package='cabot_can',
             executable='cabot_can_node',
@@ -86,7 +98,9 @@ def generate_launch_description():
                     'use_sim_time': use_sim_time,
                     'touch_params': touch_params,
                     'imu_accel_bias': imu_accel_bias,
-                    'imu_gyro_bias': imu_gyro_bias
+                    'imu_gyro_bias': imu_gyro_bias,
+                    'tof_touch_threshold_low': tof_touch_threshold_low,
+                    'tof_touch_threshold_high': tof_touch_threshold_high,
                 }
             ],
             remappings=[

@@ -24,10 +24,6 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include <odrive_can/msg/control_message.hpp>
-#include <odrive_can/msg/controller_status.hpp>
-#include <odrive_can/srv/axis_state.hpp>
-
 #include "odrive_manager.hpp"
 
 using namespace std::chrono_literals;
@@ -41,6 +37,8 @@ ODriveManager::ODriveManager(
   dist_c_fixed_(0),
   last_dist_c_(std::numeric_limits<double>::quiet_NaN()),
   ready_(false),
+  active_errors_(0),
+  disarm_reason_(0),
   last_status_time_(node->get_clock()->now()),
   sign_(sign),
   wheel_diameter_m_(wheel_diameter_m)
@@ -60,6 +58,13 @@ ODriveManager::ODriveManager(
     controller_status_qos,
     std::bind(
       &ODriveManager::controllerStatusCallback,
+      this,
+      _1));
+  odrive_status_sub_ = node->create_subscription<odrive_can::msg::ODriveStatus>(
+    (std::string("/odrive_status_") + axis_name).c_str(),
+    controller_status_qos,
+    std::bind(
+      &ODriveManager::odriveStatusCallback,
       this,
       _1));
 
@@ -100,7 +105,13 @@ void ODriveManager::controllerStatusCallback(const odrive_can::msg::ControllerSt
   }
 }
 
-void ODriveManager::callAxisStateService(unsigned int axis_state)
+void ODriveManager::odriveStatusCallback(const odrive_can::msg::ODriveStatus::SharedPtr msg)
+{
+  active_errors_ = msg->active_errors;
+  disarm_reason_ = msg->disarm_reason;
+}
+
+bool ODriveManager::callAxisStateService(unsigned int axis_state)
 {
   using AxisState = odrive_can::srv::AxisState;
   using AxisStateClient = rclcpp::Client<AxisState>;
@@ -110,19 +121,22 @@ void ODriveManager::callAxisStateService(unsigned int axis_state)
   request->axis_requested_state = axis_state;
 
   if (is_ready_axis_state_service_) {
-    RCLCPP_INFO(
+    RCLCPP_INFO_THROTTLE(
       node_->get_logger(),
+      *node_->get_clock(),
+      2000,
       "call axis_state_%s service from %d mode to %d mode",
       axis_name_.c_str(),
       axis_state_,
       axis_state);
-    while (!client_->wait_for_service(std::chrono::seconds(1)) &&
-      rclcpp::ok())
-    {
-      RCLCPP_INFO(
+    if (rclcpp::ok() && !client_->wait_for_service(std::chrono::milliseconds(100))) {
+      RCLCPP_INFO_THROTTLE(
         node_->get_logger(),
+        *node_->get_clock(),
+        2000,
         "request_axis_state_%s service not available, waiting again...",
         axis_name_.c_str());
+      return false;
     }
 
     is_ready_axis_state_service_ = false;
@@ -134,7 +148,9 @@ void ODriveManager::callAxisStateService(unsigned int axis_state)
         (void) future;
         is_ready_axis_state_service_ = true;
       });
+    return true;
   }
+  return false;
 }
 
 void ODriveManager::publishControlMessage(const odrive_can::msg::ControlMessage & msg)
@@ -165,8 +181,8 @@ void ODriveManager::checkTimeoutServiceResponse(double timeout)
   using std::chrono::system_clock;
 
   double diff_time =
-    std::chrono::duration_cast<Milliseconds>(last_call_time_ - system_clock::now()).count();
-  if (!client_->wait_for_service(Seconds(0)) && diff_time >= timeout) {
+    std::chrono::duration_cast<Milliseconds>(system_clock::now() - last_call_time_).count();
+  if (diff_time >= timeout) {
     client_->prune_pending_requests();
     is_ready_axis_state_service_ = true;
   }

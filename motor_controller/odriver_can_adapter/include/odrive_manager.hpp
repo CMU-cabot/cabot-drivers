@@ -24,6 +24,11 @@
 
 #include <string>
 
+#include <odrive_can/msg/control_message.hpp>
+#include <odrive_can/msg/controller_status.hpp>
+#include <odrive_can/msg/o_drive_status.hpp>
+#include <odrive_can/srv/axis_state.hpp>
+
 class ODriveManager
 {
 public:
@@ -31,7 +36,8 @@ public:
   ~ODriveManager();
 
   void controllerStatusCallback(const odrive_can::msg::ControllerStatus::SharedPtr msg);
-  void callAxisStateService(unsigned int axis_state);
+  void odriveStatusCallback(const odrive_can::msg::ODriveStatus::SharedPtr msg);
+  bool callAxisStateService(unsigned int axis_state);
   void publishControlMessage(const odrive_can::msg::ControlMessage & msg);
   void publishControlMessage(int control_mode, int input_mode, double spd_m_per_sec);
   unsigned int getAxisState() {return axis_state_;}
@@ -44,6 +50,8 @@ public:
   double getSign() {return sign_;}
   bool isReady() {return ready_;}
   rclcpp::Time getLastStatusTime() {return last_status_time_;}
+  int getActiveErrors() {return active_errors_;}
+  int getDisarmReason() {return disarm_reason_;}
 
 private:
   rclcpp::Node * node_;
@@ -61,6 +69,8 @@ private:
   double last_dist_c_;
   double current_setpoint_;
   double current_measured_;
+  uint32_t active_errors_;
+  uint32_t disarm_reason_;
   bool ready_;
 
   rclcpp::Time status_time_;
@@ -73,4 +83,5 @@ private:
 
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr control_message_pub_;
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr controller_status_sub_;
+  rclcpp::Subscription<odrive_can::msg::ODriveStatus>::SharedPtr odrive_status_sub_;
 };

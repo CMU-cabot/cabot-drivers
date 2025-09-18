@@ -9,7 +9,7 @@ pointcloud_to_laserscan_node:
     angle_max: 1.57  # M_PI/2
     angle_increment: 0.00436  # M_PI/360/2
     scan_time: 0.1
-    range_min: 0.2
+    range_min: 0.01
     range_max: 50.0
     use_inf: True
     inf_epsilon: 1.0

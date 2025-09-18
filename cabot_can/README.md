@@ -19,8 +19,10 @@
     - Can be set by setting parameters in calibration_params of params.yaml
 - **touch_mode** (string) - default=`touch_mode_`
     - Selecting Sensors for /touch (ToF Sensors, Capacitive Sensors, or Both)
-- **tof_touch_threshold** (int) - default=`25`
-    - Determine the maximum distance threshold for the ToF sensor
+- **tof_touch_threshold_low** (int) - default=`25` (CABOT_TOF_TOUCH_THRESHOLD_LOW)
+    - Determine the distance threshold to enable tof detection
+- **tof_touch_threshold_high** (int) - default=`35`(CABOT_TOF_TOUCH_THRESHOLD_HIGH)
+    - Determine the distance threshold to disable tof detection (after enabling)
 ### Publishers
 - **/calibration** (int[22]): only publishes values when `/run_imu_calibration` is true
 - **/imu** (sensor_msgs/msg/Imu): IMU data - 100Hz
