@@ -7,11 +7,3 @@ repositories:
     type: git
     url: https://github.com/CMU-cabot/ros_odrive.git
     version: 0a3cc6e8e94388eeebb7b80841df6f9e70ceaffd
-  uwbtag_interfaces:
-    type: git
-    url: git@github.com:CMU-cabot/uwbtag_interfaces.git
-    version: f100456cf30def0107b3f14277b723f9e4c4f278
-  uwbtag_publisher:
-    type: git
-    url: git@github.com:CMU-cabot/uwbtag_publisher.git
-    version: 2a389a35ae6c7db8c3700f6a6b9dd6fd2cce91a0
