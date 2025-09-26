@@ -2,21 +2,16 @@ repositories:
   cabot-common:
     type: git
     url: https://github.com/CMU-cabot/cabot-common
-    version: a5f2524ef5ff3537aa1ce63f2c04f98f309fae15
-  cabot-description:
-    type: git
-    url: https://github.com/CMU-cabot/cabot-description
-    version: 12e472d5c70b6e6149b962cf52e084e1f1f379a2
+    version: b1c60a4b342ab0bcc6a840ac7a2fdd60afca2324
   docker/driver/ros_odrive:
     type: git
     url: https://github.com/CMU-cabot/ros_odrive.git
     version: 0a3cc6e8e94388eeebb7b80841df6f9e70ceaffd
- uwbtag_publisher:
-    type: git
-    url: git@github.com:CMU-cabot/uwbtag_publisher.git
-    version: e86af313821eedf76a700ba12a1c4d478616ca1e
- uwbtag_interfaces:
+  uwbtag_interfaces:
     type: git
     url: git@github.com:CMU-cabot/uwbtag_interfaces.git
     version: f100456cf30def0107b3f14277b723f9e4c4f278
-  
+  uwbtag_publisher:
+    type: git
+    url: git@github.com:CMU-cabot/uwbtag_publisher.git
+    version: 2a389a35ae6c7db8c3700f6a6b9dd6fd2cce91a0
