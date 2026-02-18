@@ -1,0 +1,54 @@
+shared_control_node:
+  ros__parameters:
+    axis0_namespace: "odrive_axis0"
+    axis1_namespace: "odrive_axis1"
+    imu_topic: "/imu/data"
+    autonomy_cmd_topic: "/autonomy/cmd_vel"
+
+    wheel_radius_m: 0.0855
+    wheel_separation_m: 0.419
+    left_wheel_sign: -1.0
+    right_wheel_sign: 1.0
+    odrive_velocity_is_turns_per_sec: true
+
+    control_mode: 2
+    input_mode: 1
+    request_closed_loop_on_startup: true
+
+    observer_gain_x: 25.0
+    observer_gain_z: 25.0
+    robot_mass_x: 24.0
+    robot_inertia_z: 2.2
+    robot_damping_x: 40.0
+    robot_damping_z: 5.0
+    coulomb_friction_x: 8.0
+    coulomb_friction_z: 0.8
+    friction_smoothing_linear: 0.05
+    friction_smoothing_angular: 0.05
+    use_torque_estimate: true
+    motor_torque_constant: 0.06
+
+    use_gravity_compensation: true
+    gravity_comp_gain: 1.0
+    use_imu_linear_accel: false
+    imu_accel_blend: 0.2
+
+    desired_mass_x: 11.0
+    desired_inertia_z: 1.2
+    desired_damping_x: 14.0
+    desired_damping_z: 2.5
+
+    human_force_weight: 1.0
+    autonomy_force_weight: 0.0
+    autonomy_virtual_stiffness_x: 45.0
+    autonomy_virtual_stiffness_z: 12.0
+    autonomy_timeout_sec: 0.3
+    force_deadband_x: 3.0
+    force_deadband_z: 0.3
+
+    loop_rate_hz: 100.0
+    status_timeout_sec: 0.2
+    max_linear_velocity: 0.8
+    max_angular_velocity: 1.8
+    max_linear_accel: 1.2
+    max_angular_accel: 2.5
