@@ -113,6 +113,7 @@ private:
   double motor_torque_constant_{0.06};
 
   // IMU usage
+  bool use_imu_{true};
   bool use_gravity_compensation_{true};
   double gravity_comp_gain_{1.0};
   bool use_imu_linear_accel_{false};

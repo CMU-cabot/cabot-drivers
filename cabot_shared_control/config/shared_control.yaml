@@ -3,6 +3,7 @@ shared_control_node:
     axis0_namespace: "odrive_axis0"
     axis1_namespace: "odrive_axis1"
     imu_topic: "/imu/data"
+    use_imu: true
     autonomy_cmd_topic: "/autonomy/cmd_vel"
     pointcloud_topic: "/velodyne_points_cropped"
     footprint_topic: "/footprint"

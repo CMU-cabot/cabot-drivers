@@ -81,6 +81,7 @@ SharedControlNode::SharedControlNode()
   axis0_ns_ = this->declare_parameter<std::string>("axis0_namespace", "odrive_axis0");
   axis1_ns_ = this->declare_parameter<std::string>("axis1_namespace", "odrive_axis1");
   imu_topic_ = this->declare_parameter<std::string>("imu_topic", "/imu/data");
+  use_imu_ = this->declare_parameter<bool>("use_imu", true);
   autonomy_cmd_topic_ =
     this->declare_parameter<std::string>("autonomy_cmd_topic", "/autonomy/cmd_vel");
   pointcloud_topic_ =
@@ -116,6 +117,13 @@ SharedControlNode::SharedControlNode()
   gravity_comp_gain_ = this->declare_parameter<double>("gravity_comp_gain", 1.0);
   use_imu_linear_accel_ = this->declare_parameter<bool>("use_imu_linear_accel", false);
   imu_accel_blend_ = this->declare_parameter<double>("imu_accel_blend", 0.2);
+  if (!use_imu_) {
+    // IMU is disabled by configuration. Assume horizontal terrain.
+    use_gravity_compensation_ = false;
+    use_imu_linear_accel_ = false;
+    imu_pitch_rad_ = 0.0;
+    imu_accel_x_ = 0.0;
+  }
 
   desired_mass_x_ = this->declare_parameter<double>("desired_mass_x", 11.0);
   desired_inertia_z_ = this->declare_parameter<double>("desired_inertia_z", 1.2);
@@ -169,8 +177,14 @@ SharedControlNode::SharedControlNode()
   right_sub_ = this->create_subscription<odrive_can::msg::ControllerStatus>(
     "/" + axis1_ns_ + "/controller_status", 50,
     std::bind(&SharedControlNode::onAxis1Status, this, std::placeholders::_1));
-  imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
-    imu_topic_, 50, std::bind(&SharedControlNode::onImu, this, std::placeholders::_1));
+  if (use_imu_) {
+    imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
+      imu_topic_, 50, std::bind(&SharedControlNode::onImu, this, std::placeholders::_1));
+  } else {
+    RCLCPP_WARN(
+      this->get_logger(),
+      "IMU input disabled (use_imu=false). Assuming horizontal terrain and turning off IMU-based compensation.");
+  }
   autonomy_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
     autonomy_cmd_topic_, 20,
     std::bind(&SharedControlNode::onAutonomyCmd, this, std::placeholders::_1));
@@ -195,8 +209,9 @@ SharedControlNode::SharedControlNode()
 
   RCLCPP_INFO(
     this->get_logger(),
-    "started: axis0=/%s axis1=/%s loop=%.1fHz obstacle_guard=%s stop_distance=%.2fm",
+    "started: axis0=/%s axis1=/%s loop=%.1fHz imu=%s obstacle_guard=%s stop_distance=%.2fm",
     axis0_ns_.c_str(), axis1_ns_.c_str(), loop_rate_hz_,
+    use_imu_ ? "true" : "false",
     obstacle_guard_enabled_ ? "true" : "false",
     obstacle_stop_distance_m_);
 }
@@ -217,6 +232,10 @@ void SharedControlNode::onAxis1Status(const odrive_can::msg::ControllerStatus::S
 
 void SharedControlNode::onImu(const sensor_msgs::msg::Imu::SharedPtr msg)
 {
+  if (!use_imu_) {
+    return;
+  }
+
   imu_accel_x_ = static_cast<double>(msg->linear_acceleration.x);
 
   if (msg->orientation_covariance[0] < 0.0) {

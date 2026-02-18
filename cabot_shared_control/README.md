@@ -62,6 +62,7 @@ ros2 launch cabot_shared_control shared_control.launch.py \
 ```
 
 `odrive_model` と `odrive_firmware_version` は `ODRIVE_MODEL` / `ODRIVE_FIRMWARE_VERSION` 環境変数から参照します。
+IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` で切り替えできます（`false` でIMU無効、水平面前提）。
 
 ## 想定トピック
 
