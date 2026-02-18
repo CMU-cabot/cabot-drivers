@@ -26,20 +26,25 @@ scriptdir=$(cd "$(dirname "$0")" && pwd)
 cd "$scriptdir"
 
 service_name="driver"
+repower_odrive=0
 
 function help()
 {
     cat <<USAGE
-Usage: ./shared-control-launch.sh [-d] [-- <ros2 launch args>]
+Usage: ./shared-control-launch.sh [-d] [-r] [-- <ros2 launch args>]
   -d    Use docker compose service 'driver-dev' (default is 'driver')
+  -r    Re-power on ODrive 24V line before launch (ODrive only)
   -h    Show this help
 USAGE
 }
 
-while getopts "dh" arg; do
+while getopts "drh" arg; do
     case $arg in
         d)
             service_name="driver-dev"
+            ;;
+        r)
+            repower_odrive=1
             ;;
         h)
             help
@@ -72,53 +77,14 @@ echo "[INFO] service       : $service_name"
 echo "[INFO] ROS_LOG_DIR   : $ROS_LOG_DIR"
 echo "[INFO] host log dir  : $host_ros_log_dir"
 echo "[INFO] use imu       : $CABOT_SHARED_CONTROL_USE_IMU"
+echo "[INFO] repower       : $repower_odrive"
 echo "[INFO] launch args   : $*"
 
-docker compose run --rm -T "$service_name" bash -s -- "$@" <<'INNER_SCRIPT'
-set -euo pipefail
+container_args=()
+if [ "$repower_odrive" -eq 1 ]; then
+    container_args+=(--repower-odrive)
+fi
 
-# setup scripts may reference optional vars (e.g., COLCON_TRACE).
-# Temporarily disable nounset while sourcing.
-set +u
-source /home/developer/driver_ws/install/setup.bash
-set -u
-
-mkdir -p "$ROS_LOG_DIR"
-mkdir -p "$ROS_LOG_DIR/bag"
-
-bag_topics=(
-    /shared_control/cmd_vel
-    /shared_control/external_wrench
-    /cabot/control_message_left
-    /cabot/control_message_right
-    /cabot/controller_status_left
-    /cabot/controller_status_right
-    /cabot/odrive_status_left
-    /cabot/odrive_status_right
-    /cabot/imu/data
-    /velodyne_points_cropped
-    /footprint
-    /tf
-    /tf_static
-)
-
-bag_output="$ROS_LOG_DIR/bag/shared_control"
-
-echo "[INFO] recording bag : $bag_output"
-ros2 bag record -o "$bag_output" "${bag_topics[@]}" > "$ROS_LOG_DIR/rosbag_record.log" 2>&1 &
-bag_pid=$!
-
-cleanup()
-{
-    if kill -0 "$bag_pid" 2>/dev/null; then
-        echo "[INFO] stopping rosbag record (pid=$bag_pid)"
-        kill -INT "$bag_pid" 2>/dev/null || true
-        wait "$bag_pid" 2>/dev/null || true
-    fi
-}
-
-trap cleanup EXIT INT QUIT TERM
-
-echo "[INFO] launching shared control"
-ros2 launch cabot_shared_control shared_control.launch.py "$@"
-INNER_SCRIPT
+docker compose run --rm -T "$service_name" \
+    /home/developer/driver_ws/script/shared_control_launch_inner.sh \
+    "${container_args[@]}" "$@"
