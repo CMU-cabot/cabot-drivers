@@ -85,6 +85,11 @@ if [ "$repower_odrive" -eq 1 ]; then
     container_args+=(--repower-odrive)
 fi
 
-docker compose run --rm -T "$service_name" \
+docker_run_opts=(--rm)
+if [[ ! -t 0 ]]; then
+    docker_run_opts+=(-T)
+fi
+
+exec docker compose run "${docker_run_opts[@]}" "$service_name" \
     /home/developer/driver_ws/script/shared_control_launch_inner.sh \
     "${container_args[@]}" "$@"

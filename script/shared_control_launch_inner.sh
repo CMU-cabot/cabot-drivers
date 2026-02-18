@@ -72,9 +72,17 @@ bag_topics=(
 bag_output="$ROS_LOG_DIR/bag/shared_control"
 launch_pid=""
 bag_pid=""
+cleanup_done=0
+power_service_name=""
+odrive_power_forced_off=0
 
 cleanup()
 {
+    if [[ "$cleanup_done" -eq 1 ]]; then
+        return
+    fi
+    cleanup_done=1
+
     if [[ -n "$launch_pid" ]] && kill -0 "$launch_pid" 2>/dev/null; then
         echo "[INFO] stopping shared control launch (pid=$launch_pid)"
         kill -INT "$launch_pid" 2>/dev/null || true
@@ -85,6 +93,21 @@ cleanup()
         kill -INT "$bag_pid" 2>/dev/null || true
         wait "$bag_pid" 2>/dev/null || true
     fi
+
+    if [[ "$odrive_power_forced_off" -eq 1 ]] && [[ -n "$power_service_name" ]]; then
+        echo "[WARN] ODrive power cycle interrupted; trying to restore 24V power ON"
+        timeout 8 ros2 service call "$power_service_name" std_srvs/srv/SetBool "{data: true}" \
+            >/dev/null 2>&1 || echo "[ERROR] failed to restore ODrive power ON" >&2
+        odrive_power_forced_off=0
+    fi
+}
+
+on_signal()
+{
+    local sig_name="$1"
+    echo "[INFO] caught signal $sig_name"
+    cleanup
+    exit 130
 }
 
 wait_for_power_service()
@@ -112,20 +135,26 @@ wait_for_topic_once()
     timeout "$timeout_sec" ros2 topic echo --once "$topic_name" >/dev/null 2>&1
 }
 
-trap cleanup EXIT INT QUIT TERM
+trap cleanup EXIT
+trap 'on_signal INT' INT
+trap 'on_signal QUIT' QUIT
+trap 'on_signal TERM' TERM
 
 ros2 daemon start >/dev/null 2>&1 || true
 
 if [[ "$repower_odrive" -eq 1 ]]; then
     echo "[INFO] re-power option enabled: searching ODrive power service"
-    if ! power_service_name=$(wait_for_power_service 10); then
+    if ! power_service_name="$(wait_for_power_service 10)"; then
         echo "[ERROR] ODrive power service not found (/set_24v_power_odrive or /set_odrive_power)." >&2
         exit 1
     fi
     echo "[INFO] power service: $power_service_name"
+
     timeout 8 ros2 service call "$power_service_name" std_srvs/srv/SetBool "{data: false}" >/dev/null
+    odrive_power_forced_off=1
     sleep 1.0
     timeout 8 ros2 service call "$power_service_name" std_srvs/srv/SetBool "{data: true}" >/dev/null
+    odrive_power_forced_off=0
     sleep 1.0
 fi
 
@@ -156,4 +185,9 @@ if ! wait_for_topic_once /cabot/odrive_status_right "$odrive_status_timeout_sec"
 fi
 
 echo "[INFO] ODrive status received on both axes"
+set +e
 wait "$launch_pid"
+launch_rc=$?
+set -e
+launch_pid=""
+exit "$launch_rc"
