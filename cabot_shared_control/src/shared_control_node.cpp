@@ -1,3 +1,23 @@
+// Copyright (c) 2026  Carnegie Mellon University
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #include "cabot_shared_control/shared_control_node.hpp"
 
 #include <algorithm>
@@ -137,9 +157,11 @@ SharedControlNode::SharedControlNode()
     "/" + axis0_ns_ + "/control_message", 10);
   ctrl_pub_right_ = this->create_publisher<odrive_can::msg::ControlMessage>(
     "/" + axis1_ns_ + "/control_message", 10);
-  wrench_pub_ =
-    this->create_publisher<geometry_msgs::msg::WrenchStamped>("/shared_control/external_wrench", 10);
-  cmd_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/shared_control/cmd_vel", 10);
+  wrench_pub_ = this->create_publisher<geometry_msgs::msg::WrenchStamped>(
+    "/shared_control/external_wrench",
+    10);
+  cmd_pub_ =
+    this->create_publisher<geometry_msgs::msg::TwistStamped>("/shared_control/cmd_vel", 10);
 
   left_sub_ = this->create_subscription<odrive_can::msg::ControllerStatus>(
     "/" + axis0_ns_ + "/controller_status", 50,
@@ -155,7 +177,8 @@ SharedControlNode::SharedControlNode()
   footprint_sub_ = this->create_subscription<geometry_msgs::msg::PolygonStamped>(
     footprint_topic_, 10, std::bind(&SharedControlNode::onFootprint, this, std::placeholders::_1));
   cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    pointcloud_topic_, 10, std::bind(&SharedControlNode::onPointCloud, this, std::placeholders::_1));
+    pointcloud_topic_, 10,
+    std::bind(&SharedControlNode::onPointCloud, this, std::placeholders::_1));
 
   if (request_closed_loop_on_startup_) {
     axis0_client_ = this->create_client<odrive_can::srv::AxisState>(
