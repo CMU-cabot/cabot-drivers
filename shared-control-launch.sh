@@ -80,7 +80,6 @@ set -euo pipefail
 # setup scripts may reference optional vars (e.g., COLCON_TRACE).
 # Temporarily disable nounset while sourcing.
 set +u
-source /ros_entrypoint.sh
 source /home/developer/driver_ws/install/setup.bash
 set -u
 
