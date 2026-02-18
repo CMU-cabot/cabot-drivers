@@ -81,6 +81,7 @@ SharedControlNode::SharedControlNode()
   axis0_ns_ = this->declare_parameter<std::string>("axis0_namespace", "odrive_axis0");
   axis1_ns_ = this->declare_parameter<std::string>("axis1_namespace", "odrive_axis1");
   imu_topic_ = this->declare_parameter<std::string>("imu_topic", "/imu/data");
+  touch_topic_ = this->declare_parameter<std::string>("touch_topic", "/cabot/touch");
   use_imu_ = this->declare_parameter<bool>("use_imu", true);
   autonomy_cmd_topic_ =
     this->declare_parameter<std::string>("autonomy_cmd_topic", "/autonomy/cmd_vel");
@@ -137,6 +138,8 @@ SharedControlNode::SharedControlNode()
   autonomy_virtual_stiffness_z_ =
     this->declare_parameter<double>("autonomy_virtual_stiffness_z", 12.0);
   autonomy_timeout_sec_ = this->declare_parameter<double>("autonomy_timeout_sec", 0.3);
+  human_force_x_sign_ = this->declare_parameter<double>("human_force_x_sign", 1.0);
+  human_torque_z_sign_ = this->declare_parameter<double>("human_torque_z_sign", 1.0);
   force_deadband_x_ = this->declare_parameter<double>("force_deadband_x", 3.0);
   force_deadband_z_ = this->declare_parameter<double>("force_deadband_z", 0.3);
 
@@ -185,6 +188,8 @@ SharedControlNode::SharedControlNode()
       this->get_logger(),
       "IMU input disabled (use_imu=false). Assuming horizontal terrain and turning off IMU-based compensation.");
   }
+  touch_sub_ = this->create_subscription<std_msgs::msg::Int16>(
+    touch_topic_, 50, std::bind(&SharedControlNode::onTouch, this, std::placeholders::_1));
   autonomy_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
     autonomy_cmd_topic_, 20,
     std::bind(&SharedControlNode::onAutonomyCmd, this, std::placeholders::_1));
@@ -257,6 +262,11 @@ void SharedControlNode::onAutonomyCmd(const geometry_msgs::msg::TwistStamped::Sh
 {
   latest_autonomy_cmd_ = *msg;
   latest_autonomy_stamp_ = this->get_clock()->now();
+}
+
+void SharedControlNode::onTouch(const std_msgs::msg::Int16::SharedPtr msg)
+{
+  touch_active_ = (msg->data == 1);
 }
 
 void SharedControlNode::onFootprint(const geometry_msgs::msg::PolygonStamped::SharedPtr msg)
@@ -502,6 +512,15 @@ void SharedControlNode::controlStep()
   }
   last_step_stamp_ = now;
 
+  if (!touch_active_) {
+    external_force_x_ = 0.0;
+    external_torque_z_ = 0.0;
+    command_v_ = 0.0;
+    command_wz_ = 0.0;
+    publishStop();
+    return;
+  }
+
   if (!statusValid(left_feedback_, now) || !statusValid(right_feedback_, now)) {
     command_v_ = 0.0;
     command_wz_ = 0.0;
@@ -552,8 +571,10 @@ void SharedControlNode::controlStep()
   external_force_x_ += dt * observer_gain_x_ * (residual_x - external_force_x_);
   external_torque_z_ += dt * observer_gain_z_ * (residual_z - external_torque_z_);
 
-  const double human_force_x = signedDeadband(external_force_x_, force_deadband_x_);
-  const double human_torque_z = signedDeadband(external_torque_z_, force_deadband_z_);
+  const double human_force_x =
+    signedDeadband(human_force_x_sign_ * external_force_x_, force_deadband_x_);
+  const double human_torque_z =
+    signedDeadband(human_torque_z_sign_ * external_torque_z_, force_deadband_z_);
 
   double auto_force_x = 0.0;
   double auto_torque_z = 0.0;

@@ -3,6 +3,7 @@ shared_control_node:
     axis0_namespace: "odrive_axis0"
     axis1_namespace: "odrive_axis1"
     imu_topic: "/imu/data"
+    touch_topic: "/cabot/touch"
     use_imu: true
     autonomy_cmd_topic: "/autonomy/cmd_vel"
     pointcloud_topic: "/velodyne_points_cropped"
@@ -18,8 +19,8 @@ shared_control_node:
     input_mode: 1
     request_closed_loop_on_startup: true
 
-    observer_gain_x: 25.0
-    observer_gain_z: 25.0
+    observer_gain_x: 10.0
+    observer_gain_z: 10.0
     robot_mass_x: 24.0
     robot_inertia_z: 2.2
     robot_damping_x: 40.0
@@ -38,23 +39,25 @@ shared_control_node:
 
     desired_mass_x: 11.0
     desired_inertia_z: 1.2
-    desired_damping_x: 14.0
-    desired_damping_z: 2.5
+    desired_damping_x: 24.0
+    desired_damping_z: 4.0
 
     human_force_weight: 1.0
     autonomy_force_weight: 0.0
     autonomy_virtual_stiffness_x: 45.0
     autonomy_virtual_stiffness_z: 12.0
     autonomy_timeout_sec: 0.3
-    force_deadband_x: 3.0
-    force_deadband_z: 0.3
+    human_force_x_sign: -1.0
+    human_torque_z_sign: -1.0
+    force_deadband_x: 8.0
+    force_deadband_z: 1.2
 
     loop_rate_hz: 100.0
     status_timeout_sec: 0.2
-    max_linear_velocity: 0.2
-    max_angular_velocity: 0.45
-    max_linear_accel: 0.3
-    max_angular_accel: 0.625
+    max_linear_velocity: 0.08
+    max_angular_velocity: 0.20
+    max_linear_accel: 0.12
+    max_angular_accel: 0.30
 
     obstacle_guard_enabled: true
     obstacle_stop_distance_m: 0.5

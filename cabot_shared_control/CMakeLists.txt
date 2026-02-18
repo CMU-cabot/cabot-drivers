@@ -9,6 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
 
 add_executable(shared_control_node
@@ -24,6 +25,7 @@ ament_target_dependencies(shared_control_node
   rclcpp
   geometry_msgs
   sensor_msgs
+  std_msgs
   odrive_can
 )
 

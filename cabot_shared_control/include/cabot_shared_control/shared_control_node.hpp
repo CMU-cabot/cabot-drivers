@@ -35,6 +35,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <std_msgs/msg/int16.hpp>
 
 namespace cabot_shared_control
 {
@@ -55,6 +56,7 @@ private:
   void onAxis0Status(const odrive_can::msg::ControllerStatus::SharedPtr msg);
   void onAxis1Status(const odrive_can::msg::ControllerStatus::SharedPtr msg);
   void onImu(const sensor_msgs::msg::Imu::SharedPtr msg);
+  void onTouch(const std_msgs::msg::Int16::SharedPtr msg);
   void onAutonomyCmd(const geometry_msgs::msg::TwistStamped::SharedPtr msg);
   void onFootprint(const geometry_msgs::msg::PolygonStamped::SharedPtr msg);
   void onPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
@@ -82,6 +84,7 @@ private:
   std::string axis0_ns_;
   std::string axis1_ns_;
   std::string imu_topic_;
+  std::string touch_topic_;
   std::string autonomy_cmd_topic_;
   std::string pointcloud_topic_;
   std::string footprint_topic_;
@@ -131,6 +134,8 @@ private:
   double autonomy_virtual_stiffness_x_{45.0};
   double autonomy_virtual_stiffness_z_{12.0};
   double autonomy_timeout_sec_{0.3};
+  double human_force_x_sign_{1.0};
+  double human_torque_z_sign_{1.0};
   double force_deadband_x_{3.0};
   double force_deadband_z_{0.3};
 
@@ -173,6 +178,7 @@ private:
 
   double imu_pitch_rad_{0.0};
   double imu_accel_x_{0.0};
+  bool touch_active_{false};
 
   double external_force_x_{0.0};
   double external_torque_z_{0.0};
@@ -190,6 +196,7 @@ private:
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr left_sub_;
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr right_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
+  rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr touch_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr autonomy_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PolygonStamped>::SharedPtr footprint_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;

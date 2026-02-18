@@ -76,6 +76,32 @@ cleanup_done=0
 power_service_name=""
 odrive_power_forced_off=0
 
+stop_process_gracefully()
+{
+    local process_name="$1"
+    local process_pid="$2"
+    local timeout_sec="${3:-10}"
+
+    if [[ -z "$process_pid" ]] || ! kill -0 "$process_pid" 2>/dev/null; then
+        return
+    fi
+
+    echo "[INFO] stopping ${process_name} (pid=${process_pid})"
+    kill -INT "$process_pid" 2>/dev/null || true
+
+    local end_time=$((SECONDS + timeout_sec))
+    while kill -0 "$process_pid" 2>/dev/null; do
+        if (( SECONDS >= end_time )); then
+            echo "[WARN] ${process_name} did not exit after ${timeout_sec}s, sending SIGTERM"
+            kill -TERM "$process_pid" 2>/dev/null || true
+            break
+        fi
+        sleep 0.2
+    done
+
+    wait "$process_pid" 2>/dev/null || true
+}
+
 cleanup()
 {
     if [[ "$cleanup_done" -eq 1 ]]; then
@@ -83,16 +109,12 @@ cleanup()
     fi
     cleanup_done=1
 
-    if [[ -n "$launch_pid" ]] && kill -0 "$launch_pid" 2>/dev/null; then
-        echo "[INFO] stopping shared control launch (pid=$launch_pid)"
-        kill -INT "$launch_pid" 2>/dev/null || true
-        wait "$launch_pid" 2>/dev/null || true
-    fi
-    if [[ -n "$bag_pid" ]] && kill -0 "$bag_pid" 2>/dev/null; then
-        echo "[INFO] stopping rosbag record (pid=$bag_pid)"
-        kill -INT "$bag_pid" 2>/dev/null || true
-        wait "$bag_pid" 2>/dev/null || true
-    fi
+    # Stop rosbag first so it can flush metadata.yaml before launch/container shutdown progresses.
+    stop_process_gracefully "rosbag record" "$bag_pid" 15
+    bag_pid=""
+
+    stop_process_gracefully "shared control launch" "$launch_pid" 8
+    launch_pid=""
 
     if [[ "$odrive_power_forced_off" -eq 1 ]] && [[ -n "$power_service_name" ]]; then
         echo "[WARN] ODrive power cycle interrupted; trying to restore 24V power ON"
@@ -128,13 +150,6 @@ wait_for_power_service()
     return 1
 }
 
-wait_for_topic_once()
-{
-    local topic_name="$1"
-    local timeout_sec="$2"
-    timeout "$timeout_sec" ros2 topic echo --once "$topic_name" >/dev/null 2>&1
-}
-
 trap cleanup EXIT
 trap 'on_signal INT' INT
 trap 'on_signal QUIT' QUIT
@@ -165,26 +180,6 @@ bag_pid=$!
 echo "[INFO] launching shared control"
 ros2 launch cabot_shared_control shared_control.launch.py "${launch_args[@]}" &
 launch_pid=$!
-
-odrive_status_timeout_sec="${ODRIVE_STATUS_TIMEOUT_SEC:-12}"
-if ! wait_for_topic_once /cabot/odrive_status_left "$odrive_status_timeout_sec"; then
-    echo "[ERROR] No /cabot/odrive_status_left received within ${odrive_status_timeout_sec}s." >&2
-    echo "[ERROR] ODrive power may still be OFF (e.g., emergency stop active)." >&2
-    if [[ "$repower_odrive" -eq 0 ]]; then
-        echo "[ERROR] Retry with -r to re-power ODrive only." >&2
-    fi
-    exit 1
-fi
-if ! wait_for_topic_once /cabot/odrive_status_right "$odrive_status_timeout_sec"; then
-    echo "[ERROR] No /cabot/odrive_status_right received within ${odrive_status_timeout_sec}s." >&2
-    echo "[ERROR] ODrive power may still be OFF (e.g., emergency stop active)." >&2
-    if [[ "$repower_odrive" -eq 0 ]]; then
-        echo "[ERROR] Retry with -r to re-power ODrive only." >&2
-    fi
-    exit 1
-fi
-
-echo "[INFO] ODrive status received on both axes"
 set +e
 wait "$launch_pid"
 launch_rc=$?
