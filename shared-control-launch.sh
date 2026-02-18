@@ -74,7 +74,7 @@ echo "[INFO] host log dir  : $host_ros_log_dir"
 echo "[INFO] use imu       : $CABOT_SHARED_CONTROL_USE_IMU"
 echo "[INFO] launch args   : $*"
 
-docker compose run --rm "$service_name" bash -s -- "$@" <<'INNER_SCRIPT'
+docker compose run --rm -T "$service_name" bash -s -- "$@" <<'INNER_SCRIPT'
 set -euo pipefail
 
 source /ros_entrypoint.sh
