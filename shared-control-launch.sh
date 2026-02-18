@@ -77,8 +77,12 @@ echo "[INFO] launch args   : $*"
 docker compose run --rm -T "$service_name" bash -s -- "$@" <<'INNER_SCRIPT'
 set -euo pipefail
 
+# setup scripts may reference optional vars (e.g., COLCON_TRACE).
+# Temporarily disable nounset while sourcing.
+set +u
 source /ros_entrypoint.sh
 source /home/developer/driver_ws/install/setup.bash
+set -u
 
 mkdir -p "$ROS_LOG_DIR"
 mkdir -p "$ROS_LOG_DIR/bag"
