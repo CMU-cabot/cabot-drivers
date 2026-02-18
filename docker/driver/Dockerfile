@@ -134,6 +134,7 @@ COPY --from=src ./cabot-description/cabot_description $HOME/driver_ws/src/cabot_
 COPY --from=src ./cabot_base $HOME/driver_ws/src/cabot_base
 COPY --from=src ./cabot_serial $HOME/driver_ws/src/cabot_serial
 COPY --from=src ./cabot_can $HOME/driver_ws/src/cabot_can
+COPY --from=src ./cabot_shared_control $HOME/driver_ws/src/cabot_shared_control
 COPY --from=src ./motor_controller $HOME/driver_ws/src/motor_controller
 COPY --from=src ./power_controller $HOME/driver_ws/src/power_controller
 COPY --from=src ./wireless_scanner_ros $HOME/driver_ws/src/wireless_scanner_ros

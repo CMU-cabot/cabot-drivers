@@ -188,21 +188,17 @@ void SharedControlNode::requestClosedLoopIfReady()
   req0->axis_requested_state = kAxisStateClosedLoopControl;
   axis0_client_->async_send_request(
     req0,
-    std::bind(
-      &SharedControlNode::onAxisStateResponse,
-      this,
-      std::placeholders::_1,
-      axis0_ns_));
+    [this](rclcpp::Client<odrive_can::srv::AxisState>::SharedFuture future) {
+      this->onAxisStateResponse(future, this->axis0_ns_);
+    });
 
   auto req1 = std::make_shared<odrive_can::srv::AxisState::Request>();
   req1->axis_requested_state = kAxisStateClosedLoopControl;
   axis1_client_->async_send_request(
     req1,
-    std::bind(
-      &SharedControlNode::onAxisStateResponse,
-      this,
-      std::placeholders::_1,
-      axis1_ns_));
+    [this](rclcpp::Client<odrive_can::srv::AxisState>::SharedFuture future) {
+      this->onAxisStateResponse(future, this->axis1_ns_);
+    });
 
   request_closed_loop_on_startup_ = false;
   if (startup_timer_) {
