@@ -39,6 +39,7 @@ services:
       - ODRIVE_MODEL
       - ODRIVE_FIRMWARE_VERSION
       - HESAI_ROS_2_0
+      - CABOT_SHARED_CONTROL_USE_IMU
     volumes:
 # device, bluetooth
       - /dev:/dev

@@ -34,6 +34,13 @@ source install/setup.bash
 ros2 launch cabot_shared_control shared_control.launch.py
 ```
 
+リポジトリのトップディレクトリから docker 内で起動する場合:
+
+```bash
+./shared-control-launch.sh        # driver サービス
+./shared-control-launch.sh -d     # driver-dev サービス
+```
+
 `shared_control.launch.py` は以下を起動します（`cabot3-k4` 前提）:
 
 - `robot_state_publisher`
@@ -63,6 +70,7 @@ ros2 launch cabot_shared_control shared_control.launch.py \
 
 `odrive_model` と `odrive_firmware_version` は `ODRIVE_MODEL` / `ODRIVE_FIRMWARE_VERSION` 環境変数から参照します。
 IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` で切り替えできます（`false` でIMU無効、水平面前提）。
+`shared-control-launch.sh` は `ROS_LOG_DIR` を作成し、必要トピックの rosbag を同時記録します（`docker/home/.ros/log/latest_shared_control`）。
 
 ## 想定トピック
 
