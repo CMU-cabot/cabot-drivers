@@ -145,16 +145,38 @@ SharedControlNode::SharedControlNode()
 
   loop_rate_hz_ = this->declare_parameter<double>("loop_rate_hz", 100.0);
   status_timeout_sec_ = this->declare_parameter<double>("status_timeout_sec", 0.2);
-  max_linear_velocity_ = this->declare_parameter<double>("max_linear_velocity", 0.8);
+  const double max_linear_velocity_default =
+    this->declare_parameter<double>("max_linear_velocity", 0.8);
+  max_linear_velocity_forward_ = this->declare_parameter<double>(
+    "max_linear_velocity_forward", max_linear_velocity_default);
+  max_linear_velocity_reverse_ = this->declare_parameter<double>(
+    "max_linear_velocity_reverse", max_linear_velocity_default);
   max_angular_velocity_ = this->declare_parameter<double>("max_angular_velocity", 1.8);
-  max_linear_accel_ = this->declare_parameter<double>("max_linear_accel", 1.2);
+  const double max_linear_accel_default =
+    this->declare_parameter<double>("max_linear_accel", 1.2);
+  max_linear_accel_forward_ = this->declare_parameter<double>(
+    "max_linear_accel_forward", max_linear_accel_default);
+  max_linear_accel_reverse_ = this->declare_parameter<double>(
+    "max_linear_accel_reverse", max_linear_accel_default);
   max_angular_accel_ = this->declare_parameter<double>("max_angular_accel", 2.5);
   obstacle_guard_enabled_ = this->declare_parameter<bool>("obstacle_guard_enabled", true);
+  obstacle_guard_reverse_enabled_ =
+    this->declare_parameter<bool>("obstacle_guard_reverse_enabled", false);
   obstacle_stop_distance_m_ = this->declare_parameter<double>("obstacle_stop_distance_m", 0.5);
+  obstacle_slowdown_margin_m_ =
+    this->declare_parameter<double>("obstacle_slowdown_margin_m", 0.0);
+  obstacle_min_speed_scale_ = this->declare_parameter<double>("obstacle_min_speed_scale", 0.0);
+  obstacle_pushback_enabled_ = this->declare_parameter<bool>("obstacle_pushback_enabled", true);
+  obstacle_pushback_stiffness_ =
+    this->declare_parameter<double>("obstacle_pushback_stiffness", 60.0);
+  obstacle_pushback_max_force_ =
+    this->declare_parameter<double>("obstacle_pushback_max_force", 30.0);
   obstacle_timeout_sec_ = this->declare_parameter<double>("obstacle_timeout_sec", 0.3);
   obstacle_point_min_z_ = this->declare_parameter<double>("obstacle_point_min_z", -0.3);
   obstacle_point_max_z_ = this->declare_parameter<double>("obstacle_point_max_z", 1.2);
   strict_frame_match_ = this->declare_parameter<bool>("strict_frame_match", true);
+  sensor_guard_enabled_ = this->declare_parameter<bool>("sensor_guard_enabled", true);
+  sensor_guard_half_width_m_ = this->declare_parameter<double>("sensor_guard_half_width_m", 0.35);
 
   const auto now = this->get_clock()->now();
   left_feedback_.stamp = now;
@@ -193,7 +215,7 @@ SharedControlNode::SharedControlNode()
   autonomy_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
     autonomy_cmd_topic_, 20,
     std::bind(&SharedControlNode::onAutonomyCmd, this, std::placeholders::_1));
-  footprint_sub_ = this->create_subscription<geometry_msgs::msg::PolygonStamped>(
+  footprint_sub_ = this->create_subscription<geometry_msgs::msg::Polygon>(
     footprint_topic_, 10, std::bind(&SharedControlNode::onFootprint, this, std::placeholders::_1));
   cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     pointcloud_topic_, 10,
@@ -269,26 +291,33 @@ void SharedControlNode::onTouch(const std_msgs::msg::Int16::SharedPtr msg)
   touch_active_ = (msg->data == 1);
 }
 
-void SharedControlNode::onFootprint(const geometry_msgs::msg::PolygonStamped::SharedPtr msg)
+void SharedControlNode::onFootprint(const geometry_msgs::msg::Polygon::SharedPtr msg)
 {
   footprint_points_.clear();
-  footprint_points_.reserve(msg->polygon.points.size());
-  for (const auto & p : msg->polygon.points) {
+  footprint_points_.reserve(msg->points.size());
+  for (const auto & p : msg->points) {
     footprint_points_.push_back(XYPoint{static_cast<double>(p.x), static_cast<double>(p.y)});
   }
 
-  footprint_frame_id_ = msg->header.frame_id;
+  // geometry_msgs/Polygon has no frame information.
+  footprint_frame_id_.clear();
   footprint_stamp_ = this->get_clock()->now();
   footprint_received_ = footprint_points_.size() >= 3;
 }
 
 void SharedControlNode::onPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
-  if (!obstacle_guard_enabled_ || !footprint_received_) {
+  if (!obstacle_guard_enabled_) {
+    return;
+  }
+  if (!footprint_received_ && !sensor_guard_enabled_) {
     return;
   }
 
-  if (strict_frame_match_ && msg->header.frame_id != footprint_frame_id_) {
+  if (
+    footprint_received_ && strict_frame_match_ && !footprint_frame_id_.empty() &&
+    msg->header.frame_id != footprint_frame_id_)
+  {
     RCLCPP_WARN_THROTTLE(
       this->get_logger(), *this->get_clock(), 2000,
       "frame mismatch: pointcloud=%s footprint=%s (skip obstacle guard update)",
@@ -299,6 +328,9 @@ void SharedControlNode::onPointCloud(const sensor_msgs::msg::PointCloud2::Shared
   double front_clearance = std::numeric_limits<double>::infinity();
   double rear_clearance = std::numeric_limits<double>::infinity();
   bool has_valid_point = false;
+  double front_clearance_sensor = std::numeric_limits<double>::infinity();
+  double rear_clearance_sensor = std::numeric_limits<double>::infinity();
+  bool has_sensor_guard_point = false;
 
   try {
     sensor_msgs::PointCloud2ConstIterator<float> iter_x(*msg, "x");
@@ -317,11 +349,22 @@ void SharedControlNode::onPointCloud(const sensor_msgs::msg::PointCloud2::Shared
       }
 
       has_valid_point = true;
-      const double clearance = distancePointToFootprint(x, y);
-      if (x >= 0.0) {
-        front_clearance = std::min(front_clearance, clearance);
-      } else {
-        rear_clearance = std::min(rear_clearance, clearance);
+      if (footprint_received_) {
+        const double clearance = distancePointToFootprint(x, y);
+        if (x >= 0.0) {
+          front_clearance = std::min(front_clearance, clearance);
+        } else {
+          rear_clearance = std::min(rear_clearance, clearance);
+        }
+      }
+
+      if (sensor_guard_enabled_ && std::abs(y) <= sensor_guard_half_width_m_) {
+        has_sensor_guard_point = true;
+        if (x >= 0.0) {
+          front_clearance_sensor = std::min(front_clearance_sensor, x);
+        } else {
+          rear_clearance_sensor = std::min(rear_clearance_sensor, -x);
+        }
       }
     }
   } catch (const std::runtime_error & ex) {
@@ -334,6 +377,10 @@ void SharedControlNode::onPointCloud(const sensor_msgs::msg::PointCloud2::Shared
   if (!has_valid_point) {
     front_clearance = std::numeric_limits<double>::infinity();
     rear_clearance = std::numeric_limits<double>::infinity();
+  }
+  if (has_sensor_guard_point) {
+    front_clearance = std::min(front_clearance, front_clearance_sensor);
+    rear_clearance = std::min(rear_clearance, rear_clearance_sensor);
   }
 
   front_clearance_m_ = front_clearance;
@@ -410,6 +457,32 @@ bool SharedControlNode::obstacleDataFresh(const rclcpp::Time & now) const
     return false;
   }
   return (now - obstacle_stamp_).seconds() <= obstacle_timeout_sec_;
+}
+
+double SharedControlNode::obstacleApproachScale(double clearance_m) const
+{
+  if (!std::isfinite(clearance_m)) {
+    return 1.0;
+  }
+
+  const double stop_distance = std::max(0.0, obstacle_stop_distance_m_);
+  const double slowdown_margin = std::max(0.0, obstacle_slowdown_margin_m_);
+  const double min_scale = clamp(obstacle_min_speed_scale_, 0.0, 1.0);
+  if (clearance_m <= stop_distance) {
+    return 0.0;
+  }
+  if (slowdown_margin <= 1.0e-6) {
+    return 1.0;
+  }
+
+  const double slowdown_distance = stop_distance + slowdown_margin;
+  if (clearance_m >= slowdown_distance) {
+    return 1.0;
+  }
+
+  const double t = clamp((clearance_m - stop_distance) / slowdown_margin, 0.0, 1.0);
+  const double smooth = t * t * (3.0 - 2.0 * t);  // smoothstep
+  return min_scale + (1.0 - min_scale) * smooth;
 }
 
 double SharedControlNode::estimateWheelTorque(
@@ -588,36 +661,108 @@ void SharedControlNode::controlStep()
     auto_torque_z = autonomy_virtual_stiffness_z_ * (wz_ref - wz_meas);
   }
 
-  const double shared_force_x =
-    human_force_weight_ * human_force_x + autonomy_force_weight_ * auto_force_x;
+  double shared_force_x = human_force_weight_ * human_force_x + autonomy_force_weight_ * auto_force_x;
   const double shared_torque_z =
     human_force_weight_ * human_torque_z + autonomy_force_weight_ * auto_torque_z;
+
+  const bool obstacle_fresh = obstacleDataFresh(now);
+  const double front_scale = obstacle_fresh ? obstacleApproachScale(front_clearance_m_) : 1.0;
+  const double rear_scale = (obstacle_fresh && obstacle_guard_reverse_enabled_) ?
+    obstacleApproachScale(rear_clearance_m_) : 1.0;
+
+  // Distance-aware slowdown: reduce drive intent while approaching obstacles.
+  if (shared_force_x > 0.0) {
+    shared_force_x *= front_scale;
+  } else if (shared_force_x < 0.0 && obstacle_guard_reverse_enabled_) {
+    shared_force_x *= rear_scale;
+  }
+
+  if (obstacle_fresh && obstacle_pushback_enabled_) {
+    // Apply virtual spring force only against the intended moving direction.
+    if (front_clearance_m_ <= obstacle_stop_distance_m_ && shared_force_x > 0.0) {
+      const double penetration = obstacle_stop_distance_m_ - front_clearance_m_;
+      const double pushback = clamp(
+        obstacle_pushback_stiffness_ * penetration, 0.0, obstacle_pushback_max_force_);
+      shared_force_x -= pushback;
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *this->get_clock(), 1000,
+        "front obstacle pushback: clearance=%.3fm pushback=%.2fN",
+        front_clearance_m_, pushback);
+    } else if (
+      obstacle_guard_reverse_enabled_ && rear_clearance_m_ <= obstacle_stop_distance_m_ &&
+      shared_force_x < 0.0)
+    {
+      const double penetration = obstacle_stop_distance_m_ - rear_clearance_m_;
+      const double pushback = clamp(
+        obstacle_pushback_stiffness_ * penetration, 0.0, obstacle_pushback_max_force_);
+      shared_force_x += pushback;
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *this->get_clock(), 1000,
+        "rear obstacle pushback: clearance=%.3fm pushback=%.2fN",
+        rear_clearance_m_, pushback);
+    }
+  }
 
   double cmd_accel_x =
     (shared_force_x - desired_damping_x_ * command_v_) / std::max(desired_mass_x_, 1.0e-6);
   double cmd_accel_z =
     (shared_torque_z - desired_damping_z_ * command_wz_) / std::max(desired_inertia_z_, 1.0e-6);
-  cmd_accel_x = clamp(cmd_accel_x, -max_linear_accel_, max_linear_accel_);
+  cmd_accel_x = clamp(cmd_accel_x, -max_linear_accel_reverse_, max_linear_accel_forward_);
   cmd_accel_z = clamp(cmd_accel_z, -max_angular_accel_, max_angular_accel_);
 
   command_v_ += cmd_accel_x * dt;
   command_wz_ += cmd_accel_z * dt;
-  command_v_ = clamp(command_v_, -max_linear_velocity_, max_linear_velocity_);
+  command_v_ = clamp(command_v_, -max_linear_velocity_reverse_, max_linear_velocity_forward_);
   command_wz_ = clamp(command_wz_, -max_angular_velocity_, max_angular_velocity_);
 
-  if (obstacleDataFresh(now)) {
-    if (command_v_ > 0.0 && front_clearance_m_ <= obstacle_stop_distance_m_) {
+  // Final safety clamp: reduce approaching speed smoothly in obstacle slowdown
+  // margin, then stop only inside stop_distance.
+  if (obstacle_fresh) {
+    const double front_limit = max_linear_velocity_forward_ * front_scale;
+    if (command_v_ > front_limit) {
+      command_v_ = front_limit;
+    } else if (command_v_ > 0.0 && front_scale < 1.0) {
+      const double slowdown_brake = max_linear_accel_forward_ * (1.0 - front_scale);
+      command_v_ = std::max(0.0, command_v_ - slowdown_brake * dt);
+      command_v_ = std::min(command_v_, front_limit);
+    }
+    if (front_scale <= 1.0e-3 && command_v_ > 0.0) {
       command_v_ = 0.0;
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 1000,
-        "forward motion blocked by obstacle clearance %.3fm <= %.3fm",
+        "front approach blocked: clearance %.3fm <= %.3fm",
         front_clearance_m_, obstacle_stop_distance_m_);
-    } else if (command_v_ < 0.0 && rear_clearance_m_ <= obstacle_stop_distance_m_) {
-      command_v_ = 0.0;
+    }
+
+    if (obstacle_guard_reverse_enabled_) {
+      const double rear_limit = max_linear_velocity_reverse_ * rear_scale;
+      if (command_v_ < -rear_limit) {
+        command_v_ = -rear_limit;
+      } else if (command_v_ < 0.0 && rear_scale < 1.0) {
+        const double slowdown_brake = max_linear_accel_reverse_ * (1.0 - rear_scale);
+        command_v_ = std::min(0.0, command_v_ + slowdown_brake * dt);
+        command_v_ = std::max(command_v_, -rear_limit);
+      }
+      if (rear_scale <= 1.0e-3 && command_v_ < 0.0) {
+        command_v_ = 0.0;
+        RCLCPP_WARN_THROTTLE(
+          this->get_logger(), *this->get_clock(), 1000,
+          "rear approach blocked: clearance %.3fm <= %.3fm",
+          rear_clearance_m_, obstacle_stop_distance_m_);
+      }
+    }
+
+    if (front_scale < 0.999 || rear_scale < 0.999) {
+      RCLCPP_DEBUG_THROTTLE(
+        this->get_logger(), *this->get_clock(), 200,
+        "obstacle slowdown: front_clearance=%.3f front_scale=%.3f rear_clearance=%.3f rear_scale=%.3f command_v=%.3f",
+        front_clearance_m_, front_scale, rear_clearance_m_, rear_scale, command_v_);
+    }
+    if (front_scale <= 1.0e-3 || rear_scale <= 1.0e-3) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 1000,
-        "reverse motion blocked by obstacle clearance %.3fm <= %.3fm",
-        rear_clearance_m_, obstacle_stop_distance_m_);
+        "obstacle stop active: front_clearance=%.3f rear_clearance=%.3f stop_distance=%.3f",
+        front_clearance_m_, rear_clearance_m_, obstacle_stop_distance_m_);
     }
   }
 

@@ -27,7 +27,7 @@
 #include <vector>
 
 #include <geometry_msgs/msg/twist_stamped.hpp>
-#include <geometry_msgs/msg/polygon_stamped.hpp>
+#include <geometry_msgs/msg/polygon.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
 #include <odrive_can/msg/control_message.hpp>
 #include <odrive_can/msg/controller_status.hpp>
@@ -58,7 +58,7 @@ private:
   void onImu(const sensor_msgs::msg::Imu::SharedPtr msg);
   void onTouch(const std_msgs::msg::Int16::SharedPtr msg);
   void onAutonomyCmd(const geometry_msgs::msg::TwistStamped::SharedPtr msg);
-  void onFootprint(const geometry_msgs::msg::PolygonStamped::SharedPtr msg);
+  void onFootprint(const geometry_msgs::msg::Polygon::SharedPtr msg);
   void onPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
   void controlStep();
@@ -79,6 +79,7 @@ private:
   double distancePointToFootprint(double x, double y) const;
   bool pointInsideFootprint(double x, double y) const;
   bool obstacleDataFresh(const rclcpp::Time & now) const;
+  double obstacleApproachScale(double clearance_m) const;
 
   // Topics / names
   std::string axis0_ns_;
@@ -142,18 +143,28 @@ private:
   // Safety / timing
   double loop_rate_hz_{100.0};
   double status_timeout_sec_{0.2};
-  double max_linear_velocity_{0.8};
+  double max_linear_velocity_forward_{0.8};
+  double max_linear_velocity_reverse_{0.8};
   double max_angular_velocity_{1.8};
-  double max_linear_accel_{1.2};
+  double max_linear_accel_forward_{1.2};
+  double max_linear_accel_reverse_{1.2};
   double max_angular_accel_{2.5};
 
   // Obstacle guard
   bool obstacle_guard_enabled_{true};
+  bool obstacle_guard_reverse_enabled_{false};
   double obstacle_stop_distance_m_{0.5};
+  double obstacle_slowdown_margin_m_{0.0};
+  double obstacle_min_speed_scale_{0.0};
+  bool obstacle_pushback_enabled_{true};
+  double obstacle_pushback_stiffness_{60.0};
+  double obstacle_pushback_max_force_{30.0};
   double obstacle_timeout_sec_{0.3};
   double obstacle_point_min_z_{-0.3};
   double obstacle_point_max_z_{1.2};
   bool strict_frame_match_{true};
+  bool sensor_guard_enabled_{true};
+  double sensor_guard_half_width_m_{0.35};
 
   struct XYPoint
   {
@@ -198,7 +209,7 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr touch_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr autonomy_sub_;
-  rclcpp::Subscription<geometry_msgs::msg::PolygonStamped>::SharedPtr footprint_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr footprint_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
 
   rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr axis0_client_;

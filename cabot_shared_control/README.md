@@ -109,7 +109,9 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` で切り替えできます
   - `autonomy_virtual_stiffness_x`, `autonomy_virtual_stiffness_z`
 - 障害物ガード:
   - `obstacle_guard_enabled`
-  - `obstacle_stop_distance_m` (初期値 0.5)
+  - `obstacle_stop_distance_m` (停止距離)
+  - `obstacle_slowdown_margin_m` (停止距離の外側で減速するマージン幅)
+  - `obstacle_min_speed_scale` (マージン内の最小速度スケール)
   - `pointcloud_topic`, `footprint_topic`
   - `obstacle_point_min_z`, `obstacle_point_max_z`
   - `strict_frame_match`

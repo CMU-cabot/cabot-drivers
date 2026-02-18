@@ -241,6 +241,25 @@ def generate_launch_description():
                 condition=IfCondition(use_crop_box)
             ),
             Node(
+                package='cabot_common',
+                executable='footprint_publisher',
+                name='footprint_publisher',
+                output=output,
+                parameters=[
+                    *param_files,
+                    {
+                        'use_sim_time': use_sim_time,
+                        # Keep this as a concrete string array. If LaunchConfiguration is
+                        # embedded directly here, it can collapse to a plain string and
+                        # crash footprint_publisher (expects string_array).
+                        'footprint_topics': ['/footprint']
+                    }
+                ],
+                remappings=[
+                    ('/footprint', footprint_topic),
+                ]
+            ),
+            Node(
                 package='odrive_can',
                 executable='odrive_can_node',
                 namespace='/cabot',
