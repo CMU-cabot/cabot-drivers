@@ -20,21 +20,270 @@
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription
+from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import Command
+from launch.substitutions import EnvironmentVariable
+from launch.substitutions import LaunchConfiguration
+from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import PythonExpression
+from launch_ros.actions import ComposableNodeContainer
 from launch_ros.actions import Node
-
-import os
+from launch_ros.descriptions import ComposableNode
+from launch_ros.descriptions import ParameterFile
+from launch_ros.descriptions import ParameterValue
 
 
 def generate_launch_description():
     pkg_share = get_package_share_directory("cabot_shared_control")
-    param_file = os.path.join(pkg_share, "config", "shared_control.yaml")
+    cabot_base_pkg_share = get_package_share_directory("cabot_base")
+    cabot_description_pkg_share = get_package_share_directory("cabot_description")
+    odrive_can_pkg_share = get_package_share_directory("odrive_can")
+    param_file = PathJoinSubstitution([pkg_share, "config", "shared_control.yaml"])
 
-    node = Node(
+    model = LaunchConfiguration("model")
+    can_interface = LaunchConfiguration("can_interface")
+    odrive_model = LaunchConfiguration("odrive_model")
+    odrive_firmware_version = LaunchConfiguration("odrive_firmware_version")
+    use_robot_state_publisher = LaunchConfiguration("use_robot_state_publisher")
+    use_hesai_lidar = LaunchConfiguration("use_hesai_lidar")
+    use_crop_box = LaunchConfiguration("use_crop_box")
+    hesai_ros_2_0 = LaunchConfiguration("hesai_ros_2_0")
+    imu_topic = LaunchConfiguration("imu_topic")
+    pointcloud_topic = LaunchConfiguration("pointcloud_topic")
+    footprint_topic = LaunchConfiguration("footprint_topic")
+
+    xacro_for_cabot_model = PathJoinSubstitution(
+        [
+            cabot_description_pkg_share,
+            "robots",
+            PythonExpression(['"', model, '.urdf.xacro.xml"']),
+        ]
+    )
+    robot_description = ParameterValue(
+        Command(["xacro ", xacro_for_cabot_model, " offset:=0.25", " sim:=false"]),
+        value_type=str,
+    )
+
+    crop_box_param_files = [
+        ParameterFile(
+            PathJoinSubstitution([cabot_base_pkg_share, "config", "cabot3-common.yaml"]),
+            allow_substs=True,
+        ),
+        ParameterFile(
+            PathJoinSubstitution([cabot_base_pkg_share, "config", PythonExpression(['"', model, '.yaml"'])]),
+            allow_substs=True,
+        ),
+    ]
+
+    flat_endpoints_json_path = PathJoinSubstitution(
+        [
+            odrive_can_pkg_share,
+            "json",
+            odrive_firmware_version,
+            PythonExpression(['"flat_endpoints_', odrive_model, '.json"']),
+        ]
+    )
+
+    robot_state_publisher_node = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        name="robot_state_publisher",
+        output="screen",
+        parameters=[
+            {
+                "publish_frequency": 100.0,
+                "robot_description": robot_description,
+            }
+        ],
+        condition=IfCondition(use_robot_state_publisher),
+    )
+
+    local_robot_state_publisher_node = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        name="local_robot_state_publisher",
+        output="screen",
+        parameters=[
+            {
+                "publish_frequency": 100.0,
+                "frame_prefix": "local/",
+                "robot_description": robot_description,
+            }
+        ],
+        condition=IfCondition(use_robot_state_publisher),
+    )
+
+    hesai_lidar_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                PathJoinSubstitution(
+                    [cabot_base_pkg_share, "launch", "include", "hesai_lidar.launch.py"]
+                )
+            ]
+        ),
+        launch_arguments={
+            "model": model,
+            "pandar": "/velodyne_points",
+            "hesai_ros_2_0": hesai_ros_2_0,
+        }.items(),
+        condition=IfCondition(use_hesai_lidar),
+    )
+
+    crop_box_container = ComposableNodeContainer(
+        name="laser_container",
+        namespace="",
+        package="rclcpp_components",
+        executable="component_container",
+        composable_node_descriptions=[
+            ComposableNode(
+                package="pcl_ros",
+                plugin="pcl_ros::CropBox",
+                namespace="",
+                name="filter_crop_box_node",
+                parameters=crop_box_param_files,
+                remappings=[
+                    ("/input", "/velodyne_points"),
+                    ("/output", "/velodyne_points_cropped"),
+                ],
+            )
+        ],
+        condition=IfCondition(use_crop_box),
+    )
+
+    shared_control_node = Node(
         package="cabot_shared_control",
         executable="shared_control_node",
         name="shared_control_node",
         output="screen",
-        parameters=[param_file],
+        parameters=[
+            param_file,
+            {
+                "imu_topic": imu_topic,
+                "pointcloud_topic": pointcloud_topic,
+                "footprint_topic": footprint_topic,
+                "autonomy_force_weight": 0.0,
+            },
+        ],
+        remappings=[
+            ("/odrive_axis0/control_message", "/cabot/control_message_left"),
+            ("/odrive_axis1/control_message", "/cabot/control_message_right"),
+            ("/odrive_axis0/controller_status", "/cabot/controller_status_left"),
+            ("/odrive_axis1/controller_status", "/cabot/controller_status_right"),
+            ("/odrive_axis0/request_axis_state", "/cabot/request_axis_state_left"),
+            ("/odrive_axis1/request_axis_state", "/cabot/request_axis_state_right"),
+        ],
     )
 
-    return LaunchDescription([node])
+    odrive_can_node_left = Node(
+        package="odrive_can",
+        executable="odrive_can_node",
+        namespace="/cabot",
+        name="odrive_can_node_left",
+        output="screen",
+        parameters=[
+            {
+                "node_id": 0,
+                "interface": can_interface,
+                "axis_idle_on_shutdown": True,
+                "json_file_path": flat_endpoints_json_path,
+            }
+        ],
+        remappings=[
+            ("/cabot/control_message", "/cabot/control_message_left"),
+            ("/cabot/controller_status", "/cabot/controller_status_left"),
+            ("/cabot/odrive_status", "/cabot/odrive_status_left"),
+            ("/cabot/request_axis_state", "/cabot/request_axis_state_left"),
+        ],
+    )
+
+    odrive_can_node_right = Node(
+        package="odrive_can",
+        executable="odrive_can_node",
+        namespace="/cabot",
+        name="odrive_can_node_right",
+        output="screen",
+        parameters=[
+            {
+                "node_id": 1,
+                "interface": can_interface,
+                "axis_idle_on_shutdown": True,
+                "json_file_path": flat_endpoints_json_path,
+            }
+        ],
+        remappings=[
+            ("/cabot/control_message", "/cabot/control_message_right"),
+            ("/cabot/controller_status", "/cabot/controller_status_right"),
+            ("/cabot/odrive_status", "/cabot/odrive_status_right"),
+            ("/cabot/request_axis_state", "/cabot/request_axis_state_right"),
+        ],
+    )
+
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                "can_interface",
+                default_value="can1",
+                description="CAN interface for ODrive S1 bus",
+            ),
+            DeclareLaunchArgument(
+                "model",
+                default_value="cabot3-k4",
+                description="CaBot model used for robot_description and lidar params",
+            ),
+            DeclareLaunchArgument(
+                "use_robot_state_publisher",
+                default_value="true",
+                description="Launch robot_state_publisher and local_robot_state_publisher",
+            ),
+            DeclareLaunchArgument(
+                "use_hesai_lidar",
+                default_value="true",
+                description="Launch Hesai lidar include launch for cabot3-k4",
+            ),
+            DeclareLaunchArgument(
+                "use_crop_box",
+                default_value="true",
+                description="Create /velodyne_points_cropped from /velodyne_points",
+            ),
+            DeclareLaunchArgument(
+                "odrive_model",
+                default_value=EnvironmentVariable("ODRIVE_MODEL"),
+                description="ODrive model (used to pick flat_endpoints json)",
+            ),
+            DeclareLaunchArgument(
+                "odrive_firmware_version",
+                default_value=EnvironmentVariable("ODRIVE_FIRMWARE_VERSION"),
+                description="ODrive firmware version directory for flat_endpoints json",
+            ),
+            DeclareLaunchArgument(
+                "hesai_ros_2_0",
+                default_value=EnvironmentVariable("HESAI_ROS_2_0", default_value="false"),
+                description="If true, use hesai_ros_driver node",
+            ),
+            DeclareLaunchArgument(
+                "imu_topic",
+                default_value="/cabot/imu/data",
+                description="IMU topic for gravity compensation",
+            ),
+            DeclareLaunchArgument(
+                "pointcloud_topic",
+                default_value="/velodyne_points_cropped",
+                description="Obstacle guard point cloud topic",
+            ),
+            DeclareLaunchArgument(
+                "footprint_topic",
+                default_value="/footprint",
+                description="Robot footprint polygon topic",
+            ),
+            robot_state_publisher_node,
+            local_robot_state_publisher_node,
+            hesai_lidar_launch,
+            crop_box_container,
+            odrive_can_node_left,
+            odrive_can_node_right,
+            shared_control_node,
+        ]
+    )

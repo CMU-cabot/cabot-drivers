@@ -34,18 +34,47 @@ source install/setup.bash
 ros2 launch cabot_shared_control shared_control.launch.py
 ```
 
+`shared_control.launch.py` は以下を起動します（`cabot3-k4` 前提）:
+
+- `robot_state_publisher`
+- `local_robot_state_publisher`
+- `hesai_lidar`（または `hesai_ros_driver`）
+- `filter_crop_box_node`（`/velodyne_points` -> `/velodyne_points_cropped`）
+- `odrive_can_node_left` (`node_id=0`)
+- `odrive_can_node_right` (`node_id=1`)
+- `shared_control_node`
+
+外部の速度指令（`/autonomy/cmd_vel`）は不要です。デフォルトで `autonomy_force_weight=0.0` を適用します。
+
+必要に応じて以下を指定できます:
+
+```bash
+ros2 launch cabot_shared_control shared_control.launch.py \
+  model:=cabot3-k4 \
+  use_robot_state_publisher:=true \
+  use_hesai_lidar:=true \
+  use_crop_box:=true \
+  can_interface:=can1 \
+  hesai_ros_2_0:=false \
+  imu_topic:=/cabot/imu/data \
+  pointcloud_topic:=/velodyne_points_cropped \
+  footprint_topic:=/footprint
+```
+
+`odrive_model` と `odrive_firmware_version` は `ODRIVE_MODEL` / `ODRIVE_FIRMWARE_VERSION` 環境変数から参照します。
+
 ## 想定トピック
 
 - 入力:
-  - `/odrive_axis0/controller_status` (`odrive_can/msg/ControllerStatus`)
-  - `/odrive_axis1/controller_status` (`odrive_can/msg/ControllerStatus`)
-  - `/imu/data` (`sensor_msgs/msg/Imu`)
+  - `/cabot/controller_status_left` (`odrive_can/msg/ControllerStatus`)
+  - `/cabot/controller_status_right` (`odrive_can/msg/ControllerStatus`)
+  - `/cabot/imu/data` (`sensor_msgs/msg/Imu`)
   - `/autonomy/cmd_vel` (`geometry_msgs/msg/TwistStamped`, 任意)
   - `/velodyne_points_cropped` (`sensor_msgs/msg/PointCloud2`)
   - `/footprint` (`geometry_msgs/msg/PolygonStamped`)
 - 出力:
-  - `/odrive_axis0/control_message` (`odrive_can/msg/ControlMessage`)
-  - `/odrive_axis1/control_message` (`odrive_can/msg/ControlMessage`)
+  - `/cabot/control_message_left` (`odrive_can/msg/ControlMessage`)
+  - `/cabot/control_message_right` (`odrive_can/msg/ControlMessage`)
   - `/shared_control/external_wrench` (`geometry_msgs/msg/WrenchStamped`)
   - `/shared_control/cmd_vel` (`geometry_msgs/msg/TwistStamped`)
 
