@@ -55,19 +55,19 @@ shared_control_node:
     loop_rate_hz: 100.0
     status_timeout_sec: 0.2
     max_linear_velocity: 0.32
-    max_linear_velocity_forward: 1.0
+    max_linear_velocity_forward: 0.7
     max_linear_velocity_reverse: 0.3
     max_angular_velocity: 0.40
     max_linear_accel: 0.48
     max_linear_accel_forward: 0.5
-    max_linear_accel_reverse: 0.25
+    max_linear_accel_reverse: 0.5
     max_angular_accel: 0.60
 
     obstacle_guard_enabled: true
     obstacle_guard_reverse_enabled: false
     obstacle_stop_distance_m: 0.00
-    obstacle_slowdown_margin_m: 0.30
-    obstacle_min_speed_scale: 0.1
+    obstacle_slowdown_margin_m: 0.60
+    obstacle_min_speed_scale: 0.2
     obstacle_pushback_enabled: true
     obstacle_pushback_stiffness: 60.0
     obstacle_pushback_max_force: 30.0
