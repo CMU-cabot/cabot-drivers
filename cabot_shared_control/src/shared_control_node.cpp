@@ -4,8 +4,12 @@
 #include <chrono>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
+#include <utility>
+
+#include <sensor_msgs/point_cloud2_iterator.hpp>
 
 namespace
 {
@@ -25,6 +29,27 @@ double signedDeadband(double value, double threshold)
   }
   return std::copysign(std::abs(value) - threshold, value);
 }
+
+double squaredDistanceToSegment(
+  double px, double py, double ax, double ay, double bx, double by)
+{
+  const double vx = bx - ax;
+  const double vy = by - ay;
+  const double wx = px - ax;
+  const double wy = py - ay;
+  const double vv = vx * vx + vy * vy;
+  if (vv <= 1.0e-12) {
+    const double dx = px - ax;
+    const double dy = py - ay;
+    return dx * dx + dy * dy;
+  }
+  const double t = clamp((wx * vx + wy * vy) / vv, 0.0, 1.0);
+  const double cx = ax + t * vx;
+  const double cy = ay + t * vy;
+  const double dx = px - cx;
+  const double dy = py - cy;
+  return dx * dx + dy * dy;
+}
 }  // namespace
 
 namespace cabot_shared_control
@@ -38,6 +63,9 @@ SharedControlNode::SharedControlNode()
   imu_topic_ = this->declare_parameter<std::string>("imu_topic", "/imu/data");
   autonomy_cmd_topic_ =
     this->declare_parameter<std::string>("autonomy_cmd_topic", "/autonomy/cmd_vel");
+  pointcloud_topic_ =
+    this->declare_parameter<std::string>("pointcloud_topic", "/velodyne_points_cropped");
+  footprint_topic_ = this->declare_parameter<std::string>("footprint_topic", "/footprint");
 
   wheel_radius_m_ = this->declare_parameter<double>("wheel_radius_m", 0.0855);
   wheel_separation_m_ = this->declare_parameter<double>("wheel_separation_m", 0.419);
@@ -90,12 +118,20 @@ SharedControlNode::SharedControlNode()
   max_angular_velocity_ = this->declare_parameter<double>("max_angular_velocity", 1.8);
   max_linear_accel_ = this->declare_parameter<double>("max_linear_accel", 1.2);
   max_angular_accel_ = this->declare_parameter<double>("max_angular_accel", 2.5);
+  obstacle_guard_enabled_ = this->declare_parameter<bool>("obstacle_guard_enabled", true);
+  obstacle_stop_distance_m_ = this->declare_parameter<double>("obstacle_stop_distance_m", 0.5);
+  obstacle_timeout_sec_ = this->declare_parameter<double>("obstacle_timeout_sec", 0.3);
+  obstacle_point_min_z_ = this->declare_parameter<double>("obstacle_point_min_z", -0.3);
+  obstacle_point_max_z_ = this->declare_parameter<double>("obstacle_point_max_z", 1.2);
+  strict_frame_match_ = this->declare_parameter<bool>("strict_frame_match", true);
 
   const auto now = this->get_clock()->now();
   left_feedback_.stamp = now;
   right_feedback_.stamp = now;
   latest_autonomy_stamp_ = now;
   last_step_stamp_ = now;
+  footprint_stamp_ = now;
+  obstacle_stamp_ = now;
 
   ctrl_pub_left_ = this->create_publisher<odrive_can::msg::ControlMessage>(
     "/" + axis0_ns_ + "/control_message", 10);
@@ -116,6 +152,10 @@ SharedControlNode::SharedControlNode()
   autonomy_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
     autonomy_cmd_topic_, 20,
     std::bind(&SharedControlNode::onAutonomyCmd, this, std::placeholders::_1));
+  footprint_sub_ = this->create_subscription<geometry_msgs::msg::PolygonStamped>(
+    footprint_topic_, 10, std::bind(&SharedControlNode::onFootprint, this, std::placeholders::_1));
+  cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+    pointcloud_topic_, 10, std::bind(&SharedControlNode::onPointCloud, this, std::placeholders::_1));
 
   if (request_closed_loop_on_startup_) {
     axis0_client_ = this->create_client<odrive_can::srv::AxisState>(
@@ -132,8 +172,10 @@ SharedControlNode::SharedControlNode()
 
   RCLCPP_INFO(
     this->get_logger(),
-    "started: axis0=/%s axis1=/%s loop=%.1fHz",
-    axis0_ns_.c_str(), axis1_ns_.c_str(), loop_rate_hz_);
+    "started: axis0=/%s axis1=/%s loop=%.1fHz obstacle_guard=%s stop_distance=%.2fm",
+    axis0_ns_.c_str(), axis1_ns_.c_str(), loop_rate_hz_,
+    obstacle_guard_enabled_ ? "true" : "false",
+    obstacle_stop_distance_m_);
 }
 
 void SharedControlNode::onAxis0Status(const odrive_can::msg::ControllerStatus::SharedPtr msg)
@@ -173,6 +215,79 @@ void SharedControlNode::onAutonomyCmd(const geometry_msgs::msg::TwistStamped::Sh
 {
   latest_autonomy_cmd_ = *msg;
   latest_autonomy_stamp_ = this->get_clock()->now();
+}
+
+void SharedControlNode::onFootprint(const geometry_msgs::msg::PolygonStamped::SharedPtr msg)
+{
+  footprint_points_.clear();
+  footprint_points_.reserve(msg->polygon.points.size());
+  for (const auto & p : msg->polygon.points) {
+    footprint_points_.push_back(XYPoint{static_cast<double>(p.x), static_cast<double>(p.y)});
+  }
+
+  footprint_frame_id_ = msg->header.frame_id;
+  footprint_stamp_ = this->get_clock()->now();
+  footprint_received_ = footprint_points_.size() >= 3;
+}
+
+void SharedControlNode::onPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+{
+  if (!obstacle_guard_enabled_ || !footprint_received_) {
+    return;
+  }
+
+  if (strict_frame_match_ && msg->header.frame_id != footprint_frame_id_) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 2000,
+      "frame mismatch: pointcloud=%s footprint=%s (skip obstacle guard update)",
+      msg->header.frame_id.c_str(), footprint_frame_id_.c_str());
+    return;
+  }
+
+  double front_clearance = std::numeric_limits<double>::infinity();
+  double rear_clearance = std::numeric_limits<double>::infinity();
+  bool has_valid_point = false;
+
+  try {
+    sensor_msgs::PointCloud2ConstIterator<float> iter_x(*msg, "x");
+    sensor_msgs::PointCloud2ConstIterator<float> iter_y(*msg, "y");
+    sensor_msgs::PointCloud2ConstIterator<float> iter_z(*msg, "z");
+
+    for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
+      const double x = static_cast<double>(*iter_x);
+      const double y = static_cast<double>(*iter_y);
+      const double z = static_cast<double>(*iter_z);
+      if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) {
+        continue;
+      }
+      if (z < obstacle_point_min_z_ || z > obstacle_point_max_z_) {
+        continue;
+      }
+
+      has_valid_point = true;
+      const double clearance = distancePointToFootprint(x, y);
+      if (x >= 0.0) {
+        front_clearance = std::min(front_clearance, clearance);
+      } else {
+        rear_clearance = std::min(rear_clearance, clearance);
+      }
+    }
+  } catch (const std::runtime_error & ex) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 2000,
+      "pointcloud fields missing (need x,y,z): %s", ex.what());
+    return;
+  }
+
+  if (!has_valid_point) {
+    front_clearance = std::numeric_limits<double>::infinity();
+    rear_clearance = std::numeric_limits<double>::infinity();
+  }
+
+  front_clearance_m_ = front_clearance;
+  rear_clearance_m_ = rear_clearance;
+  obstacle_stamp_ = this->get_clock()->now();
+  obstacle_received_ = true;
 }
 
 void SharedControlNode::requestClosedLoopIfReady()
@@ -237,6 +352,14 @@ bool SharedControlNode::statusValid(const AxisFeedback & feedback, const rclcpp:
   return (now - feedback.stamp).seconds() <= status_timeout_sec_;
 }
 
+bool SharedControlNode::obstacleDataFresh(const rclcpp::Time & now) const
+{
+  if (!obstacle_guard_enabled_ || !obstacle_received_) {
+    return false;
+  }
+  return (now - obstacle_stamp_).seconds() <= obstacle_timeout_sec_;
+}
+
 double SharedControlNode::estimateWheelTorque(
   const odrive_can::msg::ControllerStatus & status,
   double sign) const
@@ -261,6 +384,44 @@ double SharedControlNode::fromSiAngular(double angular_velocity_rad_s) const
     return angular_velocity_rad_s / (2.0 * kPi);
   }
   return angular_velocity_rad_s;
+}
+
+bool SharedControlNode::pointInsideFootprint(double x, double y) const
+{
+  if (footprint_points_.size() < 3) {
+    return false;
+  }
+
+  bool inside = false;
+  for (size_t i = 0, j = footprint_points_.size() - 1; i < footprint_points_.size(); j = i++) {
+    const auto & pi = footprint_points_[i];
+    const auto & pj = footprint_points_[j];
+    const bool intersects =
+      ((pi.y > y) != (pj.y > y)) &&
+      (x < (pj.x - pi.x) * (y - pi.y) / ((pj.y - pi.y) + 1.0e-12) + pi.x);
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+double SharedControlNode::distancePointToFootprint(double x, double y) const
+{
+  if (footprint_points_.size() < 2) {
+    return std::numeric_limits<double>::infinity();
+  }
+  if (pointInsideFootprint(x, y)) {
+    return 0.0;
+  }
+
+  double min_sq = std::numeric_limits<double>::infinity();
+  for (size_t i = 0; i < footprint_points_.size(); ++i) {
+    const auto & a = footprint_points_[i];
+    const auto & b = footprint_points_[(i + 1) % footprint_points_.size()];
+    min_sq = std::min(min_sq, squaredDistanceToSegment(x, y, a.x, a.y, b.x, b.y));
+  }
+  return std::sqrt(min_sq);
 }
 
 void SharedControlNode::publishWheelVelocities(double left_wheel_rad_s, double right_wheel_rad_s)
@@ -380,6 +541,22 @@ void SharedControlNode::controlStep()
   command_wz_ += cmd_accel_z * dt;
   command_v_ = clamp(command_v_, -max_linear_velocity_, max_linear_velocity_);
   command_wz_ = clamp(command_wz_, -max_angular_velocity_, max_angular_velocity_);
+
+  if (obstacleDataFresh(now)) {
+    if (command_v_ > 0.0 && front_clearance_m_ <= obstacle_stop_distance_m_) {
+      command_v_ = 0.0;
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *this->get_clock(), 1000,
+        "forward motion blocked by obstacle clearance %.3fm <= %.3fm",
+        front_clearance_m_, obstacle_stop_distance_m_);
+    } else if (command_v_ < 0.0 && rear_clearance_m_ <= obstacle_stop_distance_m_) {
+      command_v_ = 0.0;
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *this->get_clock(), 1000,
+        "reverse motion blocked by obstacle clearance %.3fm <= %.3fm",
+        rear_clearance_m_, obstacle_stop_distance_m_);
+    }
+  }
 
   const double left_cmd_w =
     (command_v_ - 0.5 * wheel_separation_m_ * command_wz_) / wheel_radius_m_;

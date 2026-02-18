@@ -4,6 +4,8 @@ shared_control_node:
     axis1_namespace: "odrive_axis1"
     imu_topic: "/imu/data"
     autonomy_cmd_topic: "/autonomy/cmd_vel"
+    pointcloud_topic: "/velodyne_points_cropped"
+    footprint_topic: "/footprint"
 
     wheel_radius_m: 0.0855
     wheel_separation_m: 0.419
@@ -48,7 +50,14 @@ shared_control_node:
 
     loop_rate_hz: 100.0
     status_timeout_sec: 0.2
-    max_linear_velocity: 0.8
-    max_angular_velocity: 1.8
-    max_linear_accel: 1.2
-    max_angular_accel: 2.5
+    max_linear_velocity: 0.4
+    max_angular_velocity: 0.9
+    max_linear_accel: 0.3
+    max_angular_accel: 0.625
+
+    obstacle_guard_enabled: true
+    obstacle_stop_distance_m: 0.5
+    obstacle_timeout_sec: 0.3
+    obstacle_point_min_z: -0.3
+    obstacle_point_max_z: 1.2
+    strict_frame_match: true

@@ -7,6 +7,7 @@ ODrive S1 x2 + BotWheels 2輪差動向けの shared control 実装です。
 - IMU姿勢から坂道重力成分を補償
 - 推定外力をコンプライアンス制御で速度指令へ変換
 - 必要に応じて自律側 `TwistStamped` と合成（shared control）
+- LiDAR点群 + footprintから障害物接近時の前後進ブロック（安全ガード）
 
 実装言語は C++ (`rclcpp`) です。
 
@@ -40,6 +41,8 @@ ros2 launch cabot_shared_control shared_control.launch.py
   - `/odrive_axis1/controller_status` (`odrive_can/msg/ControllerStatus`)
   - `/imu/data` (`sensor_msgs/msg/Imu`)
   - `/autonomy/cmd_vel` (`geometry_msgs/msg/TwistStamped`, 任意)
+  - `/velodyne_points_cropped` (`sensor_msgs/msg/PointCloud2`)
+  - `/footprint` (`geometry_msgs/msg/PolygonStamped`)
 - 出力:
   - `/odrive_axis0/control_message` (`odrive_can/msg/ControlMessage`)
   - `/odrive_axis1/control_message` (`odrive_can/msg/ControlMessage`)
@@ -64,9 +67,16 @@ ros2 launch cabot_shared_control shared_control.launch.py
   - `human_force_weight`
   - `autonomy_force_weight`
   - `autonomy_virtual_stiffness_x`, `autonomy_virtual_stiffness_z`
+- 障害物ガード:
+  - `obstacle_guard_enabled`
+  - `obstacle_stop_distance_m` (初期値 0.5)
+  - `pointcloud_topic`, `footprint_topic`
+  - `obstacle_point_min_z`, `obstacle_point_max_z`
+  - `strict_frame_match`
 
 ## セットアップ注意
 
 - `odrive_can` 側で cyclic message を有効化してください（特に `heartbeat`, `encoder`, `iq`, `torques`）。
 - 軸状態は `CLOSED_LOOP_CONTROL` である必要があります。本ノードは起動時に `/request_axis_state` を呼び出す設定が可能です。
 - `wheel_radius_m`, `wheel_separation_m`, 符号パラメータは実機に合わせて必ず調整してください。
+- 障害物ガードは `PointCloud2` と `footprint` が同一フレームであることを前提にしています。
