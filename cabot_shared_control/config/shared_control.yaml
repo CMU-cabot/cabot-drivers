@@ -10,17 +10,17 @@ shared_control_node:
     footprint_topic: "/footprint"
 
     wheel_radius_m: 0.0855
-    wheel_separation_m: 0.419
+    wheel_separation_m: 0.139
     left_wheel_sign: -1.0
     right_wheel_sign: 1.0
     odrive_velocity_is_turns_per_sec: true
 
-    control_mode: 2
-    input_mode: 1
+    control_mode: 2  # ODrive ControlMode: 2 = VELOCITY_CONTROL（速度制御）
+    input_mode: 1  # ODrive InputMode: 1 = PASSTHROUGH（input_vel をそのまま使用）
     request_closed_loop_on_startup: true
 
     observer_gain_x: 10.0
-    observer_gain_z: 10.0
+    observer_gain_z: 18.0
     robot_mass_x: 24.0
     robot_inertia_z: 2.2
     robot_damping_x: 40.0
@@ -38,9 +38,9 @@ shared_control_node:
     imu_accel_blend: 0.2
 
     desired_mass_x: 11.0
-    desired_inertia_z: 1.2
+    desired_inertia_z: 0.9
     desired_damping_x: 24.0
-    desired_damping_z: 4.0
+    desired_damping_z: 2.8
 
     human_force_weight: 1.0
     autonomy_force_weight: 0.0
@@ -50,18 +50,18 @@ shared_control_node:
     human_force_x_sign: -1.0
     human_torque_z_sign: -1.0
     force_deadband_x: 2.0
-    force_deadband_z: 1.2
+    force_deadband_z: 0.5
 
     loop_rate_hz: 100.0
     status_timeout_sec: 0.2
     max_linear_velocity: 0.32
     max_linear_velocity_forward: 0.7
     max_linear_velocity_reverse: 0.3
-    max_angular_velocity: 0.40
+    max_angular_velocity: 0.55
     max_linear_accel: 0.48
     max_linear_accel_forward: 0.5
     max_linear_accel_reverse: 0.5
-    max_angular_accel: 0.60
+    max_angular_accel: 1.00
 
     obstacle_guard_enabled: true
     obstacle_guard_reverse_enabled: false
