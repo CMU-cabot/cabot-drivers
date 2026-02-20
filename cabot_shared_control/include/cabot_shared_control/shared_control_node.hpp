@@ -163,7 +163,7 @@ private:
   double loop_rate_hz_{100.0};
   double status_timeout_sec_{0.2};
   double cmd_vel_timeout_sec_{0.2};
-  double pause_control_timeout_sec_{0.6};
+  double pause_control_timeout_sec_{5.0};
   double axis_state_request_interval_sec_{0.5};
   double max_acc_{1.2};
   double max_dec_{-1.2};

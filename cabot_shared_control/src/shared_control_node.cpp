@@ -155,7 +155,7 @@ SharedControlNode::SharedControlNode()
   loop_rate_hz_ = this->declare_parameter<double>("loop_rate_hz", 100.0);
   status_timeout_sec_ = this->declare_parameter<double>("status_timeout_sec", 0.2);
   cmd_vel_timeout_sec_ = this->declare_parameter<double>("cmd_vel_timeout_sec", 0.2);
-  pause_control_timeout_sec_ = this->declare_parameter<double>("pause_control_timeout_sec", 0.6);
+  pause_control_timeout_sec_ = this->declare_parameter<double>("pause_control_timeout_sec", 5.0);
   axis_state_request_interval_sec_ =
     this->declare_parameter<double>("axis_state_request_interval_sec", 0.5);
   max_acc_ = this->declare_parameter<double>("max_acc", 1.2);
