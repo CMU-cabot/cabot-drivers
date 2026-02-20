@@ -8,6 +8,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
@@ -24,6 +25,7 @@ target_include_directories(shared_control_node PUBLIC
 ament_target_dependencies(shared_control_node
   rclcpp
   geometry_msgs
+  nav_msgs
   sensor_msgs
   std_msgs
   odrive_can

@@ -60,6 +60,7 @@ def generate_launch_description():
     use_crop_box = LaunchConfiguration('use_crop_box')
     hesai_ros_2_0 = LaunchConfiguration('hesai_ros_2_0')
     use_imu = LaunchConfiguration('use_imu')
+    use_pause_control = LaunchConfiguration('use_pause_control')
     imu_topic = LaunchConfiguration('imu_topic')
     pointcloud_topic = LaunchConfiguration('pointcloud_topic')
     footprint_topic = LaunchConfiguration('footprint_topic')
@@ -154,6 +155,11 @@ def generate_launch_description():
             'use_imu',
             default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_USE_IMU', default_value='true'),
             description='If false, disable IMU input and assume horizontal terrain'
+        ),
+        DeclareLaunchArgument(
+            'use_pause_control',
+            default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_USE_PAUSE_CONTROL', default_value='true'),
+            description='If false, ignore /cabot/pause_control and switch by touch only'
         ),
         DeclareLaunchArgument(
             'imu_topic',
@@ -306,6 +312,7 @@ def generate_launch_description():
                     shared_control_param_file,
                     {
                         'use_imu': ParameterValue(use_imu, value_type=bool),
+                        'use_pause_control': ParameterValue(use_pause_control, value_type=bool),
                         'imu_topic': imu_topic,
                         'pointcloud_topic': pointcloud_topic,
                         'footprint_topic': footprint_topic,

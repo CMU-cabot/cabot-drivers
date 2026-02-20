@@ -33,6 +33,7 @@
 
 namespace
 {
+constexpr uint32_t kAxisStateIdle = 1;
 constexpr uint32_t kAxisStateClosedLoopControl = 8;
 constexpr double kGravity = 9.80665;
 constexpr double kPi = 3.14159265358979323846;
@@ -82,12 +83,20 @@ SharedControlNode::SharedControlNode()
   axis1_ns_ = this->declare_parameter<std::string>("axis1_namespace", "odrive_axis1");
   imu_topic_ = this->declare_parameter<std::string>("imu_topic", "/imu/data");
   touch_topic_ = this->declare_parameter<std::string>("touch_topic", "/cabot/touch");
+  pause_control_topic_ =
+    this->declare_parameter<std::string>("pause_control_topic", "/cabot/pause_control");
+  cmd_vel_topic_ = this->declare_parameter<std::string>("cmd_vel_topic", "/cabot/cmd_vel");
   use_imu_ = this->declare_parameter<bool>("use_imu", true);
   autonomy_cmd_topic_ =
     this->declare_parameter<std::string>("autonomy_cmd_topic", "/autonomy/cmd_vel");
   pointcloud_topic_ =
     this->declare_parameter<std::string>("pointcloud_topic", "/velodyne_points_cropped");
   footprint_topic_ = this->declare_parameter<std::string>("footprint_topic", "/footprint");
+  odom_topic_ = this->declare_parameter<std::string>("odom_topic", "/cabot/odom_raw");
+  // Deprecated behavior switch. Kept for parameter-file compatibility.
+  shared_control_when_touch_active_ =
+    this->declare_parameter<bool>("shared_control_when_touch_active", true);
+  use_pause_control_ = this->declare_parameter<bool>("use_pause_control", true);
 
   wheel_radius_m_ = this->declare_parameter<double>("wheel_radius_m", 0.0855);
   wheel_separation_m_ = this->declare_parameter<double>("wheel_separation_m", 0.419);
@@ -145,6 +154,12 @@ SharedControlNode::SharedControlNode()
 
   loop_rate_hz_ = this->declare_parameter<double>("loop_rate_hz", 100.0);
   status_timeout_sec_ = this->declare_parameter<double>("status_timeout_sec", 0.2);
+  cmd_vel_timeout_sec_ = this->declare_parameter<double>("cmd_vel_timeout_sec", 0.2);
+  pause_control_timeout_sec_ = this->declare_parameter<double>("pause_control_timeout_sec", 0.6);
+  axis_state_request_interval_sec_ =
+    this->declare_parameter<double>("axis_state_request_interval_sec", 0.5);
+  max_acc_ = this->declare_parameter<double>("max_acc", 1.2);
+  max_dec_ = this->declare_parameter<double>("max_dec", -1.2);
   const double max_linear_velocity_default =
     this->declare_parameter<double>("max_linear_velocity", 0.8);
   max_linear_velocity_forward_ = this->declare_parameter<double>(
@@ -153,11 +168,11 @@ SharedControlNode::SharedControlNode()
     "max_linear_velocity_reverse", max_linear_velocity_default);
   max_angular_velocity_ = this->declare_parameter<double>("max_angular_velocity", 1.8);
   const double max_linear_accel_default =
-    this->declare_parameter<double>("max_linear_accel", 1.2);
+    this->declare_parameter<double>("max_linear_accel", max_acc_);
   max_linear_accel_forward_ = this->declare_parameter<double>(
     "max_linear_accel_forward", max_linear_accel_default);
   max_linear_accel_reverse_ = this->declare_parameter<double>(
-    "max_linear_accel_reverse", max_linear_accel_default);
+    "max_linear_accel_reverse", std::max(0.0, -max_dec_));
   max_angular_accel_ = this->declare_parameter<double>("max_angular_accel", 2.5);
   obstacle_guard_enabled_ = this->declare_parameter<bool>("obstacle_guard_enabled", true);
   obstacle_guard_reverse_enabled_ =
@@ -182,6 +197,9 @@ SharedControlNode::SharedControlNode()
   left_feedback_.stamp = now;
   right_feedback_.stamp = now;
   latest_autonomy_stamp_ = now;
+  latest_cmd_vel_stamp_ = now;
+  latest_pause_control_stamp_ = now;
+  last_axis_state_request_stamp_ = now;
   last_step_stamp_ = now;
   footprint_stamp_ = now;
   obstacle_stamp_ = now;
@@ -195,6 +213,7 @@ SharedControlNode::SharedControlNode()
     10);
   cmd_pub_ =
     this->create_publisher<geometry_msgs::msg::TwistStamped>("/shared_control/cmd_vel", 10);
+  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(odom_topic_, 10);
 
   left_sub_ = this->create_subscription<odrive_can::msg::ControllerStatus>(
     "/" + axis0_ns_ + "/controller_status", 50,
@@ -212,6 +231,11 @@ SharedControlNode::SharedControlNode()
   }
   touch_sub_ = this->create_subscription<std_msgs::msg::Int16>(
     touch_topic_, 50, std::bind(&SharedControlNode::onTouch, this, std::placeholders::_1));
+  pause_control_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+    pause_control_topic_, 20,
+    std::bind(&SharedControlNode::onPauseControl, this, std::placeholders::_1));
+  cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
+    cmd_vel_topic_, 20, std::bind(&SharedControlNode::onCmdVel, this, std::placeholders::_1));
   autonomy_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
     autonomy_cmd_topic_, 20,
     std::bind(&SharedControlNode::onAutonomyCmd, this, std::placeholders::_1));
@@ -221,11 +245,11 @@ SharedControlNode::SharedControlNode()
     pointcloud_topic_, 10,
     std::bind(&SharedControlNode::onPointCloud, this, std::placeholders::_1));
 
+  axis0_client_ = this->create_client<odrive_can::srv::AxisState>(
+    "/" + axis0_ns_ + "/request_axis_state");
+  axis1_client_ = this->create_client<odrive_can::srv::AxisState>(
+    "/" + axis1_ns_ + "/request_axis_state");
   if (request_closed_loop_on_startup_) {
-    axis0_client_ = this->create_client<odrive_can::srv::AxisState>(
-      "/" + axis0_ns_ + "/request_axis_state");
-    axis1_client_ = this->create_client<odrive_can::srv::AxisState>(
-      "/" + axis1_ns_ + "/request_axis_state");
     startup_timer_ = this->create_wall_timer(
       std::chrono::seconds(1), std::bind(&SharedControlNode::requestClosedLoopIfReady, this));
   }
@@ -289,6 +313,19 @@ void SharedControlNode::onAutonomyCmd(const geometry_msgs::msg::TwistStamped::Sh
 void SharedControlNode::onTouch(const std_msgs::msg::Int16::SharedPtr msg)
 {
   touch_active_ = (msg->data == 1);
+}
+
+void SharedControlNode::onPauseControl(const std_msgs::msg::Bool::SharedPtr msg)
+{
+  pause_control_active_ = msg->data;
+  pause_control_received_ = true;
+  latest_pause_control_stamp_ = this->get_clock()->now();
+}
+
+void SharedControlNode::onCmdVel(const geometry_msgs::msg::Twist::SharedPtr msg)
+{
+  latest_cmd_vel_ = *msg;
+  latest_cmd_vel_stamp_ = this->get_clock()->now();
 }
 
 void SharedControlNode::onFootprint(const geometry_msgs::msg::Polygon::SharedPtr msg)
@@ -391,34 +428,19 @@ void SharedControlNode::onPointCloud(const sensor_msgs::msg::PointCloud2::Shared
 
 void SharedControlNode::requestClosedLoopIfReady()
 {
-  if (!request_closed_loop_on_startup_ || !axis0_client_ || !axis1_client_) {
+  if (!request_closed_loop_on_startup_) {
     return;
   }
-  if (!axis0_client_->service_is_ready() || !axis1_client_->service_is_ready()) {
+  if (!axis0_client_ || !axis1_client_) {
     return;
   }
-
-  auto req0 = std::make_shared<odrive_can::srv::AxisState::Request>();
-  req0->axis_requested_state = kAxisStateClosedLoopControl;
-  axis0_client_->async_send_request(
-    req0,
-    [this](rclcpp::Client<odrive_can::srv::AxisState>::SharedFuture future) {
-      this->onAxisStateResponse(future, this->axis0_ns_);
-    });
-
-  auto req1 = std::make_shared<odrive_can::srv::AxisState::Request>();
-  req1->axis_requested_state = kAxisStateClosedLoopControl;
-  axis1_client_->async_send_request(
-    req1,
-    [this](rclcpp::Client<odrive_can::srv::AxisState>::SharedFuture future) {
-      this->onAxisStateResponse(future, this->axis1_ns_);
-    });
-
-  request_closed_loop_on_startup_ = false;
-  if (startup_timer_) {
-    startup_timer_->cancel();
+  if (axis0_client_->service_is_ready() && axis1_client_->service_is_ready()) {
+    requestAxisState(true, true);
+    request_closed_loop_on_startup_ = false;
+    if (startup_timer_) {
+      startup_timer_->cancel();
+    }
   }
-  RCLCPP_INFO(this->get_logger(), "requested CLOSED_LOOP_CONTROL on both ODrive axes");
 }
 
 void SharedControlNode::onAxisStateResponse(
@@ -441,6 +463,131 @@ void SharedControlNode::onAxisStateResponse(
       axis_name.c_str(),
       ex.what());
   }
+}
+
+bool SharedControlNode::pauseControlValid(const rclcpp::Time & now) const
+{
+  if (!use_pause_control_) {
+    return true;
+  }
+  if (!pause_control_received_) {
+    return false;
+  }
+  return (now - latest_pause_control_stamp_).seconds() <= pause_control_timeout_sec_;
+}
+
+bool SharedControlNode::cmdVelFresh(const rclcpp::Time & now) const
+{
+  if (!latest_cmd_vel_.has_value()) {
+    return false;
+  }
+  return (now - latest_cmd_vel_stamp_).seconds() <= cmd_vel_timeout_sec_;
+}
+
+double SharedControlNode::slewRate(double current, double target, double accel_limit, double dt) const
+{
+  const double step = std::max(0.0, accel_limit) * std::max(0.0, dt);
+  const double diff = target - current;
+  if (std::abs(diff) <= step) {
+    return target;
+  }
+  return current + std::copysign(step, diff);
+}
+
+void SharedControlNode::requestAxisState(bool closed_loop, bool force)
+{
+  if (!axis0_client_ || !axis1_client_) {
+    return;
+  }
+
+  const auto now = this->get_clock()->now();
+  if (!force) {
+    if (requested_closed_loop_ == closed_loop) {
+      return;
+    }
+    if ((now - last_axis_state_request_stamp_).seconds() < axis_state_request_interval_sec_) {
+      return;
+    }
+  }
+
+  if (!axis0_client_->service_is_ready() || !axis1_client_->service_is_ready()) {
+    return;
+  }
+
+  const uint32_t target_state = closed_loop ? kAxisStateClosedLoopControl : kAxisStateIdle;
+
+  auto req0 = std::make_shared<odrive_can::srv::AxisState::Request>();
+  req0->axis_requested_state = target_state;
+  axis0_client_->async_send_request(
+    req0,
+    [this](rclcpp::Client<odrive_can::srv::AxisState>::SharedFuture future) {
+      this->onAxisStateResponse(future, this->axis0_ns_);
+    });
+
+  auto req1 = std::make_shared<odrive_can::srv::AxisState::Request>();
+  req1->axis_requested_state = target_state;
+  axis1_client_->async_send_request(
+    req1,
+    [this](rclcpp::Client<odrive_can::srv::AxisState>::SharedFuture future) {
+      this->onAxisStateResponse(future, this->axis1_ns_);
+    });
+
+  requested_closed_loop_ = closed_loop;
+  last_axis_state_request_stamp_ = now;
+}
+
+void SharedControlNode::updateOdometryFromStatus(const rclcpp::Time & now)
+{
+  if (!statusValid(left_feedback_, now) || !statusValid(right_feedback_, now)) {
+    return;
+  }
+
+  const double left_pos =
+    left_wheel_sign_ * toSiAngular(static_cast<double>(left_feedback_.msg.pos_estimate));
+  const double right_pos =
+    right_wheel_sign_ * toSiAngular(static_cast<double>(right_feedback_.msg.pos_estimate));
+  const double left_dist = wheel_radius_m_ * left_pos;
+  const double right_dist = wheel_radius_m_ * right_pos;
+
+  if (!odom_initialized_) {
+    last_left_dist_m_ = left_dist;
+    last_right_dist_m_ = right_dist;
+    odom_initialized_ = true;
+  }
+
+  const double delta_left = left_dist - last_left_dist_m_;
+  const double delta_right = right_dist - last_right_dist_m_;
+  last_left_dist_m_ = left_dist;
+  last_right_dist_m_ = right_dist;
+
+  const double delta_s = 0.5 * (delta_left + delta_right);
+  const double delta_yaw = (delta_right - delta_left) / std::max(wheel_separation_m_, 1.0e-6);
+  const double mid_yaw = odom_yaw_rad_ + 0.5 * delta_yaw;
+  odom_x_m_ += delta_s * std::cos(mid_yaw);
+  odom_y_m_ += delta_s * std::sin(mid_yaw);
+  odom_yaw_rad_ += delta_yaw;
+
+  const double left_w =
+    left_wheel_sign_ * toSiAngular(static_cast<double>(left_feedback_.msg.vel_estimate));
+  const double right_w =
+    right_wheel_sign_ * toSiAngular(static_cast<double>(right_feedback_.msg.vel_estimate));
+  const double v_meas = 0.5 * wheel_radius_m_ * (right_w + left_w);
+  const double wz_meas = (wheel_radius_m_ / wheel_separation_m_) * (right_w - left_w);
+
+  nav_msgs::msg::Odometry odom;
+  odom.header.stamp = now;
+  odom.header.frame_id = "odom";
+  odom.child_frame_id = "base_footprint";
+  odom.pose.pose.position.x = odom_x_m_;
+  odom.pose.pose.position.y = odom_y_m_;
+  odom.pose.pose.position.z = 0.0;
+  odom.pose.pose.orientation.x = 0.0;
+  odom.pose.pose.orientation.y = 0.0;
+  odom.pose.pose.orientation.z = std::sin(0.5 * odom_yaw_rad_);
+  odom.pose.pose.orientation.w = std::cos(0.5 * odom_yaw_rad_);
+  odom.twist.twist.linear.x = v_meas;
+  odom.twist.twist.angular.z = wz_meas;
+  odom_pub_->publish(odom);
 }
 
 bool SharedControlNode::statusValid(const AxisFeedback & feedback, const rclcpp::Time & now) const
@@ -576,24 +723,57 @@ void SharedControlNode::publishStop()
   publishWheelVelocities(0.0, 0.0);
 }
 
-void SharedControlNode::controlStep()
+void SharedControlNode::controlStepStop(double dt)
 {
+  external_force_x_ = 0.0;
+  external_torque_z_ = 0.0;
+  command_v_ = slewRate(
+    command_v_, 0.0,
+    command_v_ >= 0.0 ? max_linear_accel_forward_ : max_linear_accel_reverse_, dt);
+  command_wz_ = slewRate(command_wz_, 0.0, max_angular_accel_, dt);
+  const double left_cmd_w =
+    (command_v_ - 0.5 * wheel_separation_m_ * command_wz_) / wheel_radius_m_;
+  const double right_cmd_w =
+    (command_v_ + 0.5 * wheel_separation_m_ * command_wz_) / wheel_radius_m_;
+  publishWheelVelocities(left_cmd_w, right_cmd_w);
+}
+
+void SharedControlNode::controlStepAutonomy(double dt)
+{
+  external_force_x_ = 0.0;
+  external_torque_z_ = 0.0;
+  double target_v = 0.0;
+  double target_wz = 0.0;
   const auto now = this->get_clock()->now();
-  double dt = (now - last_step_stamp_).seconds();
-  if (dt <= 1.0e-6) {
-    dt = 1.0 / std::max(loop_rate_hz_, 1.0);
-  }
-  last_step_stamp_ = now;
-
-  if (!touch_active_) {
-    external_force_x_ = 0.0;
-    external_torque_z_ = 0.0;
-    command_v_ = 0.0;
-    command_wz_ = 0.0;
-    publishStop();
-    return;
+  if (cmdVelFresh(now)) {
+    target_v = latest_cmd_vel_->linear.x;
+    target_wz = latest_cmd_vel_->angular.z;
   }
 
+  target_v = clamp(target_v, -max_linear_velocity_reverse_, max_linear_velocity_forward_);
+  target_wz = clamp(target_wz, -max_angular_velocity_, max_angular_velocity_);
+  const double accel_linear = target_v >= command_v_ ? max_linear_accel_forward_ : max_linear_accel_reverse_;
+  command_v_ = slewRate(command_v_, target_v, accel_linear, dt);
+  command_wz_ = slewRate(command_wz_, target_wz, max_angular_accel_, dt);
+  const double left_cmd_w =
+    (command_v_ - 0.5 * wheel_separation_m_ * command_wz_) / wheel_radius_m_;
+  const double right_cmd_w =
+    (command_v_ + 0.5 * wheel_separation_m_ * command_wz_) / wheel_radius_m_;
+  publishWheelVelocities(left_cmd_w, right_cmd_w);
+}
+
+void SharedControlNode::controlStepFree()
+{
+  external_force_x_ = 0.0;
+  external_torque_z_ = 0.0;
+  command_v_ = 0.0;
+  command_wz_ = 0.0;
+  last_v_meas_ = 0.0;
+  last_wz_meas_ = 0.0;
+}
+
+void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
+{
   if (!statusValid(left_feedback_, now) || !statusValid(right_feedback_, now)) {
     command_v_ = 0.0;
     command_wz_ = 0.0;
@@ -688,18 +868,20 @@ void SharedControlNode::controlStep()
         this->get_logger(), *this->get_clock(), 1000,
         "front obstacle pushback: clearance=%.3fm pushback=%.2fN",
         front_clearance_m_, pushback);
-    } else if (
-      obstacle_guard_reverse_enabled_ && rear_clearance_m_ <= obstacle_stop_distance_m_ &&
-      shared_force_x < 0.0)
-    {
-      const double penetration = obstacle_stop_distance_m_ - rear_clearance_m_;
-      const double pushback = clamp(
-        obstacle_pushback_stiffness_ * penetration, 0.0, obstacle_pushback_max_force_);
-      shared_force_x += pushback;
-      RCLCPP_WARN_THROTTLE(
-        this->get_logger(), *this->get_clock(), 1000,
-        "rear obstacle pushback: clearance=%.3fm pushback=%.2fN",
-        rear_clearance_m_, pushback);
+    } else {
+      if (
+        obstacle_guard_reverse_enabled_ && rear_clearance_m_ <= obstacle_stop_distance_m_ &&
+        shared_force_x < 0.0)
+      {
+        const double penetration = obstacle_stop_distance_m_ - rear_clearance_m_;
+        const double pushback = clamp(
+          obstacle_pushback_stiffness_ * penetration, 0.0, obstacle_pushback_max_force_);
+        shared_force_x += pushback;
+        RCLCPP_WARN_THROTTLE(
+          this->get_logger(), *this->get_clock(), 1000,
+          "rear obstacle pushback: clearance=%.3fm pushback=%.2fN",
+          rear_clearance_m_, pushback);
+      }
     }
   }
 
@@ -785,6 +967,53 @@ void SharedControlNode::controlStep()
   cmd_msg.twist.linear.x = command_v_;
   cmd_msg.twist.angular.z = command_wz_;
   cmd_pub_->publish(cmd_msg);
+}
+
+void SharedControlNode::controlStep()
+{
+  const auto now = this->get_clock()->now();
+  double dt = (now - last_step_stamp_).seconds();
+  if (dt <= 1.0e-6) {
+    dt = 1.0 / std::max(loop_rate_hz_, 1.0);
+  }
+  last_step_stamp_ = now;
+
+  updateOdometryFromStatus(now);
+
+  if (!pauseControlValid(now)) {
+    requestAxisState(true);
+    controlStepStop(dt);
+    return;
+  }
+
+  if (!use_pause_control_) {
+    requestAxisState(true);
+    if (touch_active_) {
+      controlStepShared(now, dt);
+      return;
+    }
+    controlStepStop(dt);
+    return;
+  }
+
+  if (pause_control_active_ && !touch_active_) {
+    requestAxisState(false);
+    controlStepFree();
+    return;
+  }
+
+  requestAxisState(true);
+  if (pause_control_active_ && touch_active_) {
+    controlStepShared(now, dt);
+    return;
+  }
+
+  if (!pause_control_active_ && touch_active_) {
+    controlStepAutonomy(dt);
+    return;
+  }
+
+  controlStepStop(dt);
 }
 
 }  // namespace cabot_shared_control

@@ -26,15 +26,18 @@
 #include <string>
 #include <vector>
 
+#include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <geometry_msgs/msg/polygon.hpp>
 #include <geometry_msgs/msg/wrench_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 #include <odrive_can/msg/control_message.hpp>
 #include <odrive_can/msg/controller_status.hpp>
 #include <odrive_can/srv/axis_state.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/int16.hpp>
 
 namespace cabot_shared_control
@@ -57,11 +60,22 @@ private:
   void onAxis1Status(const odrive_can::msg::ControllerStatus::SharedPtr msg);
   void onImu(const sensor_msgs::msg::Imu::SharedPtr msg);
   void onTouch(const std_msgs::msg::Int16::SharedPtr msg);
+  void onPauseControl(const std_msgs::msg::Bool::SharedPtr msg);
+  void onCmdVel(const geometry_msgs::msg::Twist::SharedPtr msg);
   void onAutonomyCmd(const geometry_msgs::msg::TwistStamped::SharedPtr msg);
   void onFootprint(const geometry_msgs::msg::Polygon::SharedPtr msg);
   void onPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
   void controlStep();
+  void controlStepShared(const rclcpp::Time & now, double dt);
+  void controlStepAutonomy(double dt);
+  void controlStepStop(double dt);
+  void controlStepFree();
+  void requestAxisState(bool closed_loop, bool force = false);
+  bool pauseControlValid(const rclcpp::Time & now) const;
+  bool cmdVelFresh(const rclcpp::Time & now) const;
+  void updateOdometryFromStatus(const rclcpp::Time & now);
+  double slewRate(double current, double target, double accel_limit, double dt) const;
   void publishWheelVelocities(double left_wheel_rad_s, double right_wheel_rad_s);
   void publishStop();
 
@@ -86,9 +100,12 @@ private:
   std::string axis1_ns_;
   std::string imu_topic_;
   std::string touch_topic_;
+  std::string pause_control_topic_;
+  std::string cmd_vel_topic_;
   std::string autonomy_cmd_topic_;
   std::string pointcloud_topic_;
   std::string footprint_topic_;
+  std::string odom_topic_;
 
   // Geometry
   double wheel_radius_m_{0.0855};
@@ -96,6 +113,8 @@ private:
   double left_wheel_sign_{-1.0};
   double right_wheel_sign_{1.0};
   bool odrive_velocity_is_turns_per_sec_{true};
+  bool shared_control_when_touch_active_{true};
+  bool use_pause_control_{true};
 
   // ODrive control
   int control_mode_{2};
@@ -143,6 +162,11 @@ private:
   // Safety / timing
   double loop_rate_hz_{100.0};
   double status_timeout_sec_{0.2};
+  double cmd_vel_timeout_sec_{0.2};
+  double pause_control_timeout_sec_{0.6};
+  double axis_state_request_interval_sec_{0.5};
+  double max_acc_{1.2};
+  double max_dec_{-1.2};
   double max_linear_velocity_forward_{0.8};
   double max_linear_velocity_reverse_{0.8};
   double max_angular_velocity_{1.8};
@@ -185,11 +209,18 @@ private:
   AxisFeedback left_feedback_;
   AxisFeedback right_feedback_;
   std::optional<geometry_msgs::msg::TwistStamped> latest_autonomy_cmd_;
+  std::optional<geometry_msgs::msg::Twist> latest_cmd_vel_;
   rclcpp::Time latest_autonomy_stamp_;
+  rclcpp::Time latest_cmd_vel_stamp_;
+  rclcpp::Time latest_pause_control_stamp_;
+  rclcpp::Time last_axis_state_request_stamp_;
 
   double imu_pitch_rad_{0.0};
   double imu_accel_x_{0.0};
   bool touch_active_{false};
+  bool pause_control_active_{false};
+  bool pause_control_received_{false};
+  bool requested_closed_loop_{false};
 
   double external_force_x_{0.0};
   double external_torque_z_{0.0};
@@ -198,16 +229,25 @@ private:
   double last_v_meas_{0.0};
   double last_wz_meas_{0.0};
   rclcpp::Time last_step_stamp_;
+  bool odom_initialized_{false};
+  double last_left_dist_m_{0.0};
+  double last_right_dist_m_{0.0};
+  double odom_x_m_{0.0};
+  double odom_y_m_{0.0};
+  double odom_yaw_rad_{0.0};
 
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr ctrl_pub_left_;
   rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr ctrl_pub_right_;
   rclcpp::Publisher<geometry_msgs::msg::WrenchStamped>::SharedPtr wrench_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_pub_;
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
 
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr left_sub_;
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr right_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr touch_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr pause_control_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr autonomy_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr footprint_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
