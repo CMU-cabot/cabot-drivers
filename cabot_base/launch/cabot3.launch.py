@@ -82,6 +82,12 @@ def generate_launch_description():
     imu_gyro_bias = LaunchConfiguration('imu_gyro_bias')
     default_motor_control = LaunchConfiguration('default_motor_control')
     hesai_ros_2_0 = LaunchConfiguration('hesai_ros_2_0')
+    use_shared_control = LaunchConfiguration('use_shared_control')
+    shared_control_use_imu = LaunchConfiguration('shared_control_use_imu')
+    shared_control_use_pause_control = LaunchConfiguration('shared_control_use_pause_control')
+    shared_control_imu_topic = LaunchConfiguration('shared_control_imu_topic')
+    shared_control_pointcloud_topic = LaunchConfiguration('shared_control_pointcloud_topic')
+    shared_control_footprint_topic = LaunchConfiguration('shared_control_footprint_topic')
 
     # Define models with their associated flags (without the "use_" prefix)
     model_flags = {
@@ -109,6 +115,10 @@ def generate_launch_description():
     use_serial = has_flag("serial")
     use_can_sensor = has_flag("can_sensor")
     use_can_odrive = has_flag("can_odrive")
+    use_shared_control_k4 = AndSubstitution(
+        LaunchConfigurationEquals('model', 'cabot3-k4'),
+        use_shared_control
+    )
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -176,6 +186,7 @@ def generate_launch_description():
         LogInfo(msg=PythonExpression(["\"         use_serial: ", use_serial, "\""])),
         LogInfo(msg=PythonExpression(["\"     use_can_sensor: ", use_can_sensor, "\""])),
         LogInfo(msg=PythonExpression(["\"     use_can_odrive: ", use_can_odrive, "\""])),
+        LogInfo(msg=PythonExpression(["\" use_shared_control: ", use_shared_control_k4, "\""])),
         DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
@@ -231,6 +242,36 @@ def generate_launch_description():
             'default_motor_control',
             default_value=EnvironmentVariable('CABOT_DEFAULT_MOTOR_CONTROL', default_value='true'),
             description='If true, wheels are closed-loop controlled when cmd_vel is not published'
+        ),
+        DeclareLaunchArgument(
+            'use_shared_control',
+            default_value=EnvironmentVariable('CABOT_SHARED_CONTROL', default_value='false'),
+            description='If true and model is cabot3-k4, replace odriver_can_adapter with shared_control_node'
+        ),
+        DeclareLaunchArgument(
+            'shared_control_use_imu',
+            default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_USE_IMU', default_value='true'),
+            description='If false, disable IMU in shared_control_node'
+        ),
+        DeclareLaunchArgument(
+            'shared_control_use_pause_control',
+            default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_USE_PAUSE_CONTROL', default_value='true'),
+            description='If false, ignore /cabot/pause_control in shared_control_node'
+        ),
+        DeclareLaunchArgument(
+            'shared_control_imu_topic',
+            default_value='/cabot/imu/data',
+            description='IMU topic for shared_control_node'
+        ),
+        DeclareLaunchArgument(
+            'shared_control_pointcloud_topic',
+            default_value='/velodyne_points_cropped',
+            description='Pointcloud topic for shared_control_node obstacle guard'
+        ),
+        DeclareLaunchArgument(
+            'shared_control_footprint_topic',
+            default_value='/footprint',
+            description='Footprint topic for shared_control_node obstacle guard'
         ),
         DeclareLaunchArgument(
             'odrive_model',
@@ -501,7 +542,12 @@ def generate_launch_description():
                 remappings=[
                     ('/imu', '/cabot/imu/data')
                 ],
-                condition=UnlessCondition(use_sim_time),
+                condition=IfCondition(
+                    AndSubstitution(
+                        NotSubstitution(use_sim_time),
+                        NotSubstitution(use_shared_control_k4)
+                    )
+                ),
             ),
 
             # Motor Controller (ODrive)
@@ -549,7 +595,46 @@ def generate_launch_description():
                     ('/odrive_status_right', '/cabot/odrive_status_right'),
                     ('/set_odrive_power', '/set_24v_power_odrive'),
                 ],
-                condition=IfCondition(AndSubstitution(use_can_odrive, NotSubstitution(use_sim_time)))
+                condition=IfCondition(
+                    AndSubstitution(
+                        use_can_odrive,
+                        NotSubstitution(use_sim_time),
+                        NotSubstitution(use_shared_control_k4)
+                    )
+                )
+            ),
+            Node(
+                package='cabot_shared_control',
+                executable='shared_control_node',
+                name='shared_control_node',
+                output='screen',
+                parameters=[
+                    *param_files,
+                    {
+                        'use_imu': ParameterValue(shared_control_use_imu, value_type=bool),
+                        'use_pause_control': ParameterValue(shared_control_use_pause_control, value_type=bool),
+                        'imu_topic': shared_control_imu_topic,
+                        'pointcloud_topic': shared_control_pointcloud_topic,
+                        'footprint_topic': shared_control_footprint_topic,
+                        'autonomy_force_weight': 0.0,
+                        'use_sim_time': use_sim_time
+                    }
+                ],
+                remappings=[
+                    ('/odrive_axis0/control_message', '/cabot/control_message_left'),
+                    ('/odrive_axis1/control_message', '/cabot/control_message_right'),
+                    ('/odrive_axis0/controller_status', '/cabot/controller_status_left'),
+                    ('/odrive_axis1/controller_status', '/cabot/controller_status_right'),
+                    ('/odrive_axis0/request_axis_state', '/cabot/request_axis_state_left'),
+                    ('/odrive_axis1/request_axis_state', '/cabot/request_axis_state_right')
+                ],
+                condition=IfCondition(
+                    AndSubstitution(
+                        use_can_odrive,
+                        NotSubstitution(use_sim_time),
+                        use_shared_control_k4
+                    )
+                )
             ),
             Node(
                 package='odrive_can',

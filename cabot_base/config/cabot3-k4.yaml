@@ -35,3 +35,93 @@ cabot:
     ros__parameters:
       handleside: left,right
       touchmode: cap,tof,dual
+
+shared_control_node:
+  ros__parameters:
+    axis0_namespace: "odrive_axis0"
+    axis1_namespace: "odrive_axis1"
+    imu_topic: "/imu/data"
+    touch_topic: "/cabot/touch"
+    pause_control_topic: "/cabot/pause_control"
+    use_pause_control: true
+    cmd_vel_topic: "/cabot/cmd_vel"
+    use_imu: true
+    autonomy_cmd_topic: "/cmd_vel"
+    pointcloud_topic: "/velodyne_points_cropped"
+    footprint_topic: "/footprint"
+    odom_topic: "/cabot/odom_raw"
+    shared_control_when_touch_active: false
+
+    wheel_radius_m: 0.0855
+    wheel_separation_m: 0.139
+    left_wheel_sign: -1.0
+    right_wheel_sign: 1.0
+    odrive_velocity_is_turns_per_sec: true
+
+    control_mode: 2
+    input_mode: 1
+    request_closed_loop_on_startup: true
+
+    observer_gain_x: 10.0
+    observer_gain_z: 10.0
+    robot_mass_x: 24.0
+    robot_inertia_z: 2.2
+    robot_damping_x: 40.0
+    robot_damping_z: 5.0
+    coulomb_friction_x: 8.0
+    coulomb_friction_z: 0.8
+    friction_smoothing_linear: 0.05
+    friction_smoothing_angular: 0.05
+    use_torque_estimate: true
+    motor_torque_constant: 0.06
+
+    use_gravity_compensation: true
+    gravity_comp_gain: 1.0
+    use_imu_linear_accel: false
+    imu_accel_blend: 0.2
+
+    desired_mass_x: 11.0
+    desired_inertia_z: 0.9
+    desired_damping_x: 24.0
+    desired_damping_z: 2.8
+
+    human_force_weight: 1.0
+    autonomy_force_weight: 0.0
+    autonomy_virtual_stiffness_x: 45.0
+    autonomy_virtual_stiffness_z: 12.0
+    autonomy_timeout_sec: 0.3
+    human_force_x_sign: -1.0
+    human_torque_z_sign: -1.0
+    force_deadband_x: 4.0
+    force_deadband_z: 1.2
+
+    loop_rate_hz: 100.0
+    status_timeout_sec: 0.2
+    cmd_vel_timeout_sec: 0.2
+    pause_control_timeout_sec: 5.0
+    axis_state_request_interval_sec: 0.5
+    max_acc: 0.5
+    max_dec: -0.5
+    max_linear_velocity: 0.32
+    max_linear_velocity_forward: 1.0
+    max_linear_velocity_reverse: 0.3
+    max_angular_velocity: 1.0
+    max_linear_accel: 0.48
+    max_linear_accel_forward: 0.5
+    max_linear_accel_reverse: 0.5
+    max_angular_accel: 1.50
+
+    obstacle_guard_enabled: true
+    obstacle_guard_reverse_enabled: false
+    obstacle_stop_distance_m: 0.00
+    obstacle_slowdown_margin_m: 0.60
+    obstacle_min_speed_scale: 0.2
+    obstacle_pushback_enabled: true
+    obstacle_pushback_stiffness: 60.0
+    obstacle_pushback_max_force: 30.0
+    obstacle_timeout_sec: 0.3
+    obstacle_point_min_z: -0.3
+    obstacle_point_max_z: 1.2
+    strict_frame_match: true
+    sensor_guard_enabled: true
+    sensor_guard_half_width_m: 0.35
