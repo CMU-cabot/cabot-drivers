@@ -241,7 +241,7 @@ SharedControlNode::SharedControlNode()
   footprint_sub_ = this->create_subscription<geometry_msgs::msg::Polygon>(
     footprint_topic_, 10, std::bind(&SharedControlNode::onFootprint, this, std::placeholders::_1));
   scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-    scan_topic_, 10,
+    scan_topic_, rclcpp::SensorDataQoS(),
     std::bind(&SharedControlNode::onScan, this, std::placeholders::_1));
 
   axis0_client_ = this->create_client<odrive_can::srv::AxisState>(

@@ -2,8 +2,8 @@
 
 pointcloud_to_laserscan_node:
   ros__parameters:
-    # The LiDAR is mounted 90 degrees sideways.
-    target_frame: lidar_base_link
+    # Shared-control obstacle guard assumes scan x-axis is robot forward.
+    target_frame: base_link
     angle_min: -2.615  # -M_PI (back) + M_PI/6 (rear cover)
     angle_max:  2.615  #  M_PI (back) - M_PI/6 (rear cover)
 
@@ -48,7 +48,7 @@ shared_control_node:
     use_imu: true
     autonomy_cmd_topic: "/cmd_vel"
     scan_topic: "/scan"
-    footprint_topic: "/footprint"
+    footprint_topic: "/local_costmap/footprint"
     odom_topic: "/cabot/odom_raw"
     shared_control_when_touch_active: false
 

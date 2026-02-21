@@ -115,10 +115,11 @@ def generate_launch_description():
     use_serial = has_flag("serial")
     use_can_sensor = has_flag("can_sensor")
     use_can_odrive = has_flag("can_odrive")
-    use_shared_control_k4 = AndSubstitution(
-        LaunchConfigurationEquals('model', 'cabot3-k4'),
-        use_shared_control
-    )
+    use_shared_control_k4 = PythonExpression([
+        '"', model_name, '" == "cabot3-k4" and "',
+        use_shared_control,
+        '" in ["1", "true", "True"]'
+    ])
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -186,7 +187,6 @@ def generate_launch_description():
         LogInfo(msg=PythonExpression(["\"         use_serial: ", use_serial, "\""])),
         LogInfo(msg=PythonExpression(["\"     use_can_sensor: ", use_can_sensor, "\""])),
         LogInfo(msg=PythonExpression(["\"     use_can_odrive: ", use_can_odrive, "\""])),
-        LogInfo(msg=PythonExpression(["\" use_shared_control: ", use_shared_control_k4, "\""])),
         DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
@@ -270,8 +270,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'shared_control_footprint_topic',
-            default_value='/footprint',
-            description='Footprint topic for shared_control_node obstacle guard'
+            default_value='',
+            description='Footprint topic override for shared_control_node (empty uses model yaml)'
         ),
         DeclareLaunchArgument(
             'odrive_model',
@@ -597,9 +597,48 @@ def generate_launch_description():
                 ],
                 condition=IfCondition(
                     AndSubstitution(
-                        use_can_odrive,
-                        NotSubstitution(use_sim_time),
+                        AndSubstitution(
+                            use_can_odrive,
+                            NotSubstitution(use_sim_time)
+                        ),
                         NotSubstitution(use_shared_control_k4)
+                    )
+                )
+            ),
+            Node(
+                package='cabot_shared_control',
+                executable='shared_control_node',
+                name='shared_control_node',
+                output='screen',
+                parameters=[
+                    *param_files,
+                    {
+                        'use_imu': ParameterValue(shared_control_use_imu, value_type=bool),
+                        'use_pause_control': ParameterValue(shared_control_use_pause_control, value_type=bool),
+                        'imu_topic': shared_control_imu_topic,
+                        'scan_topic': shared_control_scan_topic,
+                        'autonomy_force_weight': 0.0,
+                        'use_sim_time': use_sim_time
+                    }
+                ],
+                remappings=[
+                    ('/odrive_axis0/control_message', '/cabot/control_message_left'),
+                    ('/odrive_axis1/control_message', '/cabot/control_message_right'),
+                    ('/odrive_axis0/controller_status', '/cabot/controller_status_left'),
+                    ('/odrive_axis1/controller_status', '/cabot/controller_status_right'),
+                    ('/odrive_axis0/request_axis_state', '/cabot/request_axis_state_left'),
+                    ('/odrive_axis1/request_axis_state', '/cabot/request_axis_state_right')
+                ],
+                condition=IfCondition(
+                    AndSubstitution(
+                        AndSubstitution(
+                            use_can_odrive,
+                            NotSubstitution(use_sim_time)
+                        ),
+                        AndSubstitution(
+                            use_shared_control_k4,
+                            PythonExpression(['"', shared_control_footprint_topic, '" == ""'])
+                        )
                     )
                 )
             ),
@@ -630,9 +669,14 @@ def generate_launch_description():
                 ],
                 condition=IfCondition(
                     AndSubstitution(
-                        use_can_odrive,
-                        NotSubstitution(use_sim_time),
-                        use_shared_control_k4
+                        AndSubstitution(
+                            use_can_odrive,
+                            NotSubstitution(use_sim_time)
+                        ),
+                        AndSubstitution(
+                            use_shared_control_k4,
+                            PythonExpression(['"', shared_control_footprint_topic, '" != ""'])
+                        )
                     )
                 )
             ),
