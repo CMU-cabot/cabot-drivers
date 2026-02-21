@@ -9,7 +9,7 @@ shared_control_node:
     cmd_vel_topic: "/cabot/cmd_vel"
     use_imu: true
     autonomy_cmd_topic: "/autonomy/cmd_vel"
-    pointcloud_topic: "/velodyne_points_cropped"
+    scan_topic: "/scan"
     footprint_topic: "/footprint"
     odom_topic: "/cabot/odom_raw"
     shared_control_when_touch_active: false  # false: /cabot/touchの意味を反転（非タッチ時にshared_control）

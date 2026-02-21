@@ -36,7 +36,7 @@
 #include <odrive_can/srv/axis_state.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/int16.hpp>
 
@@ -64,7 +64,7 @@ private:
   void onCmdVel(const geometry_msgs::msg::Twist::SharedPtr msg);
   void onAutonomyCmd(const geometry_msgs::msg::TwistStamped::SharedPtr msg);
   void onFootprint(const geometry_msgs::msg::Polygon::SharedPtr msg);
-  void onPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+  void onScan(const sensor_msgs::msg::LaserScan::SharedPtr msg);
 
   void controlStep();
   void controlStepShared(const rclcpp::Time & now, double dt);
@@ -103,7 +103,7 @@ private:
   std::string pause_control_topic_;
   std::string cmd_vel_topic_;
   std::string autonomy_cmd_topic_;
-  std::string pointcloud_topic_;
+  std::string scan_topic_;
   std::string footprint_topic_;
   std::string odom_topic_;
 
@@ -250,7 +250,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr autonomy_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr footprint_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
 
   rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr axis0_client_;
   rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr axis1_client_;

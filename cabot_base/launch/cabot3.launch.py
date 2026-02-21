@@ -86,7 +86,7 @@ def generate_launch_description():
     shared_control_use_imu = LaunchConfiguration('shared_control_use_imu')
     shared_control_use_pause_control = LaunchConfiguration('shared_control_use_pause_control')
     shared_control_imu_topic = LaunchConfiguration('shared_control_imu_topic')
-    shared_control_pointcloud_topic = LaunchConfiguration('shared_control_pointcloud_topic')
+    shared_control_scan_topic = LaunchConfiguration('shared_control_scan_topic')
     shared_control_footprint_topic = LaunchConfiguration('shared_control_footprint_topic')
 
     # Define models with their associated flags (without the "use_" prefix)
@@ -264,9 +264,9 @@ def generate_launch_description():
             description='IMU topic for shared_control_node'
         ),
         DeclareLaunchArgument(
-            'shared_control_pointcloud_topic',
-            default_value='/velodyne_points_cropped',
-            description='Pointcloud topic for shared_control_node obstacle guard'
+            'shared_control_scan_topic',
+            default_value='/scan',
+            description='LaserScan topic for shared_control_node obstacle guard'
         ),
         DeclareLaunchArgument(
             'shared_control_footprint_topic',
@@ -614,7 +614,7 @@ def generate_launch_description():
                         'use_imu': ParameterValue(shared_control_use_imu, value_type=bool),
                         'use_pause_control': ParameterValue(shared_control_use_pause_control, value_type=bool),
                         'imu_topic': shared_control_imu_topic,
-                        'pointcloud_topic': shared_control_pointcloud_topic,
+                        'scan_topic': shared_control_scan_topic,
                         'footprint_topic': shared_control_footprint_topic,
                         'autonomy_force_weight': 0.0,
                         'use_sim_time': use_sim_time

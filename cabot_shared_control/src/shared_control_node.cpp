@@ -29,8 +29,6 @@
 #include <string>
 #include <utility>
 
-#include <sensor_msgs/point_cloud2_iterator.hpp>
-
 namespace
 {
 constexpr uint32_t kAxisStateIdle = 1;
@@ -89,8 +87,9 @@ SharedControlNode::SharedControlNode()
   use_imu_ = this->declare_parameter<bool>("use_imu", true);
   autonomy_cmd_topic_ =
     this->declare_parameter<std::string>("autonomy_cmd_topic", "/autonomy/cmd_vel");
-  pointcloud_topic_ =
-    this->declare_parameter<std::string>("pointcloud_topic", "/velodyne_points_cropped");
+  const auto legacy_pointcloud_topic =
+    this->declare_parameter<std::string>("pointcloud_topic", "/scan");
+  scan_topic_ = this->declare_parameter<std::string>("scan_topic", legacy_pointcloud_topic);
   footprint_topic_ = this->declare_parameter<std::string>("footprint_topic", "/footprint");
   odom_topic_ = this->declare_parameter<std::string>("odom_topic", "/cabot/odom_raw");
   // Deprecated behavior switch. Kept for parameter-file compatibility.
@@ -241,9 +240,9 @@ SharedControlNode::SharedControlNode()
     std::bind(&SharedControlNode::onAutonomyCmd, this, std::placeholders::_1));
   footprint_sub_ = this->create_subscription<geometry_msgs::msg::Polygon>(
     footprint_topic_, 10, std::bind(&SharedControlNode::onFootprint, this, std::placeholders::_1));
-  cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    pointcloud_topic_, 10,
-    std::bind(&SharedControlNode::onPointCloud, this, std::placeholders::_1));
+  scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
+    scan_topic_, 10,
+    std::bind(&SharedControlNode::onScan, this, std::placeholders::_1));
 
   axis0_client_ = this->create_client<odrive_can::srv::AxisState>(
     "/" + axis0_ns_ + "/request_axis_state");
@@ -342,7 +341,7 @@ void SharedControlNode::onFootprint(const geometry_msgs::msg::Polygon::SharedPtr
   footprint_received_ = footprint_points_.size() >= 3;
 }
 
-void SharedControlNode::onPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+void SharedControlNode::onScan(const sensor_msgs::msg::LaserScan::SharedPtr msg)
 {
   if (!obstacle_guard_enabled_) {
     return;
@@ -357,7 +356,7 @@ void SharedControlNode::onPointCloud(const sensor_msgs::msg::PointCloud2::Shared
   {
     RCLCPP_WARN_THROTTLE(
       this->get_logger(), *this->get_clock(), 2000,
-      "frame mismatch: pointcloud=%s footprint=%s (skip obstacle guard update)",
+      "frame mismatch: scan=%s footprint=%s (skip obstacle guard update)",
       msg->header.frame_id.c_str(), footprint_frame_id_.c_str());
     return;
   }
@@ -369,46 +368,38 @@ void SharedControlNode::onPointCloud(const sensor_msgs::msg::PointCloud2::Shared
   double rear_clearance_sensor = std::numeric_limits<double>::infinity();
   bool has_sensor_guard_point = false;
 
-  try {
-    sensor_msgs::PointCloud2ConstIterator<float> iter_x(*msg, "x");
-    sensor_msgs::PointCloud2ConstIterator<float> iter_y(*msg, "y");
-    sensor_msgs::PointCloud2ConstIterator<float> iter_z(*msg, "z");
+  for (size_t i = 0; i < msg->ranges.size(); ++i) {
+    const double range = static_cast<double>(msg->ranges[i]);
+    if (!std::isfinite(range)) {
+      continue;
+    }
+    if (range < static_cast<double>(msg->range_min) || range > static_cast<double>(msg->range_max)) {
+      continue;
+    }
 
-    for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
-      const double x = static_cast<double>(*iter_x);
-      const double y = static_cast<double>(*iter_y);
-      const double z = static_cast<double>(*iter_z);
-      if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) {
-        continue;
-      }
-      if (z < obstacle_point_min_z_ || z > obstacle_point_max_z_) {
-        continue;
-      }
+    const double angle =
+      static_cast<double>(msg->angle_min) + static_cast<double>(i) * static_cast<double>(msg->angle_increment);
+    const double x = range * std::cos(angle);
+    const double y = range * std::sin(angle);
 
-      has_valid_point = true;
-      if (footprint_received_) {
-        const double clearance = distancePointToFootprint(x, y);
-        if (x >= 0.0) {
-          front_clearance = std::min(front_clearance, clearance);
-        } else {
-          rear_clearance = std::min(rear_clearance, clearance);
-        }
-      }
-
-      if (sensor_guard_enabled_ && std::abs(y) <= sensor_guard_half_width_m_) {
-        has_sensor_guard_point = true;
-        if (x >= 0.0) {
-          front_clearance_sensor = std::min(front_clearance_sensor, x);
-        } else {
-          rear_clearance_sensor = std::min(rear_clearance_sensor, -x);
-        }
+    has_valid_point = true;
+    if (footprint_received_) {
+      const double clearance = distancePointToFootprint(x, y);
+      if (x >= 0.0) {
+        front_clearance = std::min(front_clearance, clearance);
+      } else {
+        rear_clearance = std::min(rear_clearance, clearance);
       }
     }
-  } catch (const std::runtime_error & ex) {
-    RCLCPP_WARN_THROTTLE(
-      this->get_logger(), *this->get_clock(), 2000,
-      "pointcloud fields missing (need x,y,z): %s", ex.what());
-    return;
+
+    if (sensor_guard_enabled_ && std::abs(y) <= sensor_guard_half_width_m_) {
+      has_sensor_guard_point = true;
+      if (x >= 0.0) {
+        front_clearance_sensor = std::min(front_clearance_sensor, x);
+      } else {
+        rear_clearance_sensor = std::min(rear_clearance_sensor, -x);
+      }
+    }
   }
 
   if (!has_valid_point) {

@@ -62,7 +62,7 @@ def generate_launch_description():
     use_imu = LaunchConfiguration('use_imu')
     use_pause_control = LaunchConfiguration('use_pause_control')
     imu_topic = LaunchConfiguration('imu_topic')
-    pointcloud_topic = LaunchConfiguration('pointcloud_topic')
+    scan_topic = LaunchConfiguration('scan_topic')
     footprint_topic = LaunchConfiguration('footprint_topic')
     odrive_model = LaunchConfiguration('odrive_model')
     odrive_firmware_version = LaunchConfiguration('odrive_firmware_version')
@@ -167,9 +167,9 @@ def generate_launch_description():
             description='IMU topic for gravity compensation'
         ),
         DeclareLaunchArgument(
-            'pointcloud_topic',
-            default_value='/velodyne_points_cropped',
-            description='Obstacle guard point cloud topic'
+            'scan_topic',
+            default_value='/scan',
+            description='Obstacle guard LaserScan topic'
         ),
         DeclareLaunchArgument(
             'footprint_topic',
@@ -314,7 +314,7 @@ def generate_launch_description():
                         'use_imu': ParameterValue(use_imu, value_type=bool),
                         'use_pause_control': ParameterValue(use_pause_control, value_type=bool),
                         'imu_topic': imu_topic,
-                        'pointcloud_topic': pointcloud_topic,
+                        'scan_topic': scan_topic,
                         'footprint_topic': footprint_topic,
                         'autonomy_force_weight': 0.0,
                         'use_sim_time': use_sim_time
