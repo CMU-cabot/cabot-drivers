@@ -616,6 +616,7 @@ def generate_launch_description():
                     *param_files,
                     {
                         'use_imu': ParameterValue(shared_control_use_imu, value_type=bool),
+                        'shared_control_mode': 0,
                         'shared_control_mode_topic': shared_control_mode_topic,
                         'imu_topic': shared_control_imu_topic,
                         'scan_topic': shared_control_scan_topic,
@@ -653,6 +654,7 @@ def generate_launch_description():
                     *param_files,
                     {
                         'use_imu': ParameterValue(shared_control_use_imu, value_type=bool),
+                        'shared_control_mode': 0,
                         'shared_control_mode_topic': shared_control_mode_topic,
                         'imu_topic': shared_control_imu_topic,
                         'scan_topic': shared_control_scan_topic,

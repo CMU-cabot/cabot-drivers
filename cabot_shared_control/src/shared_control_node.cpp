@@ -85,6 +85,21 @@ SharedControlNode::SharedControlNode()
   imu_topic_ = this->declare_parameter<std::string>("imu_topic", "/imu/data");
   shared_control_mode_topic_ =
     this->declare_parameter<std::string>("shared_control_mode_topic", "/shared_control_mode");
+  const int initial_shared_control_mode =
+    this->declare_parameter<int>("shared_control_mode", static_cast<int>(kSharedControlModeNormal));
+  if (
+    initial_shared_control_mode == kSharedControlModeNormal ||
+    initial_shared_control_mode == kSharedControlModeShared ||
+    initial_shared_control_mode == kSharedControlModeFree)
+  {
+    shared_control_mode_ = static_cast<int8_t>(initial_shared_control_mode);
+  } else {
+    RCLCPP_WARN(
+      this->get_logger(),
+      "invalid shared_control_mode=%d at startup (expected: 0=normal, 1=shared, 2=free), fallback to 0",
+      initial_shared_control_mode);
+    shared_control_mode_ = kSharedControlModeNormal;
+  }
   cmd_vel_topic_ = this->declare_parameter<std::string>("cmd_vel_topic", "/cabot/cmd_vel");
   use_imu_ = this->declare_parameter<bool>("use_imu", true);
   autonomy_cmd_topic_ =

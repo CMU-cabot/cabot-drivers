@@ -321,6 +321,7 @@ def generate_launch_description():
                 parameters=[
                     shared_control_param_file,
                     {
+                        'shared_control_mode': 1,
                         'use_imu': ParameterValue(use_imu, value_type=bool),
                         'shared_control_mode_topic': shared_control_mode_topic,
                         'imu_topic': imu_topic,
