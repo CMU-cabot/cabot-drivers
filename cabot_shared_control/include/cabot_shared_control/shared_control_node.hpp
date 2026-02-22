@@ -38,6 +38,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/int8.hpp>
 
 namespace cabot_shared_control
@@ -60,6 +61,7 @@ private:
   void onAxis1Status(const odrive_can::msg::ControllerStatus::SharedPtr msg);
   void onImu(const sensor_msgs::msg::Imu::SharedPtr msg);
   void onSharedControlMode(const std_msgs::msg::Int8::SharedPtr msg);
+  void onPauseControl(const std_msgs::msg::Bool::SharedPtr msg);
   void onCmdVel(const geometry_msgs::msg::Twist::SharedPtr msg);
   void onAutonomyCmd(const geometry_msgs::msg::TwistStamped::SharedPtr msg);
   void onFootprint(const geometry_msgs::msg::Polygon::SharedPtr msg);
@@ -71,6 +73,7 @@ private:
   void controlStepStop(double dt);
   void controlStepFree();
   void requestAxisState(bool closed_loop, bool force = false);
+  bool desiredClosedLoopControl() const;
   bool cmdVelFresh(const rclcpp::Time & now) const;
   void updateOdometryFromStatus(const rclcpp::Time & now);
   double slewRate(double current, double target, double accel_limit, double dt) const;
@@ -98,6 +101,7 @@ private:
   std::string axis1_ns_;
   std::string imu_topic_;
   std::string shared_control_mode_topic_;
+  std::string pause_control_topic_;
   std::string cmd_vel_topic_;
   std::string autonomy_cmd_topic_;
   std::string scan_topic_;
@@ -111,6 +115,7 @@ private:
   double right_wheel_sign_{1.0};
   bool odrive_velocity_is_turns_per_sec_{true};
   int8_t shared_control_mode_{1};
+  bool pause_control_{false};
 
   // ODrive control
   int control_mode_{2};
@@ -237,6 +242,7 @@ private:
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr right_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr shared_control_mode_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr pause_control_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr autonomy_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr footprint_sub_;

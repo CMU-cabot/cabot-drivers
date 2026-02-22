@@ -85,6 +85,8 @@ SharedControlNode::SharedControlNode()
   imu_topic_ = this->declare_parameter<std::string>("imu_topic", "/imu/data");
   shared_control_mode_topic_ =
     this->declare_parameter<std::string>("shared_control_mode_topic", "/shared_control_mode");
+  pause_control_topic_ =
+    this->declare_parameter<std::string>("pause_control_topic", "/cabot/pause_control");
   const int initial_shared_control_mode =
     this->declare_parameter<int>("shared_control_mode", static_cast<int>(kSharedControlModeNormal));
   if (
@@ -242,6 +244,9 @@ SharedControlNode::SharedControlNode()
   shared_control_mode_sub_ = this->create_subscription<std_msgs::msg::Int8>(
     shared_control_mode_topic_, 20,
     std::bind(&SharedControlNode::onSharedControlMode, this, std::placeholders::_1));
+  pause_control_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+    pause_control_topic_, 20,
+    std::bind(&SharedControlNode::onPauseControl, this, std::placeholders::_1));
   cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
     cmd_vel_topic_, 20, std::bind(&SharedControlNode::onCmdVel, this, std::placeholders::_1));
   autonomy_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
@@ -348,6 +353,22 @@ void SharedControlNode::onCmdVel(const geometry_msgs::msg::Twist::SharedPtr msg)
   latest_cmd_vel_stamp_ = this->get_clock()->now();
 }
 
+void SharedControlNode::onPauseControl(const std_msgs::msg::Bool::SharedPtr msg)
+{
+  const bool pause = msg->data;
+  if (pause_control_ != pause) {
+    const bool prev_pause = pause_control_;
+    pause_control_ = pause;
+    RCLCPP_INFO(
+      this->get_logger(),
+      "pause_control changed: %s -> %s (mode=%d, closed_loop=%s)",
+      prev_pause ? "true" : "false",
+      pause ? "true" : "false",
+      static_cast<int>(shared_control_mode_),
+      desiredClosedLoopControl() ? "on" : "off");
+  }
+}
+
 void SharedControlNode::onFootprint(const geometry_msgs::msg::Polygon::SharedPtr msg)
 {
   footprint_points_.clear();
@@ -447,7 +468,7 @@ void SharedControlNode::requestClosedLoopIfReady()
     return;
   }
   if (axis0_client_->service_is_ready() && axis1_client_->service_is_ready()) {
-    requestAxisState(true, true);
+    requestAxisState(desiredClosedLoopControl(), true);
     request_closed_loop_on_startup_ = false;
     if (startup_timer_) {
       startup_timer_->cancel();
@@ -535,6 +556,16 @@ void SharedControlNode::requestAxisState(bool closed_loop, bool force)
 
   requested_closed_loop_ = closed_loop;
   last_axis_state_request_stamp_ = now;
+}
+
+bool SharedControlNode::desiredClosedLoopControl() const
+{
+  // shared mode always keeps loop control ON.
+  if (shared_control_mode_ == kSharedControlModeShared) {
+    return true;
+  }
+  // normal/free modes follow pause_control topic.
+  return !pause_control_;
 }
 
 void SharedControlNode::updateOdometryFromStatus(const rclcpp::Time & now)
@@ -980,21 +1011,19 @@ void SharedControlNode::controlStep()
   last_step_stamp_ = now;
 
   updateOdometryFromStatus(now);
+  requestAxisState(desiredClosedLoopControl());
 
   if (shared_control_mode_ == kSharedControlModeNormal) {
-    requestAxisState(true);
     controlStepAutonomy(dt);
     return;
   }
 
   if (shared_control_mode_ == kSharedControlModeShared) {
-    requestAxisState(true);
     controlStepShared(now, dt);
     return;
   }
 
   if (shared_control_mode_ == kSharedControlModeFree) {
-    requestAxisState(false);
     controlStepFree();
     return;
   }
@@ -1003,7 +1032,6 @@ void SharedControlNode::controlStep()
     this->get_logger(), *this->get_clock(), 1000,
     "unknown shared_control_mode=%d, fallback to stop",
     static_cast<int>(shared_control_mode_));
-  requestAxisState(true);
   controlStepStop(dt);
 }
 
