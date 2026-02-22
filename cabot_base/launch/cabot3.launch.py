@@ -84,7 +84,7 @@ def generate_launch_description():
     hesai_ros_2_0 = LaunchConfiguration('hesai_ros_2_0')
     use_shared_control = LaunchConfiguration('use_shared_control')
     shared_control_use_imu = LaunchConfiguration('shared_control_use_imu')
-    shared_control_use_pause_control = LaunchConfiguration('shared_control_use_pause_control')
+    shared_control_mode_topic = LaunchConfiguration('shared_control_mode_topic')
     shared_control_imu_topic = LaunchConfiguration('shared_control_imu_topic')
     shared_control_scan_topic = LaunchConfiguration('shared_control_scan_topic')
     shared_control_footprint_topic = LaunchConfiguration('shared_control_footprint_topic')
@@ -256,9 +256,9 @@ def generate_launch_description():
             description='If false, disable IMU in shared_control_node'
         ),
         DeclareLaunchArgument(
-            'shared_control_use_pause_control',
-            default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_USE_PAUSE_CONTROL', default_value='true'),
-            description='If false, ignore /cabot/pause_control in shared_control_node'
+            'shared_control_mode_topic',
+            default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_MODE_TOPIC', default_value='/shared_control_mode'),
+            description='Mode topic for shared_control_node (std_msgs/Int8: 0=normal, 1=shared, 2=free)'
         ),
         DeclareLaunchArgument(
             'shared_control_imu_topic',
@@ -616,7 +616,7 @@ def generate_launch_description():
                     *param_files,
                     {
                         'use_imu': ParameterValue(shared_control_use_imu, value_type=bool),
-                        'use_pause_control': ParameterValue(shared_control_use_pause_control, value_type=bool),
+                        'shared_control_mode_topic': shared_control_mode_topic,
                         'imu_topic': shared_control_imu_topic,
                         'scan_topic': shared_control_scan_topic,
                         'autonomy_force_weight': 0.0,
@@ -653,7 +653,7 @@ def generate_launch_description():
                     *param_files,
                     {
                         'use_imu': ParameterValue(shared_control_use_imu, value_type=bool),
-                        'use_pause_control': ParameterValue(shared_control_use_pause_control, value_type=bool),
+                        'shared_control_mode_topic': shared_control_mode_topic,
                         'imu_topic': shared_control_imu_topic,
                         'scan_topic': shared_control_scan_topic,
                         'footprint_topic': shared_control_footprint_topic,

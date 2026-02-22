@@ -3,16 +3,13 @@ shared_control_node:
     axis0_namespace: "odrive_axis0"
     axis1_namespace: "odrive_axis1"
     imu_topic: "/imu/data"
-    touch_topic: "/cabot/touch"
-    pause_control_topic: "/cabot/pause_control"
-    use_pause_control: true
+    shared_control_mode_topic: "/shared_control_mode"
     cmd_vel_topic: "/cabot/cmd_vel"
     use_imu: true
     autonomy_cmd_topic: "/autonomy/cmd_vel"
     scan_topic: "/scan"
     footprint_topic: "/footprint"
     odom_topic: "/cabot/odom_raw"
-    shared_control_when_touch_active: false  # false: /cabot/touchの意味を反転（非タッチ時にshared_control）
 
     wheel_radius_m: 0.0855
     wheel_separation_m: 0.139
@@ -60,7 +57,6 @@ shared_control_node:
     loop_rate_hz: 100.0
     status_timeout_sec: 0.2
     cmd_vel_timeout_sec: 0.2
-    pause_control_timeout_sec: 5.0
     axis_state_request_interval_sec: 0.5
     max_acc: 0.5
     max_dec: -0.5
