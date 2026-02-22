@@ -338,12 +338,30 @@ void SharedControlNode::onSharedControlMode(const std_msgs::msg::Int8::SharedPtr
     return;
   }
   if (shared_control_mode_ != mode) {
+    const int8_t prev_mode = shared_control_mode_;
     RCLCPP_INFO(
       this->get_logger(),
       "shared_control_mode changed: %d -> %d",
       static_cast<int>(shared_control_mode_),
       static_cast<int>(mode));
     shared_control_mode_ = mode;
+
+    // Re-entering shared mode after free/normal can leave stale observer/dynamics state
+    // and ODrive axis state; reset and force a closed-loop request immediately.
+    if (shared_control_mode_ == kSharedControlModeShared) {
+      external_force_x_ = 0.0;
+      external_torque_z_ = 0.0;
+      command_v_ = 0.0;
+      command_wz_ = 0.0;
+      last_v_meas_ = 0.0;
+      last_wz_meas_ = 0.0;
+      last_step_stamp_ = this->get_clock()->now();
+      requestAxisState(true, true);
+      RCLCPP_INFO(
+        this->get_logger(),
+        "shared mode entry reset applied (prev_mode=%d)",
+        static_cast<int>(prev_mode));
+    }
   }
 }
 
