@@ -115,11 +115,13 @@ def generate_launch_description():
     use_serial = has_flag("serial")
     use_can_sensor = has_flag("can_sensor")
     use_can_odrive = has_flag("can_odrive")
-    use_shared_control_k4 = PythonExpression([
-        '"', model_name, '" == "cabot3-k4" and "',
-        use_shared_control,
-        '" in ["1", "true", "True"]'
+    use_shared_control_enabled = PythonExpression([
+        '"', use_shared_control, '" in ["1", "true", "True"]'
     ])
+    use_shared_control_can_odrive = AndSubstitution(
+        use_can_odrive,
+        use_shared_control_enabled
+    )
 
     xacro_for_cabot_model = PathJoinSubstitution([
         get_package_share_directory('cabot_description'),
@@ -246,7 +248,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'use_shared_control',
             default_value=EnvironmentVariable('CABOT_SHARED_CONTROL', default_value='false'),
-            description='If true and model is cabot3-k4, replace odriver_can_adapter with shared_control_node'
+            description='If true and CAN ODrive is used, replace odriver_can_adapter with shared_control_node'
         ),
         DeclareLaunchArgument(
             'shared_control_use_imu',
@@ -545,7 +547,7 @@ def generate_launch_description():
                 condition=IfCondition(
                     AndSubstitution(
                         NotSubstitution(use_sim_time),
-                        NotSubstitution(use_shared_control_k4)
+                        NotSubstitution(use_shared_control_can_odrive)
                     )
                 ),
             ),
@@ -601,7 +603,7 @@ def generate_launch_description():
                             use_can_odrive,
                             NotSubstitution(use_sim_time)
                         ),
-                        NotSubstitution(use_shared_control_k4)
+                        NotSubstitution(use_shared_control_can_odrive)
                     )
                 )
             ),
@@ -636,7 +638,7 @@ def generate_launch_description():
                             NotSubstitution(use_sim_time)
                         ),
                         AndSubstitution(
-                            use_shared_control_k4,
+                            use_shared_control_can_odrive,
                             PythonExpression(['"', shared_control_footprint_topic, '" == ""'])
                         )
                     )
@@ -674,7 +676,7 @@ def generate_launch_description():
                             NotSubstitution(use_sim_time)
                         ),
                         AndSubstitution(
-                            use_shared_control_k4,
+                            use_shared_control_can_odrive,
                             PythonExpression(['"', shared_control_footprint_topic, '" != ""'])
                         )
                     )
