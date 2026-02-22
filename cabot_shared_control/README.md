@@ -65,6 +65,7 @@ ros2 launch cabot_shared_control shared_control.launch.py \
   can_interface:=can1 \
   hesai_ros_2_0:=false \
   imu_topic:=/cabot/imu/data \
+  shared_control_mode_topic:=/shared_control_mode \
   pointcloud_topic:=/velodyne_points_cropped \
   footprint_topic:=/footprint
 ```
@@ -80,6 +81,7 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` で切り替えできます
   - `/cabot/controller_status_left` (`odrive_can/msg/ControllerStatus`)
   - `/cabot/controller_status_right` (`odrive_can/msg/ControllerStatus`)
   - `/cabot/imu/data` (`sensor_msgs/msg/Imu`)
+  - `/shared_control_mode` (`std_msgs/msg/Int8`, `0=normal`, `1=shared`, `2=free`)
   - `/autonomy/cmd_vel` (`geometry_msgs/msg/TwistStamped`, 任意)
   - `/velodyne_points_cropped` (`sensor_msgs/msg/PointCloud2`)
   - `/footprint` (`geometry_msgs/msg/PolygonStamped`)

@@ -40,19 +40,6 @@ while [[ $# -gt 0 ]]; do
 done
 launch_args=("$@")
 
-has_use_pause_control_arg=0
-for arg in "${launch_args[@]}"; do
-    case "$arg" in
-        use_pause_control:=*)
-            has_use_pause_control_arg=1
-            break
-            ;;
-    esac
-done
-if [[ "$has_use_pause_control_arg" -eq 0 ]]; then
-    launch_args+=(use_pause_control:=false)
-fi
-
 # setup scripts may reference optional vars (e.g., COLCON_TRACE).
 set +u
 source /home/developer/driver_ws/install/setup.bash
