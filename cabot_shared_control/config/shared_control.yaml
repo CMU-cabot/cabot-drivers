@@ -1,15 +1,8 @@
 shared_control_node:
   ros__parameters:
-    axis0_namespace: "odrive_axis0"
-    axis1_namespace: "odrive_axis1"
-    imu_topic: "/imu/data"
-    shared_control_mode_topic: "/shared_control_mode"
-    cmd_vel_topic: "/cabot/cmd_vel"
+    # These values are kept in sync with the C++ declare_parameter() defaults.
+    # The file is retained as an explicit reference/default parameter set.
     use_imu: true
-    autonomy_cmd_topic: "/autonomy/cmd_vel"
-    scan_topic: "/scan"
-    footprint_topic: "/footprint"
-    odom_topic: "/cabot/odom_raw"
 
     wheel_radius_m: 0.0855
     wheel_separation_m: 0.139

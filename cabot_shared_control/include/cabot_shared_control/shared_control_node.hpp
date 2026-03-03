@@ -96,17 +96,9 @@ private:
   bool obstacleDataFresh(const rclcpp::Time & now) const;
   double obstacleApproachScale(double clearance_m) const;
 
-  // Topics / names
-  std::string axis0_ns_;
-  std::string axis1_ns_;
-  std::string imu_topic_;
-  std::string shared_control_mode_topic_;
-  std::string pause_control_topic_;
-  std::string cmd_vel_topic_;
-  std::string autonomy_cmd_topic_;
-  std::string scan_topic_;
-  std::string footprint_topic_;
-  std::string odom_topic_;
+  // Fixed topics / names
+  std::string axis0_ns_{"odrive_axis0"};
+  std::string axis1_ns_{"odrive_axis1"};
 
   // Geometry
   double wheel_radius_m_{0.0855};

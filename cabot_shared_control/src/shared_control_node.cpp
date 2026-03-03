@@ -76,17 +76,21 @@ double squaredDistanceToSegment(
 
 namespace cabot_shared_control
 {
+namespace
+{
+constexpr char kImuTopic[] = "/imu/data";
+constexpr char kSharedControlModeTopic[] = "/shared_control_mode";
+constexpr char kPauseControlTopic[] = "/cabot/pause_control";
+constexpr char kCmdVelTopic[] = "/cabot/cmd_vel";
+constexpr char kAutonomyCmdTopic[] = "/autonomy/cmd_vel";
+constexpr char kScanTopic[] = "/scan";
+constexpr char kFootprintTopic[] = "/footprint";
+constexpr char kOdomTopic[] = "/cabot/odom_raw";
+}  // namespace
 
 SharedControlNode::SharedControlNode()
 : Node("shared_control_node")
 {
-  axis0_ns_ = this->declare_parameter<std::string>("axis0_namespace", "odrive_axis0");
-  axis1_ns_ = this->declare_parameter<std::string>("axis1_namespace", "odrive_axis1");
-  imu_topic_ = this->declare_parameter<std::string>("imu_topic", "/imu/data");
-  shared_control_mode_topic_ =
-    this->declare_parameter<std::string>("shared_control_mode_topic", "/shared_control_mode");
-  pause_control_topic_ =
-    this->declare_parameter<std::string>("pause_control_topic", "/cabot/pause_control");
   const int initial_shared_control_mode =
     this->declare_parameter<int>("shared_control_mode", static_cast<int>(kSharedControlModeNormal));
   if (
@@ -102,18 +106,10 @@ SharedControlNode::SharedControlNode()
       initial_shared_control_mode);
     shared_control_mode_ = kSharedControlModeNormal;
   }
-  cmd_vel_topic_ = this->declare_parameter<std::string>("cmd_vel_topic", "/cabot/cmd_vel");
   use_imu_ = this->declare_parameter<bool>("use_imu", true);
-  autonomy_cmd_topic_ =
-    this->declare_parameter<std::string>("autonomy_cmd_topic", "/autonomy/cmd_vel");
-  const auto legacy_pointcloud_topic =
-    this->declare_parameter<std::string>("pointcloud_topic", "/scan");
-  scan_topic_ = this->declare_parameter<std::string>("scan_topic", legacy_pointcloud_topic);
-  footprint_topic_ = this->declare_parameter<std::string>("footprint_topic", "/footprint");
-  odom_topic_ = this->declare_parameter<std::string>("odom_topic", "/cabot/odom_raw");
 
   wheel_radius_m_ = this->declare_parameter<double>("wheel_radius_m", 0.0855);
-  wheel_separation_m_ = this->declare_parameter<double>("wheel_separation_m", 0.419);
+  wheel_separation_m_ = this->declare_parameter<double>("wheel_separation_m", 0.139);
   left_wheel_sign_ = this->declare_parameter<double>("left_wheel_sign", -1.0);
   right_wheel_sign_ = this->declare_parameter<double>("right_wheel_sign", 1.0);
   odrive_velocity_is_turns_per_sec_ =
@@ -124,8 +120,8 @@ SharedControlNode::SharedControlNode()
   request_closed_loop_on_startup_ =
     this->declare_parameter<bool>("request_closed_loop_on_startup", true);
 
-  observer_gain_x_ = this->declare_parameter<double>("observer_gain_x", 25.0);
-  observer_gain_z_ = this->declare_parameter<double>("observer_gain_z", 25.0);
+  observer_gain_x_ = this->declare_parameter<double>("observer_gain_x", 10.0);
+  observer_gain_z_ = this->declare_parameter<double>("observer_gain_z", 10.0);
   robot_mass_x_ = this->declare_parameter<double>("robot_mass_x", 24.0);
   robot_inertia_z_ = this->declare_parameter<double>("robot_inertia_z", 2.2);
   robot_damping_x_ = this->declare_parameter<double>("robot_damping_x", 40.0);
@@ -150,9 +146,9 @@ SharedControlNode::SharedControlNode()
   }
 
   desired_mass_x_ = this->declare_parameter<double>("desired_mass_x", 11.0);
-  desired_inertia_z_ = this->declare_parameter<double>("desired_inertia_z", 1.2);
-  desired_damping_x_ = this->declare_parameter<double>("desired_damping_x", 14.0);
-  desired_damping_z_ = this->declare_parameter<double>("desired_damping_z", 2.5);
+  desired_inertia_z_ = this->declare_parameter<double>("desired_inertia_z", 0.9);
+  desired_damping_x_ = this->declare_parameter<double>("desired_damping_x", 24.0);
+  desired_damping_z_ = this->declare_parameter<double>("desired_damping_z", 2.8);
 
   human_force_weight_ = this->declare_parameter<double>("human_force_weight", 1.0);
   autonomy_force_weight_ = this->declare_parameter<double>("autonomy_force_weight", 0.0);
@@ -161,39 +157,39 @@ SharedControlNode::SharedControlNode()
   autonomy_virtual_stiffness_z_ =
     this->declare_parameter<double>("autonomy_virtual_stiffness_z", 12.0);
   autonomy_timeout_sec_ = this->declare_parameter<double>("autonomy_timeout_sec", 0.3);
-  human_force_x_sign_ = this->declare_parameter<double>("human_force_x_sign", 1.0);
-  human_torque_z_sign_ = this->declare_parameter<double>("human_torque_z_sign", 1.0);
-  force_deadband_x_ = this->declare_parameter<double>("force_deadband_x", 3.0);
-  force_deadband_z_ = this->declare_parameter<double>("force_deadband_z", 0.3);
+  human_force_x_sign_ = this->declare_parameter<double>("human_force_x_sign", -1.0);
+  human_torque_z_sign_ = this->declare_parameter<double>("human_torque_z_sign", -1.0);
+  force_deadband_x_ = this->declare_parameter<double>("force_deadband_x", 4.0);
+  force_deadband_z_ = this->declare_parameter<double>("force_deadband_z", 1.2);
 
   loop_rate_hz_ = this->declare_parameter<double>("loop_rate_hz", 100.0);
   status_timeout_sec_ = this->declare_parameter<double>("status_timeout_sec", 0.2);
   cmd_vel_timeout_sec_ = this->declare_parameter<double>("cmd_vel_timeout_sec", 0.2);
   axis_state_request_interval_sec_ =
     this->declare_parameter<double>("axis_state_request_interval_sec", 0.5);
-  max_acc_ = this->declare_parameter<double>("max_acc", 1.2);
-  max_dec_ = this->declare_parameter<double>("max_dec", -1.2);
+  max_acc_ = this->declare_parameter<double>("max_acc", 0.5);
+  max_dec_ = this->declare_parameter<double>("max_dec", -0.5);
   const double max_linear_velocity_default =
-    this->declare_parameter<double>("max_linear_velocity", 0.8);
+    this->declare_parameter<double>("max_linear_velocity", 0.32);
   max_linear_velocity_forward_ = this->declare_parameter<double>(
-    "max_linear_velocity_forward", max_linear_velocity_default);
+    "max_linear_velocity_forward", 1.0);
   max_linear_velocity_reverse_ = this->declare_parameter<double>(
-    "max_linear_velocity_reverse", max_linear_velocity_default);
-  max_angular_velocity_ = this->declare_parameter<double>("max_angular_velocity", 1.8);
+    "max_linear_velocity_reverse", 0.3);
+  max_angular_velocity_ = this->declare_parameter<double>("max_angular_velocity", 1.0);
   const double max_linear_accel_default =
-    this->declare_parameter<double>("max_linear_accel", max_acc_);
+    this->declare_parameter<double>("max_linear_accel", 0.48);
   max_linear_accel_forward_ = this->declare_parameter<double>(
-    "max_linear_accel_forward", max_linear_accel_default);
+    "max_linear_accel_forward", 0.5);
   max_linear_accel_reverse_ = this->declare_parameter<double>(
-    "max_linear_accel_reverse", std::max(0.0, -max_dec_));
-  max_angular_accel_ = this->declare_parameter<double>("max_angular_accel", 2.5);
+    "max_linear_accel_reverse", 0.5);
+  max_angular_accel_ = this->declare_parameter<double>("max_angular_accel", 1.5);
   obstacle_guard_enabled_ = this->declare_parameter<bool>("obstacle_guard_enabled", true);
   obstacle_guard_reverse_enabled_ =
     this->declare_parameter<bool>("obstacle_guard_reverse_enabled", false);
-  obstacle_stop_distance_m_ = this->declare_parameter<double>("obstacle_stop_distance_m", 0.5);
+  obstacle_stop_distance_m_ = this->declare_parameter<double>("obstacle_stop_distance_m", 0.0);
   obstacle_slowdown_margin_m_ =
-    this->declare_parameter<double>("obstacle_slowdown_margin_m", 0.0);
-  obstacle_min_speed_scale_ = this->declare_parameter<double>("obstacle_min_speed_scale", 0.0);
+    this->declare_parameter<double>("obstacle_slowdown_margin_m", 0.6);
+  obstacle_min_speed_scale_ = this->declare_parameter<double>("obstacle_min_speed_scale", 0.2);
   obstacle_pushback_enabled_ = this->declare_parameter<bool>("obstacle_pushback_enabled", true);
   obstacle_pushback_stiffness_ =
     this->declare_parameter<double>("obstacle_pushback_stiffness", 60.0);
@@ -225,7 +221,7 @@ SharedControlNode::SharedControlNode()
     10);
   cmd_pub_ =
     this->create_publisher<geometry_msgs::msg::TwistStamped>("/shared_control/cmd_vel", 10);
-  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(odom_topic_, 10);
+  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(kOdomTopic, 10);
 
   left_sub_ = this->create_subscription<odrive_can::msg::ControllerStatus>(
     "/" + axis0_ns_ + "/controller_status", 50,
@@ -235,27 +231,27 @@ SharedControlNode::SharedControlNode()
     std::bind(&SharedControlNode::onAxis1Status, this, std::placeholders::_1));
   if (use_imu_) {
     imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
-      imu_topic_, 50, std::bind(&SharedControlNode::onImu, this, std::placeholders::_1));
+      kImuTopic, 50, std::bind(&SharedControlNode::onImu, this, std::placeholders::_1));
   } else {
     RCLCPP_WARN(
       this->get_logger(),
       "IMU input disabled (use_imu=false). Assuming horizontal terrain and turning off IMU-based compensation.");
   }
   shared_control_mode_sub_ = this->create_subscription<std_msgs::msg::Int8>(
-    shared_control_mode_topic_, 20,
+    kSharedControlModeTopic, 20,
     std::bind(&SharedControlNode::onSharedControlMode, this, std::placeholders::_1));
   pause_control_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-    pause_control_topic_, 20,
+    kPauseControlTopic, 20,
     std::bind(&SharedControlNode::onPauseControl, this, std::placeholders::_1));
   cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
-    cmd_vel_topic_, 20, std::bind(&SharedControlNode::onCmdVel, this, std::placeholders::_1));
+    kCmdVelTopic, 20, std::bind(&SharedControlNode::onCmdVel, this, std::placeholders::_1));
   autonomy_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
-    autonomy_cmd_topic_, 20,
+    kAutonomyCmdTopic, 20,
     std::bind(&SharedControlNode::onAutonomyCmd, this, std::placeholders::_1));
   footprint_sub_ = this->create_subscription<geometry_msgs::msg::Polygon>(
-    footprint_topic_, 10, std::bind(&SharedControlNode::onFootprint, this, std::placeholders::_1));
+    kFootprintTopic, 10, std::bind(&SharedControlNode::onFootprint, this, std::placeholders::_1));
   scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-    scan_topic_, rclcpp::SensorDataQoS(),
+    kScanTopic, rclcpp::SensorDataQoS(),
     std::bind(&SharedControlNode::onScan, this, std::placeholders::_1));
 
   axis0_client_ = this->create_client<odrive_can::srv::AxisState>(

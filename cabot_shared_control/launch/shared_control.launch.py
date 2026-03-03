@@ -323,15 +323,15 @@ def generate_launch_description():
                     {
                         'shared_control_mode': 1,
                         'use_imu': ParameterValue(use_imu, value_type=bool),
-                        'shared_control_mode_topic': shared_control_mode_topic,
-                        'imu_topic': imu_topic,
-                        'scan_topic': scan_topic,
-                        'footprint_topic': footprint_topic,
                         'autonomy_force_weight': 0.0,
                         'use_sim_time': use_sim_time
                     }
                 ],
                 remappings=[
+                    ('/imu/data', imu_topic),
+                    ('/shared_control_mode', shared_control_mode_topic),
+                    ('/scan', scan_topic),
+                    ('/footprint', footprint_topic),
                     ('/odrive_axis0/control_message', '/cabot/control_message_left'),
                     ('/odrive_axis1/control_message', '/cabot/control_message_right'),
                     ('/odrive_axis0/controller_status', '/cabot/controller_status_left'),
