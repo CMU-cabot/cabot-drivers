@@ -12,6 +12,8 @@ find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 add_executable(shared_control_node
   src/main.cpp
@@ -29,6 +31,8 @@ ament_target_dependencies(shared_control_node
   sensor_msgs
   std_msgs
   odrive_can
+  tf2
+  tf2_ros
 )
 
 install(TARGETS shared_control_node

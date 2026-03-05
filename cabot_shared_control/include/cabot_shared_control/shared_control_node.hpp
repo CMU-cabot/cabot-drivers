@@ -27,6 +27,9 @@
 #include <string>
 #include <vector>
 
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <geometry_msgs/msg/polygon.hpp>
@@ -99,6 +102,7 @@ private:
   // Fixed topics / names
   std::string axis0_ns_{"odrive_axis0"};
   std::string axis1_ns_{"odrive_axis1"};
+  std::string footprint_frame_id_{"base_footprint"};
 
   // Geometry
   double wheel_radius_m_{0.0855};
@@ -189,7 +193,6 @@ private:
   };
 
   std::vector<XYPoint> footprint_points_;
-  std::string footprint_frame_id_;
   rclcpp::Time footprint_stamp_;
   bool footprint_received_{false};
 
@@ -239,6 +242,9 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr autonomy_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr footprint_sub_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
+
+  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
   rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr axis0_client_;
   rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr axis1_client_;

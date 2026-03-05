@@ -29,6 +29,10 @@
 #include <string>
 #include <utility>
 
+#include <tf2/exceptions.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Vector3.h>
+
 namespace
 {
 constexpr uint32_t kAxisStateIdle = 1;
@@ -86,11 +90,15 @@ constexpr char kAutonomyCmdTopic[] = "/autonomy/cmd_vel";
 constexpr char kScanTopic[] = "/scan";
 constexpr char kFootprintTopic[] = "/footprint";
 constexpr char kOdomTopic[] = "/cabot/odom_raw";
+constexpr char kFootprintFrame[] = "base_footprint";
 }  // namespace
 
 SharedControlNode::SharedControlNode()
 : Node("shared_control_node")
 {
+  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
   const int initial_shared_control_mode =
     this->declare_parameter<int>("shared_control_mode", static_cast<int>(kSharedControlModeNormal));
   if (
@@ -392,7 +400,8 @@ void SharedControlNode::onFootprint(const geometry_msgs::msg::Polygon::SharedPtr
   }
 
   // geometry_msgs/Polygon has no frame information.
-  footprint_frame_id_.clear();
+  // Assume this footprint is represented in base_footprint.
+  footprint_frame_id_ = kFootprintFrame;
   footprint_stamp_ = this->get_clock()->now();
   footprint_received_ = footprint_points_.size() >= 3;
 }
@@ -406,16 +415,32 @@ void SharedControlNode::onScan(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     return;
   }
 
-  if (
-    footprint_received_ && strict_frame_match_ && !footprint_frame_id_.empty() &&
-    msg->header.frame_id != footprint_frame_id_)
-  {
+  geometry_msgs::msg::TransformStamped scan_to_footprint;
+  if (msg->header.frame_id.empty()) {
     RCLCPP_WARN_THROTTLE(
       this->get_logger(), *this->get_clock(), 2000,
-      "frame mismatch: scan=%s footprint=%s (skip obstacle guard update)",
-      msg->header.frame_id.c_str(), footprint_frame_id_.c_str());
+      "scan frame is empty, cannot transform to %s", footprint_frame_id_.c_str());
     return;
   }
+  try {
+    scan_to_footprint = tf_buffer_->lookupTransform(
+      footprint_frame_id_,
+      msg->header.frame_id,
+      tf2::TimePointZero);
+  } catch (const tf2::TransformException & ex) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 2000,
+      "failed to transform scan frame %s to %s: %s",
+      msg->header.frame_id.c_str(),
+      footprint_frame_id_.c_str(),
+      ex.what());
+    return;
+  }
+
+  const auto & tr = scan_to_footprint.transform.translation;
+  const auto & rot = scan_to_footprint.transform.rotation;
+  const tf2::Quaternion q(rot.x, rot.y, rot.z, rot.w);
+  const tf2::Vector3 t(tr.x, tr.y, tr.z);
 
   double front_clearance = std::numeric_limits<double>::infinity();
   double rear_clearance = std::numeric_limits<double>::infinity();
@@ -435,8 +460,12 @@ void SharedControlNode::onScan(const sensor_msgs::msg::LaserScan::SharedPtr msg)
 
     const double angle =
       static_cast<double>(msg->angle_min) + static_cast<double>(i) * static_cast<double>(msg->angle_increment);
-    const double x = range * std::cos(angle);
-    const double y = range * std::sin(angle);
+    const double x_scan = range * std::cos(angle);
+    const double y_scan = range * std::sin(angle);
+    const tf2::Vector3 scan_point(x_scan, y_scan, 0.0);
+    const tf2::Vector3 footprint_point = tf2::quatRotate(q, scan_point) + t;
+    const double x = footprint_point.x();
+    const double y = footprint_point.y();
 
     has_valid_point = true;
     if (footprint_received_) {

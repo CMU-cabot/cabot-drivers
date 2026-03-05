@@ -215,7 +215,7 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 | `obstacle_timeout_sec` | `0.3` | この時間以内の `scan_topic` データだけを有効とみなします。 |
 | `obstacle_point_min_z` | `-0.3` | 現在の `LaserScan` 実装では未使用です。旧 PointCloud 系設定との互換のため残っています。 |
 | `obstacle_point_max_z` | `1.2` | 現在の `LaserScan` 実装では未使用です。 |
-| `strict_frame_match` | `true` | `scan` と `footprint` のフレーム一致を厳密に見るための設定です。現在の `geometry_msgs/msg/Polygon` 入力では frame_id を持たないため通常は効きません。 |
+| `strict_frame_match` | `true` | 互換のため残しているフラグです。現在は `scan` 点を `base_footprint` へ tf 変換してから計算するため、実質的には未使用です。 |
 | `sensor_guard_enabled` | `true` | footprint がなくても、センサ前方帯域だけで簡易ガードを行うかどうか。 |
 | `sensor_guard_half_width_m` | `0.35` | 簡易ガードで使う左右半幅 [m] です。`|y| <= half_width` の点を監視します。 |
 
@@ -245,4 +245,5 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 - `odrive_can` 側で cyclic message を有効化してください（特に `heartbeat`, `encoder`, `iq`, `torques`）。
 - 軸状態は `CLOSED_LOOP_CONTROL` である必要があります。本ノードは起動時に `/request_axis_state` を呼び出す設定が可能です。
 - `wheel_radius_m`, `wheel_separation_m`, 符号パラメータは実機に合わせて必ず調整してください。
-- 障害物ガードは現在 `sensor_msgs/msg/LaserScan` と `geometry_msgs/msg/Polygon` を使います。`PointCloud2` を直接は入力しません。
+- 障害物ガードは `sensor_msgs/msg/LaserScan` と `geometry_msgs/msg/Polygon` を使います。`PointCloud2` を直接は入力しません。
+- `footprint` は `base_footprint` 座標系のポリゴンを前提にし、`scan` 点は tf で `base_footprint` に変換してから距離計算します。
