@@ -45,6 +45,31 @@ colcon build --symlink-install --packages-select cabot_shared_control
 source install/setup.bash
 ```
 
+## odriver_adapter 互換性テスト
+
+`odriver_adapter` 構成で収録した実機 bag から、`shared_control_node` の比較に必要な最小トピックを抜き出した回帰テスト用 bag を `test/bags/odriver_adapter_reference` に配置しています。
+
+- 入力トピック:
+  - `/cabot/cmd_vel`
+  - `/cabot/controller_status_left`
+  - `/cabot/controller_status_right`
+- 参照出力トピック:
+  - `/cabot/control_message_left`
+  - `/cabot/control_message_right`
+
+抽出済み bag の再生成は `test/extract_odriver_adapter_test_bag.py` を使います。
+
+```bash
+python3 cabot_shared_control/test/extract_odriver_adapter_test_bag.py \
+  --source-db /path/to/ros2_topics_0.db3 \
+  --output-dir /path/to/cabot_shared_control/test/bags/odriver_adapter_reference \
+  --start-ns 1770600630000000000 \
+  --duration-sec 120
+ros2 bag reindex /path/to/cabot_shared_control/test/bags/odriver_adapter_reference sqlite3
+```
+
+テストは `shared_control_node` を normal モードで起動し、bag 入力に対する `/cabot/control_message_{left,right}` を参照 bag と比較します。
+
 ## 起動
 
 ```bash

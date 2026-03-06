@@ -48,6 +48,7 @@ install(DIRECTORY launch config
 )
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
   find_package(ament_cmake_copyright REQUIRED)
   find_package(ament_cmake_cpplint REQUIRED)
   find_package(ament_cmake_lint_cmake REQUIRED)
@@ -60,6 +61,12 @@ if(BUILD_TESTING)
   ament_lint_cmake()
   ament_uncrustify(MAX_LINE_LENGTH ${MAX_LINE_LENGTH})
   ament_xmllint()
+
+  ament_add_pytest_test(
+    test_odriver_adapter_compatibility
+    test/test_odriver_adapter_compatibility.py
+    TIMEOUT 240
+  )
 endif()
 
 ament_package()
