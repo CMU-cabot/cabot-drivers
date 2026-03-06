@@ -20,6 +20,10 @@
 
 #include "cabot_shared_control/shared_control_node.hpp"
 
+#include <tf2/exceptions.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Vector3.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -28,10 +32,6 @@
 #include <memory>
 #include <string>
 #include <utility>
-
-#include <tf2/exceptions.h>
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2/LinearMath/Vector3.h>
 
 namespace
 {
