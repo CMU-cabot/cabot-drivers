@@ -26,10 +26,12 @@ import math
 import os
 import signal
 import subprocess
+import tempfile
 import time
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import List, Sequence
 
+from nav_msgs.msg import Odometry
 import rclpy
 from rclpy.node import Node
 from rclpy.serialization import deserialize_message
@@ -48,6 +50,7 @@ INPUT_TOPICS = [
 ]
 EXPECTED_LEFT_TOPIC = "/cabot/control_message_left"
 EXPECTED_RIGHT_TOPIC = "/cabot/control_message_right"
+EXPECTED_ODOM_TOPIC = "/cabot/odom_raw"
 
 
 def _bag_path() -> Path:
@@ -61,7 +64,7 @@ def _bag_path() -> Path:
 def _read_control_messages(
     bag_path: Path,
     topics: Sequence[str],
-) -> dict[str, List[ControlMessage]]:
+) -> dict[str, List[object]]:
     storage_options = StorageOptions(uri=str(bag_path), storage_id="sqlite3")
     converter_options = ConverterOptions(
         input_serialization_format="cdr",
@@ -156,6 +159,7 @@ class _Collector(Node):
         super().__init__("compatibility_collector")
         self.left: List[ControlMessage] = []
         self.right: List[ControlMessage] = []
+        self.odom: List[Odometry] = []
         self.create_subscription(
             ControlMessage,
             EXPECTED_LEFT_TOPIC,
@@ -168,12 +172,21 @@ class _Collector(Node):
             self._on_right,
             200,
         )
+        self.create_subscription(
+            Odometry,
+            EXPECTED_ODOM_TOPIC,
+            self._on_odom,
+            200,
+        )
 
     def _on_left(self, msg: ControlMessage) -> None:
         self.left.append(msg)
 
     def _on_right(self, msg: ControlMessage) -> None:
         self.right.append(msg)
+
+    def _on_odom(self, msg: Odometry) -> None:
+        self.odom.append(msg)
 
 
 def test_odriver_adapter_compatibility_from_bag():
@@ -183,13 +196,35 @@ def test_odriver_adapter_compatibility_from_bag():
 
     expected = _read_control_messages(
         bag_path,
-        [EXPECTED_LEFT_TOPIC, EXPECTED_RIGHT_TOPIC],
+        [EXPECTED_LEFT_TOPIC, EXPECTED_RIGHT_TOPIC, EXPECTED_ODOM_TOPIC],
     )
     assert len(expected[EXPECTED_LEFT_TOPIC]) > 500
     assert len(expected[EXPECTED_RIGHT_TOPIC]) > 500
+    assert len(expected[EXPECTED_ODOM_TOPIC]) > 500
 
     env = os.environ.copy()
     env["RCUTILS_COLORIZED_OUTPUT"] = "0"
+    qos_override = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
+    qos_override.write(
+        "/cabot/controller_status_left:\n"
+        "  history: keep_last\n"
+        "  depth: 50\n"
+        "  reliability: reliable\n"
+        "  durability: volatile\n"
+        "/cabot/controller_status_right:\n"
+        "  history: keep_last\n"
+        "  depth: 50\n"
+        "  reliability: reliable\n"
+        "  durability: volatile\n"
+        "/cabot/cmd_vel:\n"
+        "  history: keep_last\n"
+        "  depth: 50\n"
+        "  reliability: reliable\n"
+        "  durability: volatile\n"
+    )
+    qos_override.flush()
+    qos_override_path = qos_override.name
+    qos_override.close()
 
     node_cmd = [
         "ros2",
@@ -210,7 +245,11 @@ def test_odriver_adapter_compatibility_from_bag():
         "-r", "/odrive_axis0/request_axis_state:=/cabot/request_axis_state_left",
         "-r", "/odrive_axis1/request_axis_state:=/cabot/request_axis_state_right",
     ]
-    play_cmd = ["ros2", "bag", "play", str(bag_path), "--topics", *INPUT_TOPICS]
+    play_cmd = [
+        "ros2", "bag", "play", str(bag_path),
+        "--qos-profile-overrides-path", qos_override_path,
+        "--topics", *INPUT_TOPICS
+    ]
 
     node_proc = subprocess.Popen(
         node_cmd,
@@ -250,11 +289,15 @@ def test_odriver_adapter_compatibility_from_bag():
         if rclpy.ok():
             rclpy.shutdown()
         _terminate_process(node_proc, "shared_control_node")
+        if os.path.exists(qos_override_path):
+            os.unlink(qos_override_path)
 
     actual_left = collector.left if collector else []
     actual_right = collector.right if collector else []
+    actual_odom = collector.odom if collector else []
     assert len(actual_left) > 500
     assert len(actual_right) > 500
+    assert len(actual_odom) > 500
 
     expected_left_vel = [msg.input_vel for msg in expected[EXPECTED_LEFT_TOPIC]]
     expected_right_vel = [msg.input_vel for msg in expected[EXPECTED_RIGHT_TOPIC]]
@@ -284,3 +327,30 @@ def test_odriver_adapter_compatibility_from_bag():
         assert left_corr > 0.90, f"left input_vel correlation too low: {left_corr:.4f}"
     if right_expected_std > 1.0e-3:
         assert right_corr > 0.90, f"right input_vel correlation too low: {right_corr:.4f}"
+
+    expected_odom = expected[EXPECTED_ODOM_TOPIC]
+    compare_count_odom = min(len(expected_odom), len(actual_odom), 1500)
+    assert compare_count_odom >= 500
+
+    expected_x = _resample([msg.pose.pose.position.x for msg in expected_odom], compare_count_odom)
+    actual_x = _resample([msg.pose.pose.position.x for msg in actual_odom], compare_count_odom)
+    expected_y = _resample([msg.pose.pose.position.y for msg in expected_odom], compare_count_odom)
+    actual_y = _resample([msg.pose.pose.position.y for msg in actual_odom], compare_count_odom)
+    expected_yaw = _resample(
+        [2.0 * math.atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w) for msg in expected_odom],
+        compare_count_odom,
+    )
+    actual_yaw = _resample(
+        [2.0 * math.atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w) for msg in actual_odom],
+        compare_count_odom,
+    )
+    expected_vx = _resample([msg.twist.twist.linear.x for msg in expected_odom], compare_count_odom)
+    actual_vx = _resample([msg.twist.twist.linear.x for msg in actual_odom], compare_count_odom)
+    expected_wz = _resample([msg.twist.twist.angular.z for msg in expected_odom], compare_count_odom)
+    actual_wz = _resample([msg.twist.twist.angular.z for msg in actual_odom], compare_count_odom)
+
+    assert _mae(expected_x, actual_x) < 0.03, "odom x MAE too high"
+    assert _mae(expected_y, actual_y) < 0.03, "odom y MAE too high"
+    assert _mae(expected_yaw, actual_yaw) < 0.08, "odom yaw MAE too high"
+    assert _mae(expected_vx, actual_vx) < 0.08, "odom linear velocity MAE too high"
+    assert _mae(expected_wz, actual_wz) < 0.15, "odom angular velocity MAE too high"
