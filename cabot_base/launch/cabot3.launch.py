@@ -84,6 +84,8 @@ def generate_launch_description():
     hesai_ros_2_0 = LaunchConfiguration('hesai_ros_2_0')
     use_shared_control = LaunchConfiguration('use_shared_control')
     shared_control_use_imu = LaunchConfiguration('shared_control_use_imu')
+    shared_control_mode = LaunchConfiguration('shared_control_mode')
+    shared_torque_assist_enabled = LaunchConfiguration('shared_torque_assist_enabled')
     shared_control_mode_topic = LaunchConfiguration('shared_control_mode_topic')
     shared_control_imu_topic = LaunchConfiguration('shared_control_imu_topic')
     shared_control_scan_topic = LaunchConfiguration('shared_control_scan_topic')
@@ -256,9 +258,19 @@ def generate_launch_description():
             description='If false, disable IMU in shared_control_node'
         ),
         DeclareLaunchArgument(
+            'shared_control_mode',
+            default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_MODE', default_value='0'),
+            description='Startup mode for shared_control_node (0=normal, 1=shared, 2=free, 3=shared_torque)'
+        ),
+        DeclareLaunchArgument(
+            'shared_torque_assist_enabled',
+            default_value=EnvironmentVariable('CABOT_SHARED_TORQUE_ASSIST_ENABLED', default_value='false'),
+            description='Startup state of shared_torque assist (true=assist on, false=assist off; obstacle brake stays on)'
+        ),
+        DeclareLaunchArgument(
             'shared_control_mode_topic',
             default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_MODE_TOPIC', default_value='/shared_control_mode'),
-            description='Mode topic for shared_control_node (std_msgs/Int8: 0=normal, 1=shared, 2=free)'
+            description='Mode topic for shared_control_node (std_msgs/Int8: 0=normal, 1=shared, 2=free, 3=shared_torque)'
         ),
         DeclareLaunchArgument(
             'shared_control_imu_topic',
@@ -616,7 +628,9 @@ def generate_launch_description():
                     *param_files,
                     {
                         'use_imu': ParameterValue(shared_control_use_imu, value_type=bool),
-                        'shared_control_mode': 0,
+                        'shared_control_mode': ParameterValue(shared_control_mode, value_type=int),
+                        'shared_torque_assist_enabled': ParameterValue(
+                            shared_torque_assist_enabled, value_type=bool),
                         'shared_control_mode_topic': shared_control_mode_topic,
                         'imu_topic': shared_control_imu_topic,
                         'scan_topic': shared_control_scan_topic,
@@ -654,7 +668,9 @@ def generate_launch_description():
                     *param_files,
                     {
                         'use_imu': ParameterValue(shared_control_use_imu, value_type=bool),
-                        'shared_control_mode': 0,
+                        'shared_control_mode': ParameterValue(shared_control_mode, value_type=int),
+                        'shared_torque_assist_enabled': ParameterValue(
+                            shared_torque_assist_enabled, value_type=bool),
                         'shared_control_mode_topic': shared_control_mode_topic,
                         'imu_topic': shared_control_imu_topic,
                         'scan_topic': shared_control_scan_topic,

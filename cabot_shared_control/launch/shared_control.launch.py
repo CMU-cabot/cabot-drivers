@@ -60,6 +60,8 @@ def generate_launch_description():
     use_crop_box = LaunchConfiguration('use_crop_box')
     hesai_ros_2_0 = LaunchConfiguration('hesai_ros_2_0')
     use_imu = LaunchConfiguration('use_imu')
+    shared_control_mode = LaunchConfiguration('shared_control_mode')
+    shared_torque_assist_enabled = LaunchConfiguration('shared_torque_assist_enabled')
     shared_control_mode_topic = LaunchConfiguration('shared_control_mode_topic')
     imu_topic = LaunchConfiguration('imu_topic')
     scan_topic = LaunchConfiguration('scan_topic')
@@ -157,9 +159,19 @@ def generate_launch_description():
             description='If false, disable IMU input and assume horizontal terrain'
         ),
         DeclareLaunchArgument(
+            'shared_control_mode',
+            default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_MODE', default_value='1'),
+            description='Startup mode for shared_control_node (0=normal, 1=shared, 2=free, 3=shared_torque)'
+        ),
+        DeclareLaunchArgument(
+            'shared_torque_assist_enabled',
+            default_value=EnvironmentVariable('CABOT_SHARED_TORQUE_ASSIST_ENABLED', default_value='false'),
+            description='Startup state of shared_torque assist (true=assist on, false=assist off; obstacle brake stays on)'
+        ),
+        DeclareLaunchArgument(
             'shared_control_mode_topic',
             default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_MODE_TOPIC', default_value='/shared_control_mode'),
-            description='Mode topic for shared_control_node (std_msgs/Int8: 0=normal, 1=shared, 2=free)'
+            description='Mode topic for shared_control_node (std_msgs/Int8: 0=normal, 1=shared, 2=free, 3=shared_torque)'
         ),
         DeclareLaunchArgument(
             'imu_topic',
@@ -321,7 +333,9 @@ def generate_launch_description():
                 parameters=[
                     shared_control_param_file,
                     {
-                        'shared_control_mode': 1,
+                        'shared_control_mode': ParameterValue(shared_control_mode, value_type=int),
+                        'shared_torque_assist_enabled': ParameterValue(
+                            shared_torque_assist_enabled, value_type=bool),
                         'use_imu': ParameterValue(use_imu, value_type=bool),
                         'autonomy_force_weight': 0.0,
                         'use_sim_time': use_sim_time

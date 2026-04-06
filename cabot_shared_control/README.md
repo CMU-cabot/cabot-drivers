@@ -6,6 +6,7 @@ ODrive S1 x2 + BotWheels 2輪差動向けの shared control 実装です。
 - モーター速度/電流(または推定トルク)から外力を推定
 - IMU姿勢から坂道重力成分を補償
 - 推定外力をコンプライアンス制御で速度指令へ変換
+- `shared_torque` モードでは推定外力を直接トルク指令へ変換
 - 必要に応じて自律側 `TwistStamped` と合成（shared control）
 - LiDAR (`LaserScan`) + footprintから障害物接近時の前後進ブロック（安全ガード）
 
@@ -30,6 +31,17 @@ ODrive S1 x2 + BotWheels 2輪差動向けの shared control 実装です。
   - 後退しているのを止めるときは前に押してください。
 - 障害物
   - 障害物に近づくと減速し、一定距離以上は近づかないように制御します
+
+### `shared_torque` モード (`shared_control_mode=3`)
+
+- 起動時の `shared_torque` 走行アシストはデフォルトで OFF です。`/shared_torque_assist_enabled` に `std_msgs/msg/Bool` を流すと ON/OFF を切り替えられます。
+- 走行アシストが ON のときは、押している間だけアシストし、押すのをやめると減衰トルクで止まる方向に制御します。
+- 走行アシストが OFF のときは通常のアシストトルクは出しませんが、障害物接近時の距離ベースのブレーキ・押し返しは有効のままです。
+- ただし静止近傍では速度ノイズで微振動しないよう、`torque_obstacle_brake_velocity_deadband` 未満の微小速度では障害物ブレーキを掛けません。
+- `shared` モードのように「一度ついた速度を維持する」挙動ではありません。
+- `/shared_control/cmd_vel` は指令速度ではなく、現在の実測速度テレメトリとして publish します。
+- ODrive 側はトルク制御を使うため、必要に応じて torque mode の速度制限やゲイン調整を確認してください。
+  - 参考: https://docs.odriverobotics.com/v/latest/manual/control.html#torque-control
 
 
 ## 依存
@@ -71,10 +83,19 @@ python3 cabot_shared_control/test/extract_odriver_adapter_test_bag.py \
 テストは `shared_control_node` を normal モードで起動し、bag 入力に対する
 `/cabot/control_message_{left,right}` と `/cabot/odom_raw` を参照 bag と比較します。
 
+加えて、`shared_torque` モード向けに synthetic な `ControllerStatus` / `LaserScan` を使った統合テストを用意しています。
+
 ## 起動
 
 ```bash
 ros2 launch cabot_shared_control shared_control.launch.py
+```
+
+`shared_torque` モードで起動する例:
+
+```bash
+ros2 launch cabot_shared_control shared_control.launch.py shared_control_mode:=3
+./shared-control-launch.sh shared_control_mode:=3
 ```
 
 リポジトリのトップディレクトリから docker 内で起動する場合:
@@ -107,6 +128,8 @@ ros2 launch cabot_shared_control shared_control.launch.py \
   use_crop_box:=true \
   can_interface:=can1 \
   hesai_ros_2_0:=false \
+  shared_control_mode:=3 \
+  shared_torque_assist_enabled:=false \
   use_imu:=true \
   imu_topic:=/cabot/imu/data \
   shared_control_mode_topic:=/shared_control_mode \
@@ -143,14 +166,16 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 | `odrive_firmware_version` | `ODRIVE_FIRMWARE_VERSION` 環境変数 | 読み込む ODrive endpoint JSON のファームウェア版。 |
 | `hesai_ros_2_0` | `HESAI_ROS_2_0` 環境変数。未設定時は `false` | `true` のとき `HesaiLidar_ROS_2.0` 構成を使います。 |
 | `use_imu` | `CABOT_SHARED_CONTROL_USE_IMU` 環境変数。未設定時は `true` | `shared_control_node` の IMU 入力を有効化します。 |
-| `shared_control_mode_topic` | `CABOT_SHARED_CONTROL_MODE_TOPIC` 環境変数。未設定時は `/shared_control_mode` | `shared_control_node` の `/shared_control_mode` 入力を remap するためのトピック名です。 |
+| `shared_control_mode` | `CABOT_SHARED_CONTROL_MODE` 環境変数。未設定時は `1` | `shared_control_node` の起動時モードです。`0=normal`, `1=shared`, `2=free`, `3=shared_torque` を使います。 |
+| `shared_torque_assist_enabled` | `CABOT_SHARED_TORQUE_ASSIST_ENABLED` 環境変数。未設定時は `false` | `shared_torque` モードの走行アシスト初期状態です。`false` でも障害物ブレーキは有効のままです。 |
+| `shared_control_mode_topic` | `CABOT_SHARED_CONTROL_MODE_TOPIC` 環境変数。未設定時は `/shared_control_mode` | `shared_control_node` の `/shared_control_mode` 入力を remap するためのトピック名です。`std_msgs/msg/Int8` で `0=normal`, `1=shared`, `2=free`, `3=shared_torque` を使います。 |
 | `imu_topic` | `/cabot/imu/data` | `shared_control_node` の `/imu/data` 入力を remap するための IMU トピック名です。 |
 | `scan_topic` | `/scan` | `shared_control_node` の `/scan` 入力を remap するための `sensor_msgs/msg/LaserScan` トピック名です。 |
 | `footprint_topic` | `/footprint` | `shared_control_node` の `/footprint` 入力を remap するための `geometry_msgs/msg/Polygon` トピック名です。 |
 
 補足:
 
-- `shared_control.launch.py` は `shared_control_node` に `shared_control_mode:=1` を固定で渡します。
+- `shared_control.launch.py` の起動時モードは `shared_control_mode` 引数で切り替えられます。未指定時は `1` (`shared`) です。
 - 同じく `autonomy_force_weight:=0.0` を固定で渡すため、自律指令はデフォルトでは shared 力へ反映されません。
 
 ## `shared_control_node` のパラメーター一覧
@@ -164,7 +189,8 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 
 | パラメーター | C++ default | 説明 |
 | --- | --- | --- |
-| `shared_control_mode` | `0` (`normal`) | 起動時モード。`0=normal`, `1=shared`, `2=free` です。`shared_control.launch.py` では `1` (`shared`) を固定で渡します。 |
+| `shared_control_mode` | `0` (`normal`) | 起動時モード。`0=normal`, `1=shared`, `2=free`, `3=shared_torque` です。`shared_control.launch.py` の既定値は `1` (`shared`) です。 |
+| `shared_torque_assist_enabled` | `false` | `shared_torque` モードの走行アシスト ON/OFF です。`false` のときは通常アシストを止めますが、障害物ブレーキと押し返しは有効のままです。 |
 | `use_imu` | `true` | `false` のとき IMU 購読を止め、重力補償と IMU 加速度利用も自動で無効化します。launch では `CABOT_SHARED_CONTROL_USE_IMU` または `true` が使われます。 |
 
 ### 車体・ODrive 設定
@@ -176,7 +202,7 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 | `left_wheel_sign` | `-1.0` | 左車輪速度の符号補正です。 |
 | `right_wheel_sign` | `1.0` | 右車輪速度の符号補正です。 |
 | `odrive_velocity_is_turns_per_sec` | `true` | ODrive の速度値を `turns/s` とみなして `rad/s` に変換するかどうか。 |
-| `control_mode` | `2` | `odrive_can/msg/ControlMessage.control_mode` に入れる値です。既定値 `2` は `VELOCITY_CONTROL`。 |
+| `control_mode` | `2` | `odrive_can/msg/ControlMessage.control_mode` に入れる値です。既定値 `2` は `VELOCITY_CONTROL`。`shared_torque` モードではこの値を使わず、内部で `TORQUE_CONTROL(=1)` を使います。 |
 | `input_mode` | `1` | `odrive_can/msg/ControlMessage.input_mode` に入れる値です。既定値 `1` は `PASSTHROUGH`。 |
 | `request_closed_loop_on_startup` | `true` | 起動時に `/request_axis_state` を呼んで閉ループ制御へ遷移させるかどうか。 |
 
@@ -209,6 +235,18 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 | `desired_inertia_z` | `0.9` | shared 制御で実現したいヨー方向の仮想慣性です。 |
 | `desired_damping_x` | `24.0` | shared 制御で実現したい前後方向の仮想減衰です。 |
 | `desired_damping_z` | `2.8` | shared 制御で実現したいヨー方向の仮想減衰です。 |
+| `torque_assist_damping_x` | `24.0` | `shared_torque` モードで前後速度に対して掛ける減衰係数です。押していないときに止まる方向へ働きます。 |
+| `torque_assist_damping_z` | `2.8` | `shared_torque` モードで角速度に対して掛ける減衰係数です。 |
+| `torque_assist_input_scale` | `0.25` | `shared_torque_assist_enabled=true` のときの前後アシスト入力スケールです。`0.25` で通常アシストをさらに半分にしています。 |
+| `torque_assist_torque_scale` | `0.0` | `shared_torque_assist_enabled=true` のときの回転アシスト入力スケールです。`0.0` で回転はアシストしません。 |
+| `torque_assist_max_force_forward` | `20.0` | `shared_torque` モードで前進方向に許容する最大仮想力 [N] です。 |
+| `torque_assist_max_force_reverse` | `45.0` | `shared_torque` モードで後退方向に許容する最大仮想力 [N] です。障害物前での制動・押し返しの頭打ちにも効きます。 |
+| `torque_assist_max_torque_z` | `2.5` | `shared_torque` モードで許容する最大仮想ヨートルク [Nm] です。 |
+| `torque_obstacle_stop_distance_m` | `0.35` | `shared_torque` モード専用の停止距離です。`shared` モードの障害物ガード設定は変えません。 |
+| `torque_obstacle_pushback_stiffness` | `70.0` | `shared_torque` モード専用の押し返し剛性です。 |
+| `torque_obstacle_pushback_max_force` | `22.5` | `shared_torque` モード専用の押し返し力上限です。 |
+| `torque_obstacle_force_filter_alpha` | `0.12` | `shared_torque` モード専用の障害物 force 平滑化係数です。 |
+| `torque_obstacle_brake_velocity_deadband` | `0.03` | `shared_torque` モード専用の障害物ブレーキ速度デッドバンド [m/s] です。静止近傍の速度ノイズではブレーキトルクを出しません。 |
 
 ### Shared control 合成
 
@@ -249,12 +287,12 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 | --- | --- | --- |
 | `obstacle_guard_enabled` | `true` | 障害物ガード全体を有効にします。 |
 | `obstacle_guard_reverse_enabled` | `false` | 後退側にも同じ障害物ガードを適用するかどうか。 |
-| `obstacle_stop_distance_m` | `0.0` | 障害物までこの距離以下になったら前後進を停止させる閾値です。 |
+| `obstacle_stop_distance_m` | `0.0` | 障害物までこの距離以下になったら前後進を停止させる閾値です。`shared` モードの既存挙動用です。 |
 | `obstacle_slowdown_margin_m` | `0.6` | `obstacle_stop_distance_m` の外側で速度を滑らかに落とすマージン幅です。 |
 | `obstacle_min_speed_scale` | `0.2` | 減速マージン内で許容する最小速度スケールです。 |
 | `obstacle_pushback_enabled` | `true` | 停止距離に侵入したときに仮想ばねの押し返し力を与えるかどうか。 |
-| `obstacle_pushback_stiffness` | `60.0` | 押し返し力のばね定数です。 |
-| `obstacle_pushback_max_force` | `30.0` | 押し返し力の最大値です。 |
+| `obstacle_pushback_stiffness` | `60.0` | 押し返し力のばね定数です。`shared` モードの既存設定です。 |
+| `obstacle_pushback_max_force` | `30.0` | 押し返し力の最大値です。`shared` モードの既存設定です。 |
 | `obstacle_timeout_sec` | `0.3` | この時間以内の `scan_topic` データだけを有効とみなします。 |
 | `obstacle_point_min_z` | `-0.3` | 現在の `LaserScan` 実装では未使用です。旧 PointCloud 系設定との互換のため残っています。 |
 | `obstacle_point_max_z` | `1.2` | 現在の `LaserScan` 実装では未使用です。 |
@@ -270,7 +308,8 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
   - `/cabot/controller_status_left` (`odrive_can/msg/ControllerStatus`)
   - `/cabot/controller_status_right` (`odrive_can/msg/ControllerStatus`)
   - `/cabot/imu/data` (`sensor_msgs/msg/Imu`)
-  - `/shared_control_mode` (`std_msgs/msg/Int8`, `0=normal`, `1=shared`, `2=free`)
+  - `/shared_control_mode` (`std_msgs/msg/Int8`, `0=normal`, `1=shared`, `2=free`, `3=shared_torque`)
+  - `/shared_torque_assist_enabled` (`std_msgs/msg/Bool`, `true=assist on`, `false=assist off`)
   - `/cabot/pause_control` (`std_msgs/msg/Bool`)
   - `/cabot/cmd_vel` (`geometry_msgs/msg/Twist`)
   - `/autonomy/cmd_vel` (`geometry_msgs/msg/TwistStamped`, 任意)
@@ -288,5 +327,6 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 - `odrive_can` 側で cyclic message を有効化してください（特に `heartbeat`, `encoder`, `iq`, `torques`）。
 - 軸状態は `CLOSED_LOOP_CONTROL` である必要があります。本ノードは起動時に `/request_axis_state` を呼び出す設定が可能です。
 - `wheel_radius_m`, `wheel_separation_m`, 符号パラメータは実機に合わせて必ず調整してください。
+- `shared_torque` モードでは ODrive 側の torque mode 制約の影響を直接受けます。想定より動き出しが弱い場合は、ODrive 側の速度制限や関連ゲイン設定も確認してください。
 - 障害物ガードは `sensor_msgs/msg/LaserScan` と `geometry_msgs/msg/Polygon` を使います。`PointCloud2` を直接は入力しません。
 - `footprint` は `base_footprint` 座標系のポリゴンを前提にし、`scan` 点は tf で `base_footprint` に変換してから距離計算します。

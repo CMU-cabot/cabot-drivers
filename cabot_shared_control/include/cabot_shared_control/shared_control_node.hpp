@@ -65,6 +65,7 @@ private:
   void onAxis1Status(const odrive_can::msg::ControllerStatus::SharedPtr msg);
   void onImu(const sensor_msgs::msg::Imu::SharedPtr msg);
   void onSharedControlMode(const std_msgs::msg::Int8::SharedPtr msg);
+  void onSharedTorqueAssistEnabled(const std_msgs::msg::Bool::SharedPtr msg);
   void onPauseControl(const std_msgs::msg::Bool::SharedPtr msg);
   void onCmdVel(const geometry_msgs::msg::Twist::SharedPtr msg);
   void onAutonomyCmd(const geometry_msgs::msg::TwistStamped::SharedPtr msg);
@@ -73,6 +74,7 @@ private:
 
   void controlStep();
   void controlStepShared(const rclcpp::Time & now, double dt);
+  void controlStepSharedTorque(const rclcpp::Time & now, double dt);
   void controlStepAutonomy(double dt);
   void controlStepStop(double dt);
   void controlStepFree();
@@ -82,7 +84,10 @@ private:
   void updateOdometryFromStatus(const rclcpp::Time & now);
   double slewRate(double current, double target, double accel_limit, double dt) const;
   void publishWheelVelocities(double left_wheel_rad_s, double right_wheel_rad_s);
+  void publishWheelTorques(double left_wheel_torque_nm, double right_wheel_torque_nm);
   void publishStop();
+  void publishZeroCommandForCurrentMode();
+  void publishSharedTelemetry(const rclcpp::Time & now, double linear_x, double angular_z);
 
   void requestClosedLoopIfReady();
   void onAxisStateResponse(
@@ -93,12 +98,27 @@ private:
   double estimateWheelTorque(
     const odrive_can::msg::ControllerStatus & status,
     double sign) const;
+  struct SharedControlState
+  {
+    double v_meas{0.0};
+    double wz_meas{0.0};
+    double shared_force_x{0.0};
+    double shared_torque_z{0.0};
+    bool obstacle_fresh{false};
+    double front_scale{1.0};
+    double rear_scale{1.0};
+  };
+  bool computeSharedControlState(
+    const rclcpp::Time & now,
+    double dt,
+    SharedControlState & state);
+  void resetSharedState();
   double toSiAngular(double odrive_velocity_value) const;
   double fromSiAngular(double angular_velocity_rad_s) const;
   double distancePointToFootprint(double x, double y) const;
   bool pointInsideFootprint(double x, double y) const;
   bool obstacleDataFresh(const rclcpp::Time & now) const;
-  double obstacleApproachScale(double clearance_m) const;
+  double obstacleApproachScale(double clearance_m, double stop_distance_m) const;
 
   // Fixed topics / names
   std::string axis0_ns_{"odrive_axis0"};
@@ -107,11 +127,12 @@ private:
 
   // Geometry
   double wheel_radius_m_{0.0855};
-  double wheel_separation_m_{0.419};
+  double wheel_separation_m_{0.139};
   double left_wheel_sign_{-1.0};
   double right_wheel_sign_{1.0};
   bool odrive_velocity_is_turns_per_sec_{true};
   int8_t shared_control_mode_{1};
+  bool shared_torque_assist_enabled_{false};
   bool pause_control_{false};
 
   // ODrive control
@@ -142,9 +163,21 @@ private:
 
   // Compliance parameters
   double desired_mass_x_{11.0};
-  double desired_inertia_z_{1.2};
-  double desired_damping_x_{14.0};
-  double desired_damping_z_{2.5};
+  double desired_inertia_z_{0.9};
+  double desired_damping_x_{24.0};
+  double desired_damping_z_{2.8};
+  double torque_assist_damping_x_{24.0};
+  double torque_assist_damping_z_{2.8};
+  double torque_assist_input_scale_{0.25};
+  double torque_assist_torque_scale_{0.0};
+  double torque_assist_max_force_forward_{20.0};
+  double torque_assist_max_force_reverse_{45.0};
+  double torque_assist_max_torque_z_{2.5};
+  double torque_obstacle_stop_distance_m_{0.35};
+  double torque_obstacle_pushback_stiffness_{70.0};
+  double torque_obstacle_pushback_max_force_{22.5};
+  double torque_obstacle_force_filter_alpha_{0.12};
+  double torque_obstacle_brake_velocity_deadband_{0.03};
 
   // Shared control blending
   double human_force_weight_{1.0};
@@ -174,7 +207,7 @@ private:
   // Obstacle guard
   bool obstacle_guard_enabled_{true};
   bool obstacle_guard_reverse_enabled_{false};
-  double obstacle_stop_distance_m_{0.5};
+  double obstacle_stop_distance_m_{0.0};
   double obstacle_slowdown_margin_m_{0.0};
   double obstacle_min_speed_scale_{0.0};
   bool obstacle_pushback_enabled_{true};
@@ -216,6 +249,7 @@ private:
 
   double external_force_x_{0.0};
   double external_torque_z_{0.0};
+  double filtered_obstacle_force_x_{0.0};
   double command_v_{0.0};
   double command_wz_{0.0};
   double last_v_meas_{0.0};
@@ -238,6 +272,7 @@ private:
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr right_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr shared_control_mode_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr shared_torque_assist_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr pause_control_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr autonomy_sub_;

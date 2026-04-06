@@ -3,6 +3,7 @@ shared_control_node:
     # These values are kept in sync with the C++ declare_parameter() defaults.
     # The file is retained as an explicit reference/default parameter set.
     use_imu: true
+    shared_torque_assist_enabled: false
 
     wheel_radius_m: 0.0855
     wheel_separation_m: 0.139
@@ -36,6 +37,18 @@ shared_control_node:
     desired_inertia_z: 0.9
     desired_damping_x: 24.0
     desired_damping_z: 2.8
+    torque_assist_damping_x: 24.0
+    torque_assist_damping_z: 2.8
+    torque_assist_input_scale: 0.25
+    torque_assist_torque_scale: 0.0
+    torque_assist_max_force_forward: 20.0
+    torque_assist_max_force_reverse: 45.0
+    torque_assist_max_torque_z: 2.5
+    torque_obstacle_stop_distance_m: 0.35
+    torque_obstacle_pushback_stiffness: 70.0
+    torque_obstacle_pushback_max_force: 22.5
+    torque_obstacle_force_filter_alpha: 0.12
+    torque_obstacle_brake_velocity_deadband: 0.03
 
     human_force_weight: 1.0
     autonomy_force_weight: 0.0

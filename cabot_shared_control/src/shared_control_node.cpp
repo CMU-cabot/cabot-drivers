@@ -42,10 +42,18 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr int8_t kSharedControlModeNormal = 0;
 constexpr int8_t kSharedControlModeShared = 1;
 constexpr int8_t kSharedControlModeFree = 2;
+constexpr int8_t kSharedControlModeSharedTorque = 3;
+constexpr uint32_t kControlModeTorque = 1;
+constexpr uint32_t kInputModePassthrough = 1;
 
 double clamp(double value, double lower, double upper)
 {
   return std::max(lower, std::min(upper, value));
+}
+
+bool isAssistMode(int8_t mode)
+{
+  return mode == kSharedControlModeShared || mode == kSharedControlModeSharedTorque;
 }
 
 double signedDeadband(double value, double threshold)
@@ -84,6 +92,7 @@ namespace
 {
 constexpr char kImuTopic[] = "/imu/data";
 constexpr char kSharedControlModeTopic[] = "/shared_control_mode";
+constexpr char kSharedTorqueAssistEnabledTopic[] = "/shared_torque_assist_enabled";
 constexpr char kPauseControlTopic[] = "/cabot/pause_control";
 constexpr char kCmdVelTopic[] = "/cabot/cmd_vel";
 constexpr char kAutonomyCmdTopic[] = "/autonomy/cmd_vel";
@@ -104,17 +113,20 @@ SharedControlNode::SharedControlNode()
   if (
     initial_shared_control_mode == kSharedControlModeNormal ||
     initial_shared_control_mode == kSharedControlModeShared ||
-    initial_shared_control_mode == kSharedControlModeFree)
+    initial_shared_control_mode == kSharedControlModeFree ||
+    initial_shared_control_mode == kSharedControlModeSharedTorque)
   {
     shared_control_mode_ = static_cast<int8_t>(initial_shared_control_mode);
   } else {
     RCLCPP_WARN(
       this->get_logger(),
-      "invalid shared_control_mode=%d at startup (expected: 0=normal, 1=shared, 2=free), fallback to 0",
+      "invalid shared_control_mode=%d at startup (expected: 0=normal, 1=shared, 2=free, 3=shared_torque), fallback to 0",
       initial_shared_control_mode);
     shared_control_mode_ = kSharedControlModeNormal;
   }
   use_imu_ = this->declare_parameter<bool>("use_imu", true);
+  shared_torque_assist_enabled_ =
+    this->declare_parameter<bool>("shared_torque_assist_enabled", false);
 
   wheel_radius_m_ = this->declare_parameter<double>("wheel_radius_m", 0.0855);
   wheel_separation_m_ = this->declare_parameter<double>("wheel_separation_m", 0.139);
@@ -157,6 +169,28 @@ SharedControlNode::SharedControlNode()
   desired_inertia_z_ = this->declare_parameter<double>("desired_inertia_z", 0.9);
   desired_damping_x_ = this->declare_parameter<double>("desired_damping_x", 24.0);
   desired_damping_z_ = this->declare_parameter<double>("desired_damping_z", 2.8);
+  torque_assist_damping_x_ = this->declare_parameter<double>("torque_assist_damping_x", 24.0);
+  torque_assist_damping_z_ = this->declare_parameter<double>("torque_assist_damping_z", 2.8);
+  torque_assist_input_scale_ =
+    this->declare_parameter<double>("torque_assist_input_scale", 0.25);
+  torque_assist_torque_scale_ =
+    this->declare_parameter<double>("torque_assist_torque_scale", 0.0);
+  torque_assist_max_force_forward_ =
+    this->declare_parameter<double>("torque_assist_max_force_forward", 20.0);
+  torque_assist_max_force_reverse_ =
+    this->declare_parameter<double>("torque_assist_max_force_reverse", 45.0);
+  torque_assist_max_torque_z_ =
+    this->declare_parameter<double>("torque_assist_max_torque_z", 2.5);
+  torque_obstacle_stop_distance_m_ =
+    this->declare_parameter<double>("torque_obstacle_stop_distance_m", 0.35);
+  torque_obstacle_pushback_stiffness_ =
+    this->declare_parameter<double>("torque_obstacle_pushback_stiffness", 70.0);
+  torque_obstacle_pushback_max_force_ =
+    this->declare_parameter<double>("torque_obstacle_pushback_max_force", 22.5);
+  torque_obstacle_force_filter_alpha_ =
+    this->declare_parameter<double>("torque_obstacle_force_filter_alpha", 0.12);
+  torque_obstacle_brake_velocity_deadband_ =
+    this->declare_parameter<double>("torque_obstacle_brake_velocity_deadband", 0.03);
 
   human_force_weight_ = this->declare_parameter<double>("human_force_weight", 1.0);
   autonomy_force_weight_ = this->declare_parameter<double>("autonomy_force_weight", 0.0);
@@ -248,6 +282,9 @@ SharedControlNode::SharedControlNode()
   shared_control_mode_sub_ = this->create_subscription<std_msgs::msg::Int8>(
     kSharedControlModeTopic, 20,
     std::bind(&SharedControlNode::onSharedControlMode, this, std::placeholders::_1));
+  shared_torque_assist_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+    kSharedTorqueAssistEnabledTopic, 20,
+    std::bind(&SharedControlNode::onSharedTorqueAssistEnabled, this, std::placeholders::_1));
   pause_control_sub_ = this->create_subscription<std_msgs::msg::Bool>(
     kPauseControlTopic, 20,
     std::bind(&SharedControlNode::onPauseControl, this, std::placeholders::_1));
@@ -277,11 +314,12 @@ SharedControlNode::SharedControlNode()
 
   RCLCPP_INFO(
     this->get_logger(),
-    "started: axis0=/%s axis1=/%s loop=%.1fHz imu=%s obstacle_guard=%s stop_distance=%.2fm",
+    "started: axis0=/%s axis1=/%s loop=%.1fHz imu=%s obstacle_guard=%s stop_distance=%.2fm torque_assist_default=%s",
     axis0_ns_.c_str(), axis1_ns_.c_str(), loop_rate_hz_,
     use_imu_ ? "true" : "false",
     obstacle_guard_enabled_ ? "true" : "false",
-    obstacle_stop_distance_m_);
+    obstacle_stop_distance_m_,
+    shared_torque_assist_enabled_ ? "on" : "off");
 }
 
 void SharedControlNode::onAxis0Status(const odrive_can::msg::ControllerStatus::SharedPtr msg)
@@ -333,11 +371,12 @@ void SharedControlNode::onSharedControlMode(const std_msgs::msg::Int8::SharedPtr
   if (
     mode != kSharedControlModeNormal &&
     mode != kSharedControlModeShared &&
-    mode != kSharedControlModeFree)
+    mode != kSharedControlModeFree &&
+    mode != kSharedControlModeSharedTorque)
   {
     RCLCPP_WARN_THROTTLE(
       this->get_logger(), *this->get_clock(), 1000,
-      "ignore invalid shared_control_mode=%d (expected: 0=normal, 1=shared, 2=free)",
+      "ignore invalid shared_control_mode=%d (expected: 0=normal, 1=shared, 2=free, 3=shared_torque)",
       static_cast<int>(mode));
     return;
   }
@@ -350,20 +389,15 @@ void SharedControlNode::onSharedControlMode(const std_msgs::msg::Int8::SharedPtr
       static_cast<int>(mode));
     shared_control_mode_ = mode;
 
-    // Re-entering shared mode after free/normal can leave stale observer/dynamics state
-    // and ODrive axis state; reset and force a closed-loop request immediately.
-    if (shared_control_mode_ == kSharedControlModeShared) {
-      external_force_x_ = 0.0;
-      external_torque_z_ = 0.0;
-      command_v_ = 0.0;
-      command_wz_ = 0.0;
-      last_v_meas_ = 0.0;
-      last_wz_meas_ = 0.0;
-      last_step_stamp_ = this->get_clock()->now();
+    // Entering an assist mode after any other mode can leave stale observer and command
+    // state behind. Reset and immediately publish a zero command in the new mode.
+    if (isAssistMode(shared_control_mode_)) {
+      resetSharedState();
+      publishZeroCommandForCurrentMode();
       requestAxisState(true, true);
       RCLCPP_INFO(
         this->get_logger(),
-        "shared mode entry reset applied (prev_mode=%d)",
+        "assist mode entry reset applied (prev_mode=%d)",
         static_cast<int>(prev_mode));
     }
   }
@@ -373,6 +407,28 @@ void SharedControlNode::onCmdVel(const geometry_msgs::msg::Twist::SharedPtr msg)
 {
   latest_cmd_vel_ = *msg;
   latest_cmd_vel_stamp_ = this->get_clock()->now();
+}
+
+void SharedControlNode::onSharedTorqueAssistEnabled(const std_msgs::msg::Bool::SharedPtr msg)
+{
+  const bool enabled = msg->data;
+  if (shared_torque_assist_enabled_ == enabled) {
+    return;
+  }
+
+  const bool prev_enabled = shared_torque_assist_enabled_;
+  shared_torque_assist_enabled_ = enabled;
+  RCLCPP_INFO(
+    this->get_logger(),
+    "shared_torque assist changed: %s -> %s",
+    prev_enabled ? "on" : "off",
+    enabled ? "on" : "off");
+
+  if (shared_control_mode_ == kSharedControlModeSharedTorque) {
+    command_v_ = 0.0;
+    command_wz_ = 0.0;
+    publishZeroCommandForCurrentMode();
+  }
 }
 
 void SharedControlNode::onPauseControl(const std_msgs::msg::Bool::SharedPtr msg)
@@ -603,8 +659,8 @@ void SharedControlNode::requestAxisState(bool closed_loop, bool force)
 
 bool SharedControlNode::desiredClosedLoopControl() const
 {
-  // shared mode always keeps loop control ON.
-  if (shared_control_mode_ == kSharedControlModeShared) {
+  // Assist modes always keep loop control ON.
+  if (isAssistMode(shared_control_mode_)) {
     return true;
   }
   // normal/free modes follow pause_control topic.
@@ -681,13 +737,13 @@ bool SharedControlNode::obstacleDataFresh(const rclcpp::Time & now) const
   return (now - obstacle_stamp_).seconds() <= obstacle_timeout_sec_;
 }
 
-double SharedControlNode::obstacleApproachScale(double clearance_m) const
+double SharedControlNode::obstacleApproachScale(double clearance_m, double stop_distance_m) const
 {
   if (!std::isfinite(clearance_m)) {
     return 1.0;
   }
 
-  const double stop_distance = std::max(0.0, obstacle_stop_distance_m_);
+  const double stop_distance = std::max(0.0, stop_distance_m);
   const double slowdown_margin = std::max(0.0, obstacle_slowdown_margin_m_);
   const double min_scale = clamp(obstacle_min_speed_scale_, 0.0, 1.0);
   if (clearance_m <= stop_distance) {
@@ -771,6 +827,18 @@ double SharedControlNode::distancePointToFootprint(double x, double y) const
   return std::sqrt(min_sq);
 }
 
+void SharedControlNode::resetSharedState()
+{
+  external_force_x_ = 0.0;
+  external_torque_z_ = 0.0;
+  filtered_obstacle_force_x_ = 0.0;
+  command_v_ = 0.0;
+  command_wz_ = 0.0;
+  last_v_meas_ = 0.0;
+  last_wz_meas_ = 0.0;
+  last_step_stamp_ = this->get_clock()->now();
+}
+
 void SharedControlNode::publishWheelVelocities(double left_wheel_rad_s, double right_wheel_rad_s)
 {
   odrive_can::msg::ControlMessage left_msg;
@@ -793,9 +861,60 @@ void SharedControlNode::publishWheelVelocities(double left_wheel_rad_s, double r
   ctrl_pub_right_->publish(right_msg);
 }
 
+void SharedControlNode::publishWheelTorques(
+  double left_wheel_torque_nm,
+  double right_wheel_torque_nm)
+{
+  odrive_can::msg::ControlMessage left_msg;
+  left_msg.control_mode = kControlModeTorque;
+  left_msg.input_mode = kInputModePassthrough;
+  left_msg.input_pos = 0.0F;
+  left_msg.input_vel = 0.0F;
+  left_msg.input_torque = static_cast<float>(left_wheel_sign_ * left_wheel_torque_nm);
+
+  odrive_can::msg::ControlMessage right_msg;
+  right_msg.control_mode = kControlModeTorque;
+  right_msg.input_mode = kInputModePassthrough;
+  right_msg.input_pos = 0.0F;
+  right_msg.input_vel = 0.0F;
+  right_msg.input_torque = static_cast<float>(right_wheel_sign_ * right_wheel_torque_nm);
+
+  ctrl_pub_left_->publish(left_msg);
+  ctrl_pub_right_->publish(right_msg);
+}
+
 void SharedControlNode::publishStop()
 {
   publishWheelVelocities(0.0, 0.0);
+}
+
+void SharedControlNode::publishZeroCommandForCurrentMode()
+{
+  if (shared_control_mode_ == kSharedControlModeSharedTorque) {
+    publishWheelTorques(0.0, 0.0);
+    return;
+  }
+  publishStop();
+}
+
+void SharedControlNode::publishSharedTelemetry(
+  const rclcpp::Time & now,
+  double linear_x,
+  double angular_z)
+{
+  geometry_msgs::msg::WrenchStamped wrench_msg;
+  wrench_msg.header.stamp = now;
+  wrench_msg.header.frame_id = "base_link";
+  wrench_msg.wrench.force.x = external_force_x_;
+  wrench_msg.wrench.torque.z = external_torque_z_;
+  wrench_pub_->publish(wrench_msg);
+
+  geometry_msgs::msg::TwistStamped cmd_msg;
+  cmd_msg.header.stamp = now;
+  cmd_msg.header.frame_id = "base_link";
+  cmd_msg.twist.linear.x = linear_x;
+  cmd_msg.twist.angular.z = angular_z;
+  cmd_pub_->publish(cmd_msg);
 }
 
 void SharedControlNode::controlStepStop(double dt)
@@ -810,6 +929,12 @@ void SharedControlNode::controlStepStop(double dt)
     (command_v_ - 0.5 * wheel_separation_m_ * command_wz_) / wheel_radius_m_;
   const double right_cmd_w =
     (command_v_ + 0.5 * wheel_separation_m_ * command_wz_) / wheel_radius_m_;
+  if (shared_control_mode_ == kSharedControlModeSharedTorque) {
+    command_v_ = 0.0;
+    command_wz_ = 0.0;
+    publishWheelTorques(0.0, 0.0);
+    return;
+  }
   publishWheelVelocities(left_cmd_w, right_cmd_w);
 }
 
@@ -847,13 +972,14 @@ void SharedControlNode::controlStepFree()
   last_wz_meas_ = 0.0;
 }
 
-void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
+bool SharedControlNode::computeSharedControlState(
+  const rclcpp::Time & now,
+  double dt,
+  SharedControlState & state)
 {
   if (!statusValid(left_feedback_, now) || !statusValid(right_feedback_, now)) {
-    command_v_ = 0.0;
-    command_wz_ = 0.0;
-    publishStop();
-    return;
+    resetSharedState();
+    return false;
   }
 
   const double left_w =
@@ -861,13 +987,13 @@ void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
   const double right_w =
     right_wheel_sign_ * toSiAngular(static_cast<double>(right_feedback_.msg.vel_estimate));
 
-  const double v_meas = 0.5 * wheel_radius_m_ * (right_w + left_w);
-  const double wz_meas = (wheel_radius_m_ / wheel_separation_m_) * (right_w - left_w);
+  state.v_meas = 0.5 * wheel_radius_m_ * (right_w + left_w);
+  state.wz_meas = (wheel_radius_m_ / wheel_separation_m_) * (right_w - left_w);
 
-  const double wheel_a_x = (v_meas - last_v_meas_) / dt;
-  const double wheel_a_z = (wz_meas - last_wz_meas_) / dt;
-  last_v_meas_ = v_meas;
-  last_wz_meas_ = wz_meas;
+  const double wheel_a_x = (state.v_meas - last_v_meas_) / dt;
+  const double wheel_a_z = (state.wz_meas - last_wz_meas_) / dt;
+  last_v_meas_ = state.v_meas;
+  last_wz_meas_ = state.wz_meas;
 
   double a_x = wheel_a_x;
   if (use_imu_linear_accel_) {
@@ -882,9 +1008,9 @@ void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
   const double n_motor_z = (wheel_separation_m_ / (2.0 * wheel_radius_m_)) * (tau_r - tau_l);
 
   const double friction_x = coulomb_friction_x_ *
-    std::tanh(v_meas / std::max(friction_smoothing_linear_, 1.0e-3));
+    std::tanh(state.v_meas / std::max(friction_smoothing_linear_, 1.0e-3));
   const double friction_z = coulomb_friction_z_ *
-    std::tanh(wz_meas / std::max(friction_smoothing_angular_, 1.0e-3));
+    std::tanh(state.wz_meas / std::max(friction_smoothing_angular_, 1.0e-3));
 
   double gravity_force_x = 0.0;
   if (use_gravity_compensation_) {
@@ -892,9 +1018,9 @@ void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
   }
 
   const double residual_x =
-    f_motor_x - robot_mass_x_ * a_x - robot_damping_x_ * v_meas - friction_x - gravity_force_x;
+    f_motor_x - robot_mass_x_ * a_x - robot_damping_x_ * state.v_meas - friction_x - gravity_force_x;
   const double residual_z =
-    n_motor_z - robot_inertia_z_ * wheel_a_z - robot_damping_z_ * wz_meas - friction_z;
+    n_motor_z - robot_inertia_z_ * wheel_a_z - robot_damping_z_ * state.wz_meas - friction_z;
 
   external_force_x_ += dt * observer_gain_x_ * (residual_x - external_force_x_);
   external_torque_z_ += dt * observer_gain_z_ * (residual_z - external_torque_z_);
@@ -912,46 +1038,68 @@ void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
   {
     const double v_ref = static_cast<double>(latest_autonomy_cmd_->twist.linear.x);
     const double wz_ref = static_cast<double>(latest_autonomy_cmd_->twist.angular.z);
-    auto_force_x = autonomy_virtual_stiffness_x_ * (v_ref - v_meas);
-    auto_torque_z = autonomy_virtual_stiffness_z_ * (wz_ref - wz_meas);
+    auto_force_x = autonomy_virtual_stiffness_x_ * (v_ref - state.v_meas);
+    auto_torque_z = autonomy_virtual_stiffness_z_ * (wz_ref - state.wz_meas);
   }
 
-  double shared_force_x = human_force_weight_ * human_force_x + autonomy_force_weight_ * auto_force_x;
-  const double shared_torque_z =
-    human_force_weight_ * human_torque_z + autonomy_force_weight_ * auto_torque_z;
+  const bool torque_assist_active =
+    shared_control_mode_ != kSharedControlModeSharedTorque || shared_torque_assist_enabled_;
+  const bool shared_torque_mode = shared_control_mode_ == kSharedControlModeSharedTorque;
+  const double obstacle_stop_distance =
+    shared_torque_mode ? torque_obstacle_stop_distance_m_ : obstacle_stop_distance_m_;
+  const double obstacle_pushback_stiffness =
+    shared_torque_mode ? torque_obstacle_pushback_stiffness_ : obstacle_pushback_stiffness_;
+  const double obstacle_pushback_max_force =
+    shared_torque_mode ? torque_obstacle_pushback_max_force_ : obstacle_pushback_max_force_;
+  const double torque_force_input_scale =
+    shared_torque_mode ? clamp(torque_assist_input_scale_, 0.0, 1.0) : 1.0;
+  const double torque_torque_input_scale =
+    shared_torque_mode ? clamp(torque_assist_torque_scale_, 0.0, 1.0) : 1.0;
+  const double blended_force_x =
+    torque_force_input_scale *
+    (human_force_weight_ * human_force_x + autonomy_force_weight_ * auto_force_x);
+  const double blended_torque_z =
+    torque_torque_input_scale *
+    (human_force_weight_ * human_torque_z + autonomy_force_weight_ * auto_torque_z);
+  const double base_shared_force_x = torque_assist_active ? blended_force_x : 0.0;
+  state.shared_force_x = base_shared_force_x;
+  state.shared_torque_z = torque_assist_active ? blended_torque_z : 0.0;
 
-  const bool obstacle_fresh = obstacleDataFresh(now);
-  const double front_scale = obstacle_fresh ? obstacleApproachScale(front_clearance_m_) : 1.0;
-  const double rear_scale = (obstacle_fresh && obstacle_guard_reverse_enabled_) ?
-    obstacleApproachScale(rear_clearance_m_) : 1.0;
+  state.obstacle_fresh = obstacleDataFresh(now);
+  state.front_scale = state.obstacle_fresh ?
+    obstacleApproachScale(front_clearance_m_, obstacle_stop_distance) : 1.0;
+  state.rear_scale = (state.obstacle_fresh && obstacle_guard_reverse_enabled_) ?
+    obstacleApproachScale(rear_clearance_m_, obstacle_stop_distance) : 1.0;
+  const bool front_intent = shared_torque_mode ? (human_force_x > 0.0) : (state.shared_force_x > 0.0);
+  const bool rear_intent = shared_torque_mode ? (human_force_x < 0.0) : (state.shared_force_x < 0.0);
 
   // Distance-aware slowdown: reduce drive intent while approaching obstacles.
-  if (shared_force_x > 0.0) {
-    shared_force_x *= front_scale;
-  } else if (shared_force_x < 0.0 && obstacle_guard_reverse_enabled_) {
-    shared_force_x *= rear_scale;
+  if (state.shared_force_x > 0.0) {
+    state.shared_force_x *= state.front_scale;
+  } else if (state.shared_force_x < 0.0 && obstacle_guard_reverse_enabled_) {
+    state.shared_force_x *= state.rear_scale;
   }
 
-  if (obstacle_fresh && obstacle_pushback_enabled_) {
+  if (state.obstacle_fresh && obstacle_pushback_enabled_) {
     // Apply virtual spring force only against the intended moving direction.
-    if (front_clearance_m_ <= obstacle_stop_distance_m_ && shared_force_x > 0.0) {
-      const double penetration = obstacle_stop_distance_m_ - front_clearance_m_;
+    if (front_clearance_m_ <= obstacle_stop_distance && front_intent) {
+      const double penetration = obstacle_stop_distance - front_clearance_m_;
       const double pushback = clamp(
-        obstacle_pushback_stiffness_ * penetration, 0.0, obstacle_pushback_max_force_);
-      shared_force_x -= pushback;
+        obstacle_pushback_stiffness * penetration, 0.0, obstacle_pushback_max_force);
+      state.shared_force_x -= pushback;
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 1000,
         "front obstacle pushback: clearance=%.3fm pushback=%.2fN",
         front_clearance_m_, pushback);
     } else {
       if (
-        obstacle_guard_reverse_enabled_ && rear_clearance_m_ <= obstacle_stop_distance_m_ &&
-        shared_force_x < 0.0)
+        obstacle_guard_reverse_enabled_ && rear_clearance_m_ <= obstacle_stop_distance &&
+        rear_intent)
       {
-        const double penetration = obstacle_stop_distance_m_ - rear_clearance_m_;
+        const double penetration = obstacle_stop_distance - rear_clearance_m_;
         const double pushback = clamp(
-          obstacle_pushback_stiffness_ * penetration, 0.0, obstacle_pushback_max_force_);
-        shared_force_x += pushback;
+          obstacle_pushback_stiffness * penetration, 0.0, obstacle_pushback_max_force);
+        state.shared_force_x += pushback;
         RCLCPP_WARN_THROTTLE(
           this->get_logger(), *this->get_clock(), 1000,
           "rear obstacle pushback: clearance=%.3fm pushback=%.2fN",
@@ -960,10 +1108,30 @@ void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
     }
   }
 
+  const double obstacle_force_target =
+    shared_torque_mode && !front_intent && !rear_intent ?
+    0.0 : (state.shared_force_x - base_shared_force_x);
+  const double obstacle_force_alpha = shared_torque_mode ?
+    clamp(torque_obstacle_force_filter_alpha_, 0.0, 1.0) : 1.0;
+  filtered_obstacle_force_x_ += obstacle_force_alpha *
+    (obstacle_force_target - filtered_obstacle_force_x_);
+  state.shared_force_x = base_shared_force_x + filtered_obstacle_force_x_;
+
+  return true;
+}
+
+void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
+{
+  SharedControlState state;
+  if (!computeSharedControlState(now, dt, state)) {
+    publishZeroCommandForCurrentMode();
+    return;
+  }
+
   double cmd_accel_x =
-    (shared_force_x - desired_damping_x_ * command_v_) / std::max(desired_mass_x_, 1.0e-6);
+    (state.shared_force_x - desired_damping_x_ * command_v_) / std::max(desired_mass_x_, 1.0e-6);
   double cmd_accel_z =
-    (shared_torque_z - desired_damping_z_ * command_wz_) / std::max(desired_inertia_z_, 1.0e-6);
+    (state.shared_torque_z - desired_damping_z_ * command_wz_) / std::max(desired_inertia_z_, 1.0e-6);
   cmd_accel_x = clamp(cmd_accel_x, -max_linear_accel_reverse_, max_linear_accel_forward_);
   cmd_accel_z = clamp(cmd_accel_z, -max_angular_accel_, max_angular_accel_);
 
@@ -974,16 +1142,16 @@ void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
 
   // Final safety clamp: reduce approaching speed smoothly in obstacle slowdown
   // margin, then stop only inside stop_distance.
-  if (obstacle_fresh) {
-    const double front_limit = max_linear_velocity_forward_ * front_scale;
+  if (state.obstacle_fresh) {
+    const double front_limit = max_linear_velocity_forward_ * state.front_scale;
     if (command_v_ > front_limit) {
       command_v_ = front_limit;
-    } else if (command_v_ > 0.0 && front_scale < 1.0) {
-      const double slowdown_brake = max_linear_accel_forward_ * (1.0 - front_scale);
+    } else if (command_v_ > 0.0 && state.front_scale < 1.0) {
+      const double slowdown_brake = max_linear_accel_forward_ * (1.0 - state.front_scale);
       command_v_ = std::max(0.0, command_v_ - slowdown_brake * dt);
       command_v_ = std::min(command_v_, front_limit);
     }
-    if (front_scale <= 1.0e-3 && command_v_ > 0.0) {
+    if (state.front_scale <= 1.0e-3 && command_v_ > 0.0) {
       command_v_ = 0.0;
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 1000,
@@ -992,15 +1160,15 @@ void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
     }
 
     if (obstacle_guard_reverse_enabled_) {
-      const double rear_limit = max_linear_velocity_reverse_ * rear_scale;
+      const double rear_limit = max_linear_velocity_reverse_ * state.rear_scale;
       if (command_v_ < -rear_limit) {
         command_v_ = -rear_limit;
-      } else if (command_v_ < 0.0 && rear_scale < 1.0) {
-        const double slowdown_brake = max_linear_accel_reverse_ * (1.0 - rear_scale);
+      } else if (command_v_ < 0.0 && state.rear_scale < 1.0) {
+        const double slowdown_brake = max_linear_accel_reverse_ * (1.0 - state.rear_scale);
         command_v_ = std::min(0.0, command_v_ + slowdown_brake * dt);
         command_v_ = std::max(command_v_, -rear_limit);
       }
-      if (rear_scale <= 1.0e-3 && command_v_ < 0.0) {
+      if (state.rear_scale <= 1.0e-3 && command_v_ < 0.0) {
         command_v_ = 0.0;
         RCLCPP_WARN_THROTTLE(
           this->get_logger(), *this->get_clock(), 1000,
@@ -1009,13 +1177,13 @@ void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
       }
     }
 
-    if (front_scale < 0.999 || rear_scale < 0.999) {
+    if (state.front_scale < 0.999 || state.rear_scale < 0.999) {
       RCLCPP_DEBUG_THROTTLE(
         this->get_logger(), *this->get_clock(), 200,
         "obstacle slowdown: front_clearance=%.3f front_scale=%.3f rear_clearance=%.3f rear_scale=%.3f command_v=%.3f",
-        front_clearance_m_, front_scale, rear_clearance_m_, rear_scale, command_v_);
+        front_clearance_m_, state.front_scale, rear_clearance_m_, state.rear_scale, command_v_);
     }
-    if (front_scale <= 1.0e-3 || rear_scale <= 1.0e-3) {
+    if (state.front_scale <= 1.0e-3 || state.rear_scale <= 1.0e-3) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 1000,
         "obstacle stop active: front_clearance=%.3f rear_clearance=%.3f stop_distance=%.3f",
@@ -1028,20 +1196,65 @@ void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
   const double right_cmd_w =
     (command_v_ + 0.5 * wheel_separation_m_ * command_wz_) / wheel_radius_m_;
   publishWheelVelocities(left_cmd_w, right_cmd_w);
+  publishSharedTelemetry(now, command_v_, command_wz_);
+}
 
-  geometry_msgs::msg::WrenchStamped wrench_msg;
-  wrench_msg.header.stamp = now;
-  wrench_msg.header.frame_id = "base_link";
-  wrench_msg.wrench.force.x = external_force_x_;
-  wrench_msg.wrench.torque.z = external_torque_z_;
-  wrench_pub_->publish(wrench_msg);
+void SharedControlNode::controlStepSharedTorque(const rclcpp::Time & now, double dt)
+{
+  SharedControlState state;
+  if (!computeSharedControlState(now, dt, state)) {
+    publishZeroCommandForCurrentMode();
+    return;
+  }
 
-  geometry_msgs::msg::TwistStamped cmd_msg;
-  cmd_msg.header.stamp = now;
-  cmd_msg.header.frame_id = "base_link";
-  cmd_msg.twist.linear.x = command_v_;
-  cmd_msg.twist.angular.z = command_wz_;
-  cmd_pub_->publish(cmd_msg);
+  double force_cmd = state.shared_force_x;
+  double torque_cmd = state.shared_torque_z;
+  if (state.obstacle_fresh) {
+    const double brake_velocity_deadband =
+      std::max(0.0, torque_obstacle_brake_velocity_deadband_);
+    const double front_velocity_limit = max_linear_velocity_forward_ * state.front_scale;
+    if (state.v_meas > brake_velocity_deadband && state.front_scale < 1.0) {
+      force_cmd -= desired_mass_x_ * max_linear_accel_forward_ * (1.0 - state.front_scale);
+      if (state.v_meas > front_velocity_limit) {
+        force_cmd -= torque_assist_damping_x_ * (state.v_meas - front_velocity_limit);
+      }
+    }
+
+    if (obstacle_guard_reverse_enabled_) {
+      const double rear_velocity_limit = max_linear_velocity_reverse_ * state.rear_scale;
+      if (state.v_meas < -brake_velocity_deadband && state.rear_scale < 1.0) {
+        force_cmd += desired_mass_x_ * max_linear_accel_reverse_ * (1.0 - state.rear_scale);
+        if (-state.v_meas > rear_velocity_limit) {
+          force_cmd += torque_assist_damping_x_ * ((-state.v_meas) - rear_velocity_limit);
+        }
+      }
+    }
+  }
+
+  if (shared_torque_assist_enabled_) {
+    force_cmd -= torque_assist_damping_x_ * state.v_meas;
+    torque_cmd -= torque_assist_damping_z_ * state.wz_meas;
+  } else {
+    torque_cmd = 0.0;
+  }
+  force_cmd = clamp(
+    force_cmd,
+    -torque_assist_max_force_reverse_,
+    torque_assist_max_force_forward_);
+  torque_cmd = clamp(
+    torque_cmd,
+    -torque_assist_max_torque_z_,
+    torque_assist_max_torque_z_);
+
+  const double yaw_to_wheel = wheel_radius_m_ / std::max(wheel_separation_m_, 1.0e-6);
+  const double left_torque =
+    0.5 * wheel_radius_m_ * force_cmd - yaw_to_wheel * torque_cmd;
+  const double right_torque =
+    0.5 * wheel_radius_m_ * force_cmd + yaw_to_wheel * torque_cmd;
+  command_v_ = 0.0;
+  command_wz_ = 0.0;
+  publishWheelTorques(left_torque, right_torque);
+  publishSharedTelemetry(now, state.v_meas, state.wz_meas);
 }
 
 void SharedControlNode::controlStep()
@@ -1063,6 +1276,11 @@ void SharedControlNode::controlStep()
 
   if (shared_control_mode_ == kSharedControlModeShared) {
     controlStepShared(now, dt);
+    return;
+  }
+
+  if (shared_control_mode_ == kSharedControlModeSharedTorque) {
+    controlStepSharedTorque(now, dt);
     return;
   }
 
