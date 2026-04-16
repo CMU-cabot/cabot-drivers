@@ -59,6 +59,18 @@ shared_control_node:
     human_torque_z_sign: -1.0
     force_deadband_x: 4.0
     force_deadband_z: 1.2
+    local_speed_delta_max_forward: 0.10
+    local_speed_delta_max_reverse: 0.10
+    local_speed_delta_gain: 0.20
+    local_speed_delta_decay: 0.25
+    push_pull_engage_threshold: 1.5
+    push_pull_release_threshold: 0.75
+    speed_event_hold_sec: 0.7
+    speed_event_retrigger_sec: 1.0
+    creep_speed_max: 0.08
+    creep_force_threshold: 2.0
+    speed_event_yaw_rate_threshold: 0.35
+    speedup_min_tracking_ratio: 0.5
 
     loop_rate_hz: 100.0
     status_timeout_sec: 0.2

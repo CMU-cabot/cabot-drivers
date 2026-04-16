@@ -44,6 +44,7 @@
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/int8.hpp>
+#include <std_msgs/msg/string.hpp>
 
 namespace cabot_shared_control
 {
@@ -61,6 +62,8 @@ private:
     bool received{false};
   };
 
+  struct SharedControlState;
+
   void onAxis0Status(const odrive_can::msg::ControllerStatus::SharedPtr msg);
   void onAxis1Status(const odrive_can::msg::ControllerStatus::SharedPtr msg);
   void onImu(const sensor_msgs::msg::Imu::SharedPtr msg);
@@ -73,6 +76,7 @@ private:
   void onScan(const sensor_msgs::msg::LaserScan::SharedPtr msg);
 
   void controlStep();
+  void controlStepSpeedOverlay(const rclcpp::Time & now, double dt);
   void controlStepShared(const rclcpp::Time & now, double dt);
   void controlStepSharedTorque(const rclcpp::Time & now, double dt);
   void controlStepAutonomy(double dt);
@@ -88,6 +92,13 @@ private:
   void publishStop();
   void publishZeroCommandForCurrentMode();
   void publishSharedTelemetry(const rclcpp::Time & now, double linear_x, double angular_z);
+  void publishNavigationEvent(const std::string & event_name);
+  void updateLocalSpeedControl(
+    const rclcpp::Time & now,
+    const SharedControlState & state,
+    double dt,
+    double nav_v,
+    double nav_wz);
 
   void requestClosedLoopIfReady();
   void onAxisStateResponse(
@@ -104,6 +115,7 @@ private:
     double wz_meas{0.0};
     double shared_force_x{0.0};
     double shared_torque_z{0.0};
+    double human_force_x{0.0};
     bool obstacle_fresh{false};
     double front_scale{1.0};
     double rear_scale{1.0};
@@ -131,7 +143,7 @@ private:
   double left_wheel_sign_{-1.0};
   double right_wheel_sign_{1.0};
   bool odrive_velocity_is_turns_per_sec_{true};
-  int8_t shared_control_mode_{1};
+  int8_t shared_control_mode_{0};
   bool shared_torque_assist_enabled_{false};
   bool pause_control_{false};
 
@@ -189,6 +201,18 @@ private:
   double human_torque_z_sign_{1.0};
   double force_deadband_x_{3.0};
   double force_deadband_z_{0.3};
+  double local_speed_delta_max_forward_{0.10};
+  double local_speed_delta_max_reverse_{0.10};
+  double local_speed_delta_gain_{0.20};
+  double local_speed_delta_decay_{0.25};
+  double push_pull_engage_threshold_{1.5};
+  double push_pull_release_threshold_{0.75};
+  double speed_event_hold_sec_{0.7};
+  double speed_event_retrigger_sec_{1.0};
+  double creep_speed_max_{0.08};
+  double creep_force_threshold_{2.0};
+  double speed_event_yaw_rate_threshold_{0.35};
+  double speedup_min_tracking_ratio_{0.5};
 
   // Safety / timing
   double loop_rate_hz_{100.0};
@@ -250,11 +274,19 @@ private:
   double external_force_x_{0.0};
   double external_torque_z_{0.0};
   double filtered_obstacle_force_x_{0.0};
+  double filtered_human_force_x_{0.0};
+  double local_speed_delta_{0.0};
   double command_v_{0.0};
   double command_wz_{0.0};
   double last_v_meas_{0.0};
   double last_wz_meas_{0.0};
   rclcpp::Time last_step_stamp_;
+  rclcpp::Time last_speedup_event_stamp_;
+  rclcpp::Time last_speeddown_event_stamp_;
+  rclcpp::Time speed_saturation_start_stamp_;
+  int speed_event_hold_direction_{0};
+  int push_pull_direction_{0};
+  bool speed_event_neutral_rearmed_{true};
   bool odom_initialized_{false};
   double last_left_dist_m_{0.0};
   double last_right_dist_m_{0.0};
@@ -267,6 +299,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::WrenchStamped>::SharedPtr wrench_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_pub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr event_pub_;
 
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr left_sub_;
   rclcpp::Subscription<odrive_can::msg::ControllerStatus>::SharedPtr right_sub_;

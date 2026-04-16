@@ -40,9 +40,10 @@ constexpr uint32_t kAxisStateClosedLoopControl = 8;
 constexpr double kGravity = 9.80665;
 constexpr double kPi = 3.14159265358979323846;
 constexpr int8_t kSharedControlModeNormal = 0;
-constexpr int8_t kSharedControlModeShared = 1;
-constexpr int8_t kSharedControlModeFree = 2;
+constexpr int8_t kSharedControlModeSpeedOverlay = 1;
+constexpr int8_t kSharedControlModeShared = 2;
 constexpr int8_t kSharedControlModeSharedTorque = 3;
+constexpr int8_t kSharedControlModeFree = 4;
 constexpr uint32_t kControlModeTorque = 1;
 constexpr uint32_t kInputModePassthrough = 1;
 
@@ -51,9 +52,19 @@ double clamp(double value, double lower, double upper)
   return std::max(lower, std::min(upper, value));
 }
 
+double moveToward(double current, double target, double max_delta)
+{
+  if (current < target) {
+    return std::min(current + max_delta, target);
+  }
+  return std::max(current - max_delta, target);
+}
+
 bool isAssistMode(int8_t mode)
 {
-  return mode == kSharedControlModeShared || mode == kSharedControlModeSharedTorque;
+  return mode == kSharedControlModeSpeedOverlay ||
+         mode == kSharedControlModeShared ||
+         mode == kSharedControlModeSharedTorque;
 }
 
 double signedDeadband(double value, double threshold)
@@ -96,6 +107,7 @@ constexpr char kSharedTorqueAssistEnabledTopic[] = "/shared_torque_assist_enable
 constexpr char kPauseControlTopic[] = "/cabot/pause_control";
 constexpr char kCmdVelTopic[] = "/cabot/cmd_vel";
 constexpr char kAutonomyCmdTopic[] = "/autonomy/cmd_vel";
+constexpr char kEventTopic[] = "/cabot/event";
 constexpr char kScanTopic[] = "/scan";
 constexpr char kFootprintTopic[] = "/footprint";
 constexpr char kOdomTopic[] = "/cabot/odom_raw";
@@ -112,6 +124,7 @@ SharedControlNode::SharedControlNode()
     this->declare_parameter<int>("shared_control_mode", static_cast<int>(kSharedControlModeNormal));
   if (
     initial_shared_control_mode == kSharedControlModeNormal ||
+    initial_shared_control_mode == kSharedControlModeSpeedOverlay ||
     initial_shared_control_mode == kSharedControlModeShared ||
     initial_shared_control_mode == kSharedControlModeFree ||
     initial_shared_control_mode == kSharedControlModeSharedTorque)
@@ -120,7 +133,7 @@ SharedControlNode::SharedControlNode()
   } else {
     RCLCPP_WARN(
       this->get_logger(),
-      "invalid shared_control_mode=%d at startup (expected: 0=normal, 1=shared, 2=free, 3=shared_torque), fallback to 0",
+      "invalid shared_control_mode=%d at startup (expected: 0=normal, 1=speed_overlay, 2=shared, 3=shared_torque, 4=free), fallback to 0",
       initial_shared_control_mode);
     shared_control_mode_ = kSharedControlModeNormal;
   }
@@ -203,6 +216,25 @@ SharedControlNode::SharedControlNode()
   human_torque_z_sign_ = this->declare_parameter<double>("human_torque_z_sign", -1.0);
   force_deadband_x_ = this->declare_parameter<double>("force_deadband_x", 4.0);
   force_deadband_z_ = this->declare_parameter<double>("force_deadband_z", 1.2);
+  local_speed_delta_max_forward_ =
+    this->declare_parameter<double>("local_speed_delta_max_forward", 0.10);
+  local_speed_delta_max_reverse_ =
+    this->declare_parameter<double>("local_speed_delta_max_reverse", 0.10);
+  local_speed_delta_gain_ = this->declare_parameter<double>("local_speed_delta_gain", 0.20);
+  local_speed_delta_decay_ = this->declare_parameter<double>("local_speed_delta_decay", 0.25);
+  push_pull_engage_threshold_ =
+    this->declare_parameter<double>("push_pull_engage_threshold", 1.5);
+  push_pull_release_threshold_ =
+    this->declare_parameter<double>("push_pull_release_threshold", 0.75);
+  speed_event_hold_sec_ = this->declare_parameter<double>("speed_event_hold_sec", 0.7);
+  speed_event_retrigger_sec_ =
+    this->declare_parameter<double>("speed_event_retrigger_sec", 1.0);
+  creep_speed_max_ = this->declare_parameter<double>("creep_speed_max", 0.08);
+  creep_force_threshold_ = this->declare_parameter<double>("creep_force_threshold", 2.0);
+  speed_event_yaw_rate_threshold_ =
+    this->declare_parameter<double>("speed_event_yaw_rate_threshold", 0.35);
+  speedup_min_tracking_ratio_ =
+    this->declare_parameter<double>("speedup_min_tracking_ratio", 0.5);
 
   loop_rate_hz_ = this->declare_parameter<double>("loop_rate_hz", 100.0);
   status_timeout_sec_ = this->declare_parameter<double>("status_timeout_sec", 0.2);
@@ -253,6 +285,11 @@ SharedControlNode::SharedControlNode()
   last_step_stamp_ = now;
   footprint_stamp_ = now;
   obstacle_stamp_ = now;
+  const auto event_ready_stamp =
+    now - rclcpp::Duration::from_seconds(std::max(speed_event_retrigger_sec_, 0.0));
+  last_speedup_event_stamp_ = event_ready_stamp;
+  last_speeddown_event_stamp_ = event_ready_stamp;
+  speed_saturation_start_stamp_ = now;
 
   ctrl_pub_left_ = this->create_publisher<odrive_can::msg::ControlMessage>(
     "/" + axis0_ns_ + "/control_message", 10);
@@ -264,6 +301,7 @@ SharedControlNode::SharedControlNode()
   cmd_pub_ =
     this->create_publisher<geometry_msgs::msg::TwistStamped>("/shared_control/cmd_vel", 10);
   odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(kOdomTopic, 10);
+  event_pub_ = this->create_publisher<std_msgs::msg::String>(kEventTopic, 10);
 
   left_sub_ = this->create_subscription<odrive_can::msg::ControllerStatus>(
     "/" + axis0_ns_ + "/controller_status", 50,
@@ -370,13 +408,14 @@ void SharedControlNode::onSharedControlMode(const std_msgs::msg::Int8::SharedPtr
   const int8_t mode = msg->data;
   if (
     mode != kSharedControlModeNormal &&
+    mode != kSharedControlModeSpeedOverlay &&
     mode != kSharedControlModeShared &&
     mode != kSharedControlModeFree &&
     mode != kSharedControlModeSharedTorque)
   {
     RCLCPP_WARN_THROTTLE(
       this->get_logger(), *this->get_clock(), 1000,
-      "ignore invalid shared_control_mode=%d (expected: 0=normal, 1=shared, 2=free, 3=shared_torque)",
+      "ignore invalid shared_control_mode=%d (expected: 0=normal, 1=speed_overlay, 2=shared, 3=shared_torque, 4=free)",
       static_cast<int>(mode));
     return;
   }
@@ -832,11 +871,139 @@ void SharedControlNode::resetSharedState()
   external_force_x_ = 0.0;
   external_torque_z_ = 0.0;
   filtered_obstacle_force_x_ = 0.0;
+  filtered_human_force_x_ = 0.0;
+  local_speed_delta_ = 0.0;
+  speed_event_hold_direction_ = 0;
+  push_pull_direction_ = 0;
+  speed_event_neutral_rearmed_ = true;
   command_v_ = 0.0;
   command_wz_ = 0.0;
   last_v_meas_ = 0.0;
   last_wz_meas_ = 0.0;
   last_step_stamp_ = this->get_clock()->now();
+}
+
+void SharedControlNode::publishNavigationEvent(const std::string & event_name)
+{
+  std_msgs::msg::String msg;
+  msg.data = event_name;
+  event_pub_->publish(msg);
+}
+
+void SharedControlNode::updateLocalSpeedControl(
+  const rclcpp::Time & now,
+  const SharedControlState & state,
+  double dt,
+  double nav_v,
+  double nav_wz)
+{
+  const double human_force_alpha = clamp(dt * 8.0, 0.0, 1.0);
+  filtered_human_force_x_ += human_force_alpha * (state.human_force_x - filtered_human_force_x_);
+
+  const double engage_threshold = std::max(push_pull_engage_threshold_, 0.0);
+  const double release_threshold = clamp(push_pull_release_threshold_, 0.0, engage_threshold);
+  if (push_pull_direction_ == 0) {
+    if (filtered_human_force_x_ >= engage_threshold) {
+      push_pull_direction_ = 1;
+      speed_event_neutral_rearmed_ = true;
+    } else if (filtered_human_force_x_ <= -engage_threshold) {
+      push_pull_direction_ = -1;
+      speed_event_neutral_rearmed_ = true;
+    }
+  } else if (std::abs(filtered_human_force_x_) <= release_threshold) {
+    push_pull_direction_ = 0;
+    speed_event_hold_direction_ = 0;
+    speed_event_neutral_rearmed_ = true;
+  }
+
+  const bool obstacle_stop = state.obstacle_fresh && state.front_scale <= 1.0e-3;
+  const bool front_blocked = state.obstacle_fresh && state.front_scale < 0.999;
+  const bool can_forward_creep =
+    !obstacle_stop &&
+    std::abs(nav_v) < 1.0e-3 &&
+    filtered_human_force_x_ >= std::max(creep_force_threshold_, engage_threshold);
+
+  double local_delta_target = local_speed_delta_;
+  if (push_pull_direction_ > 0) {
+    if (front_blocked && !can_forward_creep) {
+      local_delta_target = std::min(local_delta_target, 0.0);
+    } else {
+      local_delta_target += local_speed_delta_gain_ * filtered_human_force_x_ * dt;
+    }
+  } else if (push_pull_direction_ < 0) {
+    local_delta_target += local_speed_delta_gain_ * filtered_human_force_x_ * dt;
+  } else {
+    local_speed_delta_ = moveToward(
+      local_speed_delta_, 0.0, std::max(local_speed_delta_decay_, 0.0) * dt);
+    local_delta_target = local_speed_delta_;
+  }
+
+  const double local_forward_limit = can_forward_creep ?
+    std::max(0.0, std::min(local_speed_delta_max_forward_, creep_speed_max_)) :
+    std::max(0.0, local_speed_delta_max_forward_);
+  const double local_reverse_limit =
+    std::abs(nav_v) < 1.0e-3 ? 0.0 : std::max(0.0, local_speed_delta_max_reverse_);
+  local_speed_delta_ = clamp(local_delta_target, -local_reverse_limit, local_forward_limit);
+
+  const bool saturated_up =
+    local_forward_limit > 0.0 &&
+    local_speed_delta_ >= (local_forward_limit - 1.0e-4) &&
+    push_pull_direction_ > 0;
+  const bool saturated_down =
+    local_reverse_limit > 0.0 &&
+    local_speed_delta_ <= (-local_reverse_limit + 1.0e-4) &&
+    push_pull_direction_ < 0;
+  const int saturated_direction = saturated_up ? 1 : (saturated_down ? -1 : 0);
+  if (saturated_direction != speed_event_hold_direction_) {
+    speed_event_hold_direction_ = saturated_direction;
+    speed_saturation_start_stamp_ = now;
+  }
+
+  if (saturated_direction == 0 || !speed_event_neutral_rearmed_) {
+    return;
+  }
+
+  const double hold_duration = (now - speed_saturation_start_stamp_).seconds();
+  if (hold_duration < speed_event_hold_sec_) {
+    return;
+  }
+
+  const bool large_yaw_rate =
+    std::abs(nav_wz) > std::max(0.0, speed_event_yaw_rate_threshold_);
+  const bool speedup_blocked =
+    large_yaw_rate ||
+    front_blocked ||
+    (nav_v > 1.0e-3 &&
+    state.v_meas < nav_v * std::max(0.0, speedup_min_tracking_ratio_));
+
+  if (saturated_direction > 0 && speedup_blocked) {
+    RCLCPP_DEBUG_THROTTLE(
+      this->get_logger(), *this->get_clock(), 1000,
+      "suppress navigation_speedup: human_force=%.3f local_delta=%.3f nav_v=%.3f v_meas=%.3f front_scale=%.3f nav_wz=%.3f",
+      filtered_human_force_x_, local_speed_delta_, nav_v, state.v_meas, state.front_scale, nav_wz);
+    return;
+  }
+
+  const double since_last_event = saturated_direction > 0 ?
+    (now - last_speedup_event_stamp_).seconds() :
+    (now - last_speeddown_event_stamp_).seconds();
+  if (since_last_event < speed_event_retrigger_sec_) {
+    return;
+  }
+
+  if (saturated_direction > 0) {
+    publishNavigationEvent("navigation_speedup");
+    last_speedup_event_stamp_ = now;
+  } else {
+    publishNavigationEvent("navigation_speeddown");
+    last_speeddown_event_stamp_ = now;
+  }
+  speed_event_neutral_rearmed_ = false;
+  RCLCPP_INFO(
+    this->get_logger(),
+    "published %s: human_force=%.3f local_delta=%.3f nav_v=%.3f v_meas=%.3f hold=%.3fs",
+    saturated_direction > 0 ? "navigation_speedup" : "navigation_speeddown",
+    filtered_human_force_x_, local_speed_delta_, nav_v, state.v_meas, hold_duration);
 }
 
 void SharedControlNode::publishWheelVelocities(double left_wheel_rad_s, double right_wheel_rad_s)
@@ -1029,6 +1196,7 @@ bool SharedControlNode::computeSharedControlState(
     signedDeadband(human_force_x_sign_ * external_force_x_, force_deadband_x_);
   const double human_torque_z =
     signedDeadband(human_torque_z_sign_ * external_torque_z_, force_deadband_z_);
+  state.human_force_x = human_force_x;
 
   double auto_force_x = 0.0;
   double auto_torque_z = 0.0;
@@ -1120,6 +1288,102 @@ bool SharedControlNode::computeSharedControlState(
   return true;
 }
 
+void SharedControlNode::controlStepSpeedOverlay(const rclcpp::Time & now, double dt)
+{
+  SharedControlState state;
+  if (!computeSharedControlState(now, dt, state)) {
+    publishZeroCommandForCurrentMode();
+    return;
+  }
+
+  double nav_v = 0.0;
+  double nav_wz = 0.0;
+  if (cmdVelFresh(now)) {
+    nav_v = latest_cmd_vel_->linear.x;
+    nav_wz = latest_cmd_vel_->angular.z;
+  }
+
+  updateLocalSpeedControl(now, state, dt, nav_v, nav_wz);
+
+  double target_v = nav_v + local_speed_delta_;
+  const bool allow_forward_creep =
+    std::abs(nav_v) < 1.0e-3 &&
+    filtered_human_force_x_ >= std::max(creep_force_threshold_, push_pull_engage_threshold_) &&
+    (!state.obstacle_fresh || state.front_scale > 1.0e-3);
+  if (std::abs(nav_v) < 1.0e-3) {
+    target_v = clamp(target_v, 0.0, allow_forward_creep ? creep_speed_max_ : max_linear_velocity_forward_);
+  }
+
+  target_v = clamp(target_v, -max_linear_velocity_reverse_, max_linear_velocity_forward_);
+  nav_wz = clamp(nav_wz, -max_angular_velocity_, max_angular_velocity_);
+  const double accel_linear = target_v >= command_v_ ?
+    max_linear_accel_forward_ : max_linear_accel_reverse_;
+  command_v_ = slewRate(command_v_, target_v, accel_linear, dt);
+  command_wz_ = slewRate(command_wz_, nav_wz, max_angular_accel_, dt);
+
+  // Final safety clamp: reduce approaching speed smoothly in obstacle slowdown
+  // margin, then stop only inside stop_distance.
+  if (state.obstacle_fresh) {
+    const double front_limit = max_linear_velocity_forward_ * state.front_scale;
+    if (command_v_ > front_limit) {
+      command_v_ = front_limit;
+    } else if (command_v_ > 0.0 && state.front_scale < 1.0) {
+      const double slowdown_brake = max_linear_accel_forward_ * (1.0 - state.front_scale);
+      command_v_ = std::max(0.0, command_v_ - slowdown_brake * dt);
+      command_v_ = std::min(command_v_, front_limit);
+    }
+    if (state.front_scale <= 1.0e-3 && command_v_ > 0.0) {
+      command_v_ = 0.0;
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *this->get_clock(), 1000,
+        "front approach blocked: clearance %.3fm <= %.3fm",
+        front_clearance_m_, obstacle_stop_distance_m_);
+    }
+
+    if (obstacle_guard_reverse_enabled_) {
+      const double rear_limit = max_linear_velocity_reverse_ * state.rear_scale;
+      if (command_v_ < -rear_limit) {
+        command_v_ = -rear_limit;
+      } else if (command_v_ < 0.0 && state.rear_scale < 1.0) {
+        const double slowdown_brake = max_linear_accel_reverse_ * (1.0 - state.rear_scale);
+        command_v_ = std::min(0.0, command_v_ + slowdown_brake * dt);
+        command_v_ = std::max(command_v_, -rear_limit);
+      }
+      if (state.rear_scale <= 1.0e-3 && command_v_ < 0.0) {
+        command_v_ = 0.0;
+        RCLCPP_WARN_THROTTLE(
+          this->get_logger(), *this->get_clock(), 1000,
+          "rear approach blocked: clearance %.3fm <= %.3fm",
+          rear_clearance_m_, obstacle_stop_distance_m_);
+      }
+    }
+
+    if (state.front_scale < 0.999 || state.rear_scale < 0.999) {
+      RCLCPP_DEBUG_THROTTLE(
+        this->get_logger(), *this->get_clock(), 200,
+        "obstacle slowdown: front_clearance=%.3f front_scale=%.3f rear_clearance=%.3f rear_scale=%.3f command_v=%.3f",
+        front_clearance_m_, state.front_scale, rear_clearance_m_, state.rear_scale, command_v_);
+    }
+    if (state.front_scale <= 1.0e-3 || state.rear_scale <= 1.0e-3) {
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *this->get_clock(), 1000,
+        "obstacle stop active: front_clearance=%.3f rear_clearance=%.3f stop_distance=%.3f",
+        front_clearance_m_, rear_clearance_m_, obstacle_stop_distance_m_);
+    }
+  }
+
+  const double left_cmd_w =
+    (command_v_ - 0.5 * wheel_separation_m_ * command_wz_) / wheel_radius_m_;
+  const double right_cmd_w =
+    (command_v_ + 0.5 * wheel_separation_m_ * command_wz_) / wheel_radius_m_;
+  publishWheelVelocities(left_cmd_w, right_cmd_w);
+  RCLCPP_DEBUG_THROTTLE(
+    this->get_logger(), *this->get_clock(), 250,
+    "speed overlay: human_force=%.3f filtered_force=%.3f nav_v=%.3f local_delta=%.3f target_v=%.3f v_meas=%.3f",
+    state.human_force_x, filtered_human_force_x_, nav_v, local_speed_delta_, target_v, state.v_meas);
+  publishSharedTelemetry(now, command_v_, command_wz_);
+}
+
 void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
 {
   SharedControlState state;
@@ -1140,8 +1404,6 @@ void SharedControlNode::controlStepShared(const rclcpp::Time & now, double dt)
   command_v_ = clamp(command_v_, -max_linear_velocity_reverse_, max_linear_velocity_forward_);
   command_wz_ = clamp(command_wz_, -max_angular_velocity_, max_angular_velocity_);
 
-  // Final safety clamp: reduce approaching speed smoothly in obstacle slowdown
-  // margin, then stop only inside stop_distance.
   if (state.obstacle_fresh) {
     const double front_limit = max_linear_velocity_forward_ * state.front_scale;
     if (command_v_ > front_limit) {
@@ -1271,6 +1533,11 @@ void SharedControlNode::controlStep()
 
   if (shared_control_mode_ == kSharedControlModeNormal) {
     controlStepAutonomy(dt);
+    return;
+  }
+
+  if (shared_control_mode_ == kSharedControlModeSpeedOverlay) {
+    controlStepSpeedOverlay(now, dt);
     return;
   }
 

@@ -161,7 +161,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'shared_control_mode',
             default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_MODE', default_value='1'),
-            description='Startup mode for shared_control_node (0=normal, 1=shared, 2=free, 3=shared_torque)'
+            description='Startup mode for shared_control_node (0=normal, 1=speed_overlay, 2=shared, 3=shared_torque, 4=free)'
         ),
         DeclareLaunchArgument(
             'shared_torque_assist_enabled',
@@ -171,7 +171,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'shared_control_mode_topic',
             default_value=EnvironmentVariable('CABOT_SHARED_CONTROL_MODE_TOPIC', default_value='/shared_control_mode'),
-            description='Mode topic for shared_control_node (std_msgs/Int8: 0=normal, 1=shared, 2=free, 3=shared_torque)'
+            description='Mode topic for shared_control_node (std_msgs/Int8: 0=normal, 1=speed_overlay, 2=shared, 3=shared_torque, 4=free)'
         ),
         DeclareLaunchArgument(
             'imu_topic',

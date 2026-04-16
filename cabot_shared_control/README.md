@@ -48,13 +48,17 @@ ODrive S1 x2 + BotWheels 2輪差動向けの shared control 実装です。
 
 - ROS 2 Humble
 - `odrive_can` パッケージ（`ros_odrive` リポジトリ）
-- `sensor_msgs/Imu`
+- `geometry_msgs`
+- `nav_msgs`
+- `sensor_msgs`
+- `std_msgs`
+- `tf2`, `tf2_ros`
+- launch 実行時: `cabot_common`, `launch`, `launch_ros`, `ament_index_python`
 
 ## ビルド
 
 ```bash
-colcon build --symlink-install --packages-select cabot_shared_control
-source install/setup.bash
+./build-workspace.sh
 ```
 
 ## odriver_adapter 互換性テスト
@@ -83,7 +87,21 @@ python3 cabot_shared_control/test/extract_odriver_adapter_test_bag.py \
 テストは `shared_control_node` を normal モードで起動し、bag 入力に対する
 `/cabot/control_message_{left,right}` と `/cabot/odom_raw` を参照 bag と比較します。
 
-加えて、`shared_torque` モード向けに synthetic な `ControllerStatus` / `LaserScan` を使った統合テストを用意しています。
+このパッケージで現状確認できる自動テストは `test_odriver_adapter_compatibility.py` です。
+
+リポジトリ方針に従い、テストは Docker 内で実行します。
+
+全体:
+
+```bash
+./unittest.sh
+```
+
+単一パッケージ:
+
+```bash
+docker compose run --rm driver ./script/unittest.sh -p cabot_shared_control -b
+```
 
 ## 起動
 
@@ -111,7 +129,9 @@ ros2 launch cabot_shared_control shared_control.launch.py shared_control_mode:=3
 - `robot_state_publisher`
 - `local_robot_state_publisher`
 - `hesai_lidar`（または `hesai_ros_driver`）
-- `filter_crop_box_node`（`/velodyne_points` -> `/velodyne_points_cropped`）
+- `laser_container` 内の `filter_crop_box_node`（`/velodyne_points` -> `/velodyne_points_cropped`、`use_crop_box=true` のとき）
+- `laser_container` 内の `pointcloud_to_laserscan_node`（`/velodyne_points_cropped` から `/scan` を生成、`use_crop_box=true` のとき）
+- `footprint_publisher`
 - `odrive_can_node_left` (`node_id=0`)
 - `odrive_can_node_right` (`node_id=1`)
 - `shared_control_node`
@@ -140,7 +160,7 @@ ros2 launch cabot_shared_control shared_control.launch.py \
 `odrive_model` と `odrive_firmware_version` は `ODRIVE_MODEL` / `ODRIVE_FIRMWARE_VERSION` 環境変数から参照します。
 IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできます（`false` でIMU無効、水平面前提）。
 `shared-control-launch.sh` は `ROS_LOG_DIR` を作成し、必要トピックの rosbag を同時記録します（`docker/home/.ros/log/latest_shared_control`）。
-`shared-control-launch.sh` は起動時に `/cabot/odrive_status_left` と `/cabot/odrive_status_right` を確認し、受信できない場合は ODrive 電源OFFとみなしてエラー終了します。
+`shared-control-launch.sh -r` は利用可能な ODrive 電源サービス（`/set_24v_power_odrive` または `/set_odrive_power`）を探し、24V ラインを OFF/ON してから launch します。
 
 ## パラメーターの優先順位
 
@@ -166,16 +186,16 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 | `odrive_firmware_version` | `ODRIVE_FIRMWARE_VERSION` 環境変数 | 読み込む ODrive endpoint JSON のファームウェア版。 |
 | `hesai_ros_2_0` | `HESAI_ROS_2_0` 環境変数。未設定時は `false` | `true` のとき `HesaiLidar_ROS_2.0` 構成を使います。 |
 | `use_imu` | `CABOT_SHARED_CONTROL_USE_IMU` 環境変数。未設定時は `true` | `shared_control_node` の IMU 入力を有効化します。 |
-| `shared_control_mode` | `CABOT_SHARED_CONTROL_MODE` 環境変数。未設定時は `1` | `shared_control_node` の起動時モードです。`0=normal`, `1=shared`, `2=free`, `3=shared_torque` を使います。 |
+| `shared_control_mode` | `CABOT_SHARED_CONTROL_MODE` 環境変数。未設定時は `1` | `shared_control_node` の起動時モードです。`0=normal`, `1=speed_overlay`, `2=shared`, `3=shared_torque`, `4=free` を使います。 |
 | `shared_torque_assist_enabled` | `CABOT_SHARED_TORQUE_ASSIST_ENABLED` 環境変数。未設定時は `false` | `shared_torque` モードの走行アシスト初期状態です。`false` でも障害物ブレーキは有効のままです。 |
-| `shared_control_mode_topic` | `CABOT_SHARED_CONTROL_MODE_TOPIC` 環境変数。未設定時は `/shared_control_mode` | `shared_control_node` の `/shared_control_mode` 入力を remap するためのトピック名です。`std_msgs/msg/Int8` で `0=normal`, `1=shared`, `2=free`, `3=shared_torque` を使います。 |
+| `shared_control_mode_topic` | `CABOT_SHARED_CONTROL_MODE_TOPIC` 環境変数。未設定時は `/shared_control_mode` | `shared_control_node` の `/shared_control_mode` 入力を remap するためのトピック名です。`std_msgs/msg/Int8` で `0=normal`, `1=speed_overlay`, `2=shared`, `3=shared_torque`, `4=free` を使います。 |
 | `imu_topic` | `/cabot/imu/data` | `shared_control_node` の `/imu/data` 入力を remap するための IMU トピック名です。 |
 | `scan_topic` | `/scan` | `shared_control_node` の `/scan` 入力を remap するための `sensor_msgs/msg/LaserScan` トピック名です。 |
 | `footprint_topic` | `/footprint` | `shared_control_node` の `/footprint` 入力を remap するための `geometry_msgs/msg/Polygon` トピック名です。 |
 
 補足:
 
-- `shared_control.launch.py` の起動時モードは `shared_control_mode` 引数で切り替えられます。未指定時は `1` (`shared`) です。
+- `shared_control.launch.py` の起動時モードは `shared_control_mode` 引数で切り替えられます。未指定時は `1` (`speed_overlay`) です。
 - 同じく `autonomy_force_weight:=0.0` を固定で渡すため、自律指令はデフォルトでは shared 力へ反映されません。
 
 ## `shared_control_node` のパラメーター一覧
@@ -189,7 +209,7 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 
 | パラメーター | C++ default | 説明 |
 | --- | --- | --- |
-| `shared_control_mode` | `0` (`normal`) | 起動時モード。`0=normal`, `1=shared`, `2=free`, `3=shared_torque` です。`shared_control.launch.py` の既定値は `1` (`shared`) です。 |
+| `shared_control_mode` | `0` (`normal`) | 起動時モード。`0=normal`, `1=speed_overlay`, `2=shared`, `3=shared_torque`, `4=free` です。`shared_control.launch.py` の既定値は `1` (`speed_overlay`) です。 |
 | `shared_torque_assist_enabled` | `false` | `shared_torque` モードの走行アシスト ON/OFF です。`false` のときは通常アシストを止めますが、障害物ブレーキと押し返しは有効のままです。 |
 | `use_imu` | `true` | `false` のとき IMU 購読を止め、重力補償と IMU 加速度利用も自動で無効化します。launch では `CABOT_SHARED_CONTROL_USE_IMU` または `true` が使われます。 |
 
@@ -261,6 +281,18 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 | `human_torque_z_sign` | `-1.0` | 推定したヨー方向トルクの符号補正です。 |
 | `force_deadband_x` | `4.0` | 人の前後方向入力として無視するデッドバンド [N] です。 |
 | `force_deadband_z` | `1.2` | 人の回転入力として無視するデッドバンド [Nm] です。 |
+| `local_speed_delta_max_forward` | `0.10` | `speed_overlay` モードで `cmd_vel` に前進方向へ上乗せする局所速度補正の上限 [m/s] です。 |
+| `local_speed_delta_max_reverse` | `0.10` | `speed_overlay` モードで `cmd_vel` から後退方向へ差し引く局所速度補正の上限 [m/s] です。 |
+| `local_speed_delta_gain` | `0.20` | 押し引き力から局所速度補正へ積分するゲインです。 |
+| `local_speed_delta_decay` | `0.25` | 入力を抜いたときに局所速度補正を 0 に戻す減衰速度 [m/s^2] です。 |
+| `push_pull_engage_threshold` | `1.5` | 押し引き認識を開始するフィルタ後力閾値 [N] です。 |
+| `push_pull_release_threshold` | `0.75` | 押し引き認識を中立へ戻すヒステリシス閾値 [N] です。 |
+| `speed_event_hold_sec` | `0.7` | 局所速度補正が飽和してから `navigation_speedup/down` を出すまでの保持時間 [s] です。 |
+| `speed_event_retrigger_sec` | `1.0` | 巡航速度変更イベントの再発火を抑制する最短間隔 [s] です。 |
+| `creep_speed_max` | `0.08` | 停止中に前方へ押し込んだときだけ許容する低速クリープ上限 [m/s] です。 |
+| `creep_force_threshold` | `2.0` | 停止中クリープを開始するフィルタ後力閾値 [N] です。 |
+| `speed_event_yaw_rate_threshold` | `0.35` | この角速度 [rad/s] を超える旋回中は `navigation_speedup` を抑制します。 |
+| `speedup_min_tracking_ratio` | `0.5` | 実速度が `cmd_vel` 線速度のこの比率未満なら `navigation_speedup` を抑制します。 |
 
 ### 制御周期と速度制限
 
@@ -302,13 +334,17 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 
 ## 想定トピック
 
-必要に応じた入出力トピックの差し替えは、ノードパラメーターではなく `shared_control.launch.py` の remapping で行います。
+`shared_control_node` 自体は固定トピック名で publish / subscribe し、起動時の remapping で差し替えます。
+`shared_control.launch.py` が引数で差し替えられるのは `imu_topic`、`shared_control_mode_topic`、`scan_topic`、`footprint_topic` と ODrive 系 remap です。
+`/shared_torque_assist_enabled`、`/cabot/pause_control`、`/cabot/cmd_vel`、`/autonomy/cmd_vel` は launch 引数化されておらず、デフォルトの固定トピックを購読します。
+
+launch で提供していないトピックを変えたい場合は、`ros2 run ... --ros-args -r old:=new` で個別に remap します。
 
 - 入力:
   - `/cabot/controller_status_left` (`odrive_can/msg/ControllerStatus`)
   - `/cabot/controller_status_right` (`odrive_can/msg/ControllerStatus`)
   - `/cabot/imu/data` (`sensor_msgs/msg/Imu`)
-  - `/shared_control_mode` (`std_msgs/msg/Int8`, `0=normal`, `1=shared`, `2=free`, `3=shared_torque`)
+  - `/shared_control_mode` (`std_msgs/msg/Int8`, `0=normal`, `1=speed_overlay`, `2=shared`, `3=shared_torque`, `4=free`)
   - `/shared_torque_assist_enabled` (`std_msgs/msg/Bool`, `true=assist on`, `false=assist off`)
   - `/cabot/pause_control` (`std_msgs/msg/Bool`)
   - `/cabot/cmd_vel` (`geometry_msgs/msg/Twist`)
@@ -318,8 +354,12 @@ IMUの使用有無は `CABOT_SHARED_CONTROL_USE_IMU` でも切り替えできま
 - 出力:
   - `/cabot/control_message_left` (`odrive_can/msg/ControlMessage`)
   - `/cabot/control_message_right` (`odrive_can/msg/ControlMessage`)
+  - `/cabot/event` (`std_msgs/msg/String`)
+    - `speed_overlay` モードで局所速度補正が飽和し、同方向の押し引きが継続したときだけ `navigation_speedup` または `navigation_speeddown` を publish します。
   - `/shared_control/external_wrench` (`geometry_msgs/msg/WrenchStamped`)
   - `/shared_control/cmd_vel` (`geometry_msgs/msg/TwistStamped`)
+    - `speed_overlay` / `shared` モードでは内部の指令速度テレメトリを publish します。
+    - `shared_torque` モードでは実測速度テレメトリを publish します。
   - `/cabot/odom_raw` (`nav_msgs/msg/Odometry`)
 
 ## セットアップ注意
