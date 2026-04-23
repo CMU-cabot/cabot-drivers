@@ -36,6 +36,8 @@
 #include <rclcpp/node.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <sensor_msgs/msg/imu.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
+#include <std_msgs/msg/float32.hpp>
 
 namespace MotorAdapter
 {
@@ -52,6 +54,10 @@ private:
   void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr input);
   void imuCallback(const sensor_msgs::msg::Imu::SharedPtr input);
   void pauseControlCallback(const std_msgs::msg::Bool::SharedPtr input);
+  void LidarLimitCallback(const std_msgs::msg::Float32::SharedPtr msg);
+  void LidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr input);
+  void LowLidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr input);
+
 
   MotorAdapter::DiffDrive diffDrive_;
 
@@ -77,6 +83,7 @@ private:
   double count_per_rotate_;
 
   double measuredSpdLinear_;
+  double measuredCurrent_;
   double measuredSpdTurn_;
   double gain_vel_;
   double gain_omega_;
@@ -93,8 +100,13 @@ private:
   rclcpp::Duration imuTimeTolerance_;
 
   // pause control
-  int pause_control_counter_;
+  bool isFreeMode_;
   bool default_motor_control_;
+
+  std::atomic<float> currentLidarLimit_;
+
+  std::atomic<float> currentLidarDist_;
+  std::atomic<float> currentLowLidarDist_;
 
   rclcpp::Publisher<odriver_msgs::msg::MotorTarget>::SharedPtr motorPub;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPub;
@@ -104,6 +116,13 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr pauseControlSub;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr lidarLimitSub;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr lowLidarLimitSub;
+
+  rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidarSub;
+  rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lowLidarSub;
+
+  rclcpp::CallbackGroup::SharedPtr lidarCallbackGroup;
 
   std::shared_ptr<std::thread> thread;
 };  // class ODriverNode

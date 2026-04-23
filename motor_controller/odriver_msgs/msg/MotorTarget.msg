@@ -24,3 +24,4 @@ float32 spd_left
 float32 spd_right
 
 bool loop_ctrl
+bool torque_ctrl

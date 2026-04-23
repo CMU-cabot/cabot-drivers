@@ -151,6 +151,19 @@ private:
     // !msg->loop_ctrl is IDLE mode
     if (!msg->loop_ctrl) {return;}
 
+    if(msg->torque_ctrl){
+      odrive_left_->publishControlMessage(
+        kTorqueControlMode,
+        kPassthroughInputMode,
+        msg->spd_left);
+
+      odrive_right_->publishControlMessage(
+        kTorqueControlMode,
+        kPassthroughInputMode,
+        msg->spd_right);
+      return;
+    }
+
     odrive_left_->publishControlMessage(
       kVelocityControlMode,
       kPassthroughInputMode,
@@ -259,6 +272,7 @@ private:
 
   // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.ControlMode
   const int kVelocityControlMode = 2;
+  const int kTorqueControlMode = 1;
 
   // refer from: https://docs.odriverobotics.com/v/latest/fibre_types/com_odriverobotics_ODrive.html#ODrive.Controller.InputMode
   const int kPassthroughInputMode = 1;

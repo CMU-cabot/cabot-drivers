@@ -159,6 +159,8 @@ void ODriveManager::publishControlMessage(const odrive_can::msg::ControlMessage 
   control_message_pub_->publish(msg);
 }
 
+const int kTorqueControlMode = 1;
+
 void ODriveManager::publishControlMessage(
   int control_mode, int input_mode,
   double spd_m_per_sec)
@@ -168,8 +170,14 @@ void ODriveManager::publishControlMessage(
   odrive_can::msg::ControlMessage msg;
   msg.control_mode = control_mode;
   msg.input_mode = input_mode;
-  // meter/sec -> rotation/sec
-  msg.input_vel = sign_ * spd_m_per_sec / meter_per_round_;
+  if(control_mode == kTorqueControlMode) {
+    msg.input_torque = sign_ * spd_m_per_sec * (wheel_diameter_m_ / 2.0);  // for torque control, spd_m_per_sec is used as newton unit (N) => (N.m)
+    msg.input_vel = 1.0;
+  } else {  // for velocity control, spd_m_per_sec is used as velocity unit (m/s)
+    msg.input_torque = 0.0;
+    // meter/sec -> rotation/sec
+    msg.input_vel = sign_ * spd_m_per_sec / meter_per_round_;
+  }
 
   control_message_pub_->publish(msg);
 }

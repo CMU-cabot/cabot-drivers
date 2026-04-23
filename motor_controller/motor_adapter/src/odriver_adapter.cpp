@@ -25,6 +25,7 @@
  */
 
 #include <memory>
+#include <algorithm>
 
 #include <rclcpp/rclcpp.hpp>
 #include <motor_adapter/odriver_adapter.hpp>
@@ -53,7 +54,7 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   currentSpdLinear_(0),
   lastOdomTime_(0, 0, get_clock()->get_clock_type()),
 
-  targetRate_(40),
+  targetRate_(100),
   maxAcc_(0.5),
   maxDec_(-0.5),
 
@@ -69,8 +70,11 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
   lastImuTime_(0, 0, get_clock()->get_clock_type()),
   lastImuAngularVelocity_(0),
   imuTimeTolerance_(50ms),
-  pause_control_counter_(0),
-  default_motor_control_(true)
+  isFreeMode_(false),
+  default_motor_control_(true),
+  measuredCurrent_(0.0),
+  currentLowLidarDist_(0.0),
+  currentLidarDist_(0.0)
 {
   RCLCPP_INFO(get_logger(), "ODriverNode Constructor");
   PIControl_ = declare_parameter("PI_topic", PIControl_);
@@ -95,6 +99,23 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
 
 
   imuSub = create_subscription<sensor_msgs::msg::Imu>("/imu", rclcpp::SensorDataQoS(), std::bind(&ODriverNode::imuCallback, this, _1));
+
+// if self.free_mode_detect_lidar_obstacles:
+//     self._lidarLimitSub = self._node.create_subscription(std_msgs.msg.Float32, "/cabot/lidar_speed", self._lidar_limit_callback, qos_profile_sensor_data, callback_group=MutuallyExclusiveCallbackGroup())
+// if self.free_mode_detect_low_obstacles:
+//     self._lowLidarLimitSub = self._node.create_subscription(std_msgs.msg.Float32, "/cabot/low_lidar_speed", self._lidar_limit_callback, qos_profile_sensor_data, callback_group=MutuallyExclusiveCallbackGroup())
+
+  lidarCallbackGroup = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  auto sub_options = rclcpp::SubscriptionOptions();
+  sub_options.callback_group = lidarCallbackGroup;
+
+  lidarLimitSub = create_subscription<std_msgs::msg::Float32>("/cabot/lidar_speed", rclcpp::SensorDataQoS(), std::bind(&ODriverNode::LidarLimitCallback, this, _1), sub_options);
+  lowLidarLimitSub = create_subscription<std_msgs::msg::Float32>("/cabot/low_lidar_speed", rclcpp::SensorDataQoS(), std::bind(&ODriverNode::LidarLimitCallback, this, _1), sub_options);
+
+  lidarSub = create_subscription<sensor_msgs::msg::LaserScan>("/scan", rclcpp::SensorDataQoS(), std::bind(&ODriverNode::LidarCallback, this, _1), sub_options);
+  lowLidarSub = create_subscription<sensor_msgs::msg::LaserScan>("/livox_scan_expand", rclcpp::SensorDataQoS(), std::bind(&ODriverNode::LowLidarCallback, this, _1), sub_options);
+
 
   maxAcc_ = declare_parameter("max_acc", maxAcc_);
   maxDec_ = declare_parameter("max_dec", maxDec_);
@@ -124,7 +145,6 @@ ODriverNode::~ODriverNode()
   RCLCPP_INFO(get_logger(), "ODriverNode Destructor");
 }
 
-
 void ODriverNode::cmdVelLoop(int publishRate)
 {
   rclcpp::Rate loopRate(publishRate);
@@ -137,107 +157,288 @@ void ODriverNode::cmdVelLoop(int publishRate)
   while (rclcpp::ok()) {
     odriver_msgs::msg::MotorTarget target;
 
-    double targetL = targetSpdLinear_;
-    double targetT = targetSpdTurn_;
-
-    if (targetL == 0.0) {
-      // change linear speed by maximum dec rate, if the control is zero (maybe not specified)
-      double lDiff = targetL - currentSpdLinear_;
-      if (fabs(lDiff) < fabs(maxDecStep)) {
-        currentSpdLinear_ = targetL;
-      } else {
-        currentSpdLinear_ -= maxDecStep * lDiff / fabs(lDiff);
-      }
-    } else {
-      // change linear speed by maximum acc rate
-      double lDiff = targetL - currentSpdLinear_;
-      if (fabs(lDiff) < maxAccStep) {
-        currentSpdLinear_ = targetL;
-      } else {
-        currentSpdLinear_ += maxAccStep * lDiff / fabs(lDiff);
-      }
-    }
-
-    // adjust angular speed
-    target.header.stamp = get_clock()->now();
-    target.spd_left = currentSpdLinear_ - targetT;
-    target.spd_right = currentSpdLinear_ + targetT;
-
     // set loopCtrl
-    if (pause_control_counter_ > 0) {  // pause control is set
-      target.loop_ctrl = false;
-      pause_control_counter_ -= 1;
-    } else if (get_clock()->now() - lastCmdVelTime_ < rclcpp::Duration(200ms)) {  // last cmd_vel is almost up-to-date
-      target.loop_ctrl = true;
-    } else {
-      target.loop_ctrl = default_motor_control_;
-    }
+    target.loop_ctrl = true;
 
-    // linear and velocity error feedback
-    // apply feedback only when the following conditions are met to prevent integrator error accumulation
-    if (lastOdomTime_ > rclcpp::Time(0, 0, get_clock()->get_clock_type()) &&  // after receiving at least one motorStatus message
-      get_clock()->now() - lastOdomTime_ < rclcpp::Duration(200ms) &&  // last odometry is almost up-to-date (within 200ms)
-      target.loop_ctrl &&  // loop control is on
-      !(targetSpdLinear_ == 0.0 && targetSpdTurn_ == 0.0)  // command velocity is non-zero
-    )
-    {
+    if(isFreeMode_){ //TODO WALK STRAIGHT, TURN ONLY if user moves a lot
       rclcpp::Time now = get_clock()->now();
       double dt = 1.0 / publishRate;
-      double fixedMeasuredSpdTurn = measuredSpdTurn_;
-      if (now - lastImuTime_ < imuTimeTolerance_) {  // assumes imu is received continuously
-        if (imuAngularVelocityThreshold_ <= fabs(lastImuAngularVelocity_)) {
-          fixedMeasuredSpdTurn = bias_ / 2.0 * lastImuAngularVelocity_;  // radius * anguler_velocity converts rad/s to m/s dimension.
+      // double fixedMeasuredSpdTurn = measuredSpdTurn_;
+      // if (now - lastImuTime_ < imuTimeTolerance_) {  // assumes imu is received continuously
+      //   if (imuAngularVelocityThreshold_ <= fabs(lastImuAngularVelocity_)) {
+      //     fixedMeasuredSpdTurn = bias_ / 2.0 * lastImuAngularVelocity_;  // radius * anguler_velocity converts rad/s to m/s dimension.
+      //   }
+      // }
+
+      // // compute feedback wheel speed
+      // double errorSpdLinear = currentSpdLinear_ - measuredSpdLinear_;
+      // double errorSpdTurn = targetSpdTurn_ - fixedMeasuredSpdTurn;
+      // double feedbackSpdRight = gain_vel_ * errorSpdLinear + gain_omega_ * errorSpdTurn + gain_vel_i_ * integral_linear_ + gain_omega_i_ * integral_turn_;
+      // double feedbackSpdLeft = gain_vel_ * errorSpdLinear - gain_omega_ * errorSpdTurn + gain_vel_i_ * integral_linear_ - gain_omega_i_ * integral_turn_;
+      // integral_linear_ += errorSpdLinear * dt;
+      // integral_turn_ += errorSpdTurn * dt;
+
+      // // ignore small feedback speed to prevent slow rotation
+      // if (feedbackSpdDeadzone_ < fabs(feedbackSpdRight) &&
+      //   feedbackSpdDeadzone_ < fabs(feedbackSpdLeft))
+      // {
+      //   target.spd_right += feedbackSpdRight;
+      //   target.spd_left += feedbackSpdLeft;
+      // }
+
+      // const float transparency = 1.0f; 
+      // const float drag = 0.0000f;
+      // const float max_speed = 0.2f;
+
+
+      // float deltaUserSpeed = measuredSpdLinear_ - currentSpdLinear_;
+      // currentSpdLinear_ += (deltaUserSpeed * transparency) - dt*(currentSpdLinear_ * drag) - measuredCurrent_;
+      // currentSpdLinear_ = std::clamp(static_cast<float>(currentSpdLinear_), -max_speed, max_speed);
+      // target.spd_left = currentSpdLinear_;
+      // target.spd_right = currentSpdLinear_;
+
+      //float value = 10.0f * std::sin(2.0 * M_PI * (1.0 / 2.0) * now.seconds());
+
+      float value = 0.0f;
+
+      if(measuredSpdLinear_ > 0.5f){
+        float delta = measuredSpdLinear_ - 0.5f;
+        float deltaSquared = delta * delta;
+        value = -70.0f * deltaSquared;
+      }
+
+      // if(measuredSpdLinear_ > 0.8f){
+      //   value = -10.0f;
+      // }
+
+      // if(measuredSpdLinear_ > 1.0f){
+      //   value = -50.0f;
+      // }
+
+      // if(measuredSpdLinear_ > 1.5f){
+      //   value = -200.0f;
+      // }
+
+      // if(measuredSpdLinear_ > 2.0f){
+      //   value = -1000.0f;
+      // }
+
+      target.header.stamp = now;
+      target.spd_left = value;
+      target.spd_right = value;
+      target.torque_ctrl = true;
+
+      if(currentLidarDist_ < 0.3f || currentLowLidarDist_ < 0.3f){
+        target.spd_left = -1.0f;
+        target.spd_right = -1.0f;
+        if(measuredSpdLinear_ > -0.03f){
+          target.header.stamp = now;
+          target.spd_left = -0.01f;
+          target.spd_right = -0.01f;
+          target.torque_ctrl = false;
+        }
+      }
+      else if(currentLidarDist_ < 1.0f || currentLowLidarDist_ < 1.0f){
+        if(measuredSpdLinear_ > 0.05f){
+          float lidarDist = min(currentLidarDist_, currentLowLidarDist_);
+          target.spd_left += -50.0f*(measuredSpdLinear_-0.05f)*2.0f*(1.0f-lidarDist);
+          target.spd_right += -50.0f*(measuredSpdLinear_-0.05f)*2.0f*(1.0f-lidarDist);
+        }
+        else{
+          target.spd_left = 0.0f;
+          target.spd_right = 0.0f;
+        }
+
+      }
+
+
+
+
+      motorPub->publish(target);
+
+      /*odriver_msgs::msg::PIControlData control_data_msg;
+      control_data_msg.header.stamp = this->get_clock()->now();
+      control_data_msg.current_spd_linear = currentSpdLinear_;
+      control_data_msg.measured_spd_linear = measuredSpdLinear_;
+      control_data_msg.error_spd_linear = errorSpdLinear;
+      control_data_msg.integral_linear = integral_linear_;
+      control_data_msg.target_spd_turn = targetSpdTurn_;
+      control_data_msg.measured_spd_turn = measuredSpdTurn_;
+      control_data_msg.error_spd_turn = errorSpdTurn;
+      control_data_msg.integral_turn = integral_turn_;
+      PIPub->publish(control_data_msg);*/
+
+      loopRate.sleep();
+    }
+    else{
+      double targetL = targetSpdLinear_;
+      double targetT = targetSpdTurn_;
+
+      if (targetL == 0.0) {
+        // change linear speed by maximum dec rate, if the control is zero (maybe not specified)
+        double lDiff = targetL - currentSpdLinear_;
+        if (fabs(lDiff) < fabs(maxDecStep)) {
+          currentSpdLinear_ = targetL;
+        } else {
+          currentSpdLinear_ -= maxDecStep * lDiff / fabs(lDiff);
+        }
+      } else {
+        // change linear speed by maximum acc rate
+        double lDiff = targetL - currentSpdLinear_;
+        if (fabs(lDiff) < maxAccStep) {
+          currentSpdLinear_ = targetL;
+        } else {
+          currentSpdLinear_ += maxAccStep * lDiff / fabs(lDiff);
         }
       }
 
-      // compute feedback wheel speed
-      double errorSpdLinear = currentSpdLinear_ - measuredSpdLinear_;
-      double errorSpdTurn = targetSpdTurn_ - fixedMeasuredSpdTurn;
-      double feedbackSpdRight = gain_vel_ * errorSpdLinear + gain_omega_ * errorSpdTurn + gain_vel_i_ * integral_linear_ + gain_omega_i_ * integral_turn_;
-      double feedbackSpdLeft = gain_vel_ * errorSpdLinear - gain_omega_ * errorSpdTurn + gain_vel_i_ * integral_linear_ - gain_omega_i_ * integral_turn_;
-      integral_linear_ += errorSpdLinear * dt;
-      integral_turn_ += errorSpdTurn * dt;
+      // adjust angular speed
+      target.header.stamp = get_clock()->now();
+      target.spd_left = currentSpdLinear_ - targetT;
+      target.spd_right = currentSpdLinear_ + targetT;
+      target.torque_ctrl = false;
 
-      // ignore small feedback speed to prevent slow rotation
-      if (feedbackSpdDeadzone_ < fabs(feedbackSpdRight) &&
-        feedbackSpdDeadzone_ < fabs(feedbackSpdLeft))
+      // linear and velocity error feedback
+      // apply feedback only when the following conditions are met to prevent integrator error accumulation
+      if (lastOdomTime_ > rclcpp::Time(0, 0, get_clock()->get_clock_type()) &&  // after receiving at least one motorStatus message
+        get_clock()->now() - lastOdomTime_ < rclcpp::Duration(200ms) &&  // last odometry is almost up-to-date (within 200ms)
+        target.loop_ctrl &&  // loop control is on
+        !(targetSpdLinear_ == 0.0 && targetSpdTurn_ == 0.0)  // command velocity is non-zero
+      )
       {
-        target.spd_right += feedbackSpdRight;
-        target.spd_left += feedbackSpdLeft;
-      }
-    } else {
-      // reduce current speed to zero at maximum acc rate when feedback is disabled
-      double lDiff = 0.0 - currentSpdLinear_;
-      if (fabs(lDiff) < fabs(maxDecStep)) {
-        currentSpdLinear_ = 0.0;
+        rclcpp::Time now = get_clock()->now();
+        double dt = 1.0 / publishRate;
+        double fixedMeasuredSpdTurn = measuredSpdTurn_;
+        if (now - lastImuTime_ < imuTimeTolerance_) {  // assumes imu is received continuously
+          if (imuAngularVelocityThreshold_ <= fabs(lastImuAngularVelocity_)) {
+            fixedMeasuredSpdTurn = bias_ / 2.0 * lastImuAngularVelocity_;  // radius * anguler_velocity converts rad/s to m/s dimension.
+          }
+        }
+
+        // compute feedback wheel speed
+        double errorSpdLinear = currentSpdLinear_ - measuredSpdLinear_;
+        double errorSpdTurn = targetSpdTurn_ - fixedMeasuredSpdTurn;
+        double feedbackSpdRight = gain_vel_ * errorSpdLinear + gain_omega_ * errorSpdTurn + gain_vel_i_ * integral_linear_ + gain_omega_i_ * integral_turn_;
+        double feedbackSpdLeft = gain_vel_ * errorSpdLinear - gain_omega_ * errorSpdTurn + gain_vel_i_ * integral_linear_ - gain_omega_i_ * integral_turn_;
+        integral_linear_ += errorSpdLinear * dt;
+        integral_turn_ += errorSpdTurn * dt;
+
+        // ignore small feedback speed to prevent slow rotation
+        if (feedbackSpdDeadzone_ < fabs(feedbackSpdRight) &&
+          feedbackSpdDeadzone_ < fabs(feedbackSpdLeft))
+        {
+          target.spd_right += feedbackSpdRight;
+          target.spd_left += feedbackSpdLeft;
+        }
       } else {
-        currentSpdLinear_ -= maxDecStep * lDiff / fabs(lDiff);
+        // reduce current speed to zero at maximum acc rate when feedback is disabled
+        double lDiff = 0.0 - currentSpdLinear_;
+        if (fabs(lDiff) < fabs(maxDecStep)) {
+          currentSpdLinear_ = 0.0;
+        } else {
+          currentSpdLinear_ -= maxDecStep * lDiff / fabs(lDiff);
+        }
+
+        // reset integrator when feedback is disabled
+        integral_linear_ = integral_linear_ * 0.9;
+        integral_turn_ = integral_turn_ * 0.9;
       }
 
-      // reset integrator when feedback is disabled
-      integral_linear_ = integral_linear_ * 0.9;
-      integral_turn_ = integral_turn_ * 0.9;
+      motorPub->publish(target);
+
+      double errorSpdLinear = currentSpdLinear_ - measuredSpdLinear_;
+      double errorSpdTurn = targetSpdTurn_ - measuredSpdTurn_;
+
+      odriver_msgs::msg::PIControlData control_data_msg;
+      control_data_msg.header.stamp = this->get_clock()->now();
+      control_data_msg.current_spd_linear = currentSpdLinear_;
+      control_data_msg.measured_spd_linear = measuredSpdLinear_;
+      control_data_msg.error_spd_linear = errorSpdLinear;
+      control_data_msg.integral_linear = integral_linear_;
+      control_data_msg.target_spd_turn = targetSpdTurn_;
+      control_data_msg.measured_spd_turn = measuredSpdTurn_;
+      control_data_msg.error_spd_turn = errorSpdTurn;
+      control_data_msg.integral_turn = integral_turn_;
+      PIPub->publish(control_data_msg);
+
+      loopRate.sleep();
     }
-
-    motorPub->publish(target);
-
-    double errorSpdLinear = currentSpdLinear_ - measuredSpdLinear_;
-    double errorSpdTurn = targetSpdTurn_ - measuredSpdTurn_;
-
-    odriver_msgs::msg::PIControlData control_data_msg;
-    control_data_msg.header.stamp = this->get_clock()->now();
-    control_data_msg.current_spd_linear = currentSpdLinear_;
-    control_data_msg.measured_spd_linear = measuredSpdLinear_;
-    control_data_msg.error_spd_linear = errorSpdLinear;
-    control_data_msg.integral_linear = integral_linear_;
-    control_data_msg.target_spd_turn = targetSpdTurn_;
-    control_data_msg.measured_spd_turn = measuredSpdTurn_;
-    control_data_msg.error_spd_turn = errorSpdTurn;
-    control_data_msg.integral_turn = integral_turn_;
-    PIPub->publish(control_data_msg);
-
-    loopRate.sleep();
   }
+}
+
+void ODriverNode::LidarLimitCallback(const std_msgs::msg::Float32::SharedPtr msg)
+{
+  currentLidarLimit_ = msg->data;
+}
+
+void ODriverNode::LidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr input)
+{
+  // Handle lidar data
+  //auto it = std::min_element(input->ranges.begin(), input->ranges.end());
+  const auto& ranges = input->ranges;
+  const int N = ranges.size();
+
+  // Sécurité basique
+  if (N == 0) return; 
+  if (N == 1) { currentLidarDist_ = ranges[0]; return; }
+
+  const float center = (N - 1) / 2.0f;
+  float min_val_weighted = std::numeric_limits<float>::max();
+
+  for (int i = 0; i < N; ++i) {
+      // norm_dist vaut 0 au centre, -1 au tout premier élément, et +1 au dernier
+      float norm_dist = (i - center) / center; 
+      
+      // Parabole stricte : 1.0 + (0)^2 = 1x au centre | 1.0 + (1)^2 = 2x aux bords
+      float weight = 1.0f + (norm_dist * norm_dist); 
+      
+      float weighted_dist = ranges[i] * weight;
+
+      if (weighted_dist < min_val_weighted) {
+          min_val_weighted = weighted_dist;
+      }
+  }
+
+  currentLidarDist_ = min_val_weighted;
+
+  RCLCPP_INFO(get_logger(), "Min Lidar Range: %f", min_val_weighted);
+}
+
+void ODriverNode::LowLidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr input)
+{
+  std::vector<float> ranges;
+  ranges.reserve(input->ranges.size());
+
+  for (float r : input->ranges) {
+      if (r > input->range_min && r < input->range_max) {
+          ranges.push_back(r);
+      }
+  }
+
+  if (ranges.empty()) return;
+
+  // On définit la limite du 1er quartile (25%)
+  size_t q1_end = 3 * ranges.size() / 4;
+  if (q1_end == 0) q1_end = 1;
+
+  // On place les Q1 plus petites valeurs au début du vecteur (O(n))
+  std::nth_element(ranges.begin(), ranges.begin() + q1_end, ranges.end());
+
+  // Moyenne des points du 1er quartile
+  float sum = 0;
+  for (size_t i = 0; i < q1_end; ++i) {
+      sum += ranges[i];
+  }
+  
+  if (q1_end > 0) {
+      currentLowLidarDist_ = ranges[q1_end - 1]; // moyenne du 1er quartile
+  } else {
+      return;
+  }
+
+  float displayedDist = currentLowLidarDist_;
+
+  RCLCPP_INFO(get_logger(), "Min Low Lidar Range: %f", displayedDist);
 }
 
 void ODriverNode::encoderCallback(const odriver_msgs::msg::MotorStatus::SharedPtr input)
@@ -252,6 +453,8 @@ void ODriverNode::encoderCallback(const odriver_msgs::msg::MotorStatus::SharedPt
   // update measured velocity
   measuredSpdLinear_ = (input->spd_right + input->spd_left) / 2.0;
   measuredSpdTurn_ = (input->spd_right - input->spd_left) / 2.0;
+
+  measuredCurrent_ = (input->current_measured_left + input->current_measured_right) / 2.0;
 
   // ROS_INFO("input %d, %d, pose %f, %f", input->dist_left_c, input->dist_right_c, pose.x, pose.y);
 
@@ -319,11 +522,7 @@ void ODriverNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr input)
 
 void ODriverNode::pauseControlCallback(const std_msgs::msg::Bool::SharedPtr input)
 {
-  if (input->data) {
-    pause_control_counter_ = targetRate_ * 5;
-  } else {
-    pause_control_counter_ = 0;
-  }
+  isFreeMode_ = input->data;
 }
 
 }  // namespace MotorAdapter
