@@ -865,23 +865,20 @@ private:
 
   void subscribeVibratorData(const std_msgs::msg::UInt8::SharedPtr msg, int vibrator_id)
   {
-    uint8_t vibrator1 = 0;
-    uint8_t vibrator3 = 0;
-    uint8_t vibrator4 = 0;
     if (vibrator_id == 1) {
-      vibrator1 = msg->data;
+      vibrator1_ = msg->data;
     } else if (vibrator_id == 3) {
-      vibrator3 = msg->data;
+      vibrator3_ = msg->data;
     } else if (vibrator_id == 4) {
-      vibrator4 = msg->data;
+      vibrator4_ = msg->data;
     }
     struct can_frame frame;
     std::memset(&frame, 0, sizeof(struct can_frame));
     frame.can_id = CanId::VIBRATOR_CAN_ID;
     frame.can_dlc = CanDlc::VIBRATOR_CAN_DLC;
-    frame.data[0] = vibrator1;
-    frame.data[1] = vibrator3;
-    frame.data[2] = vibrator4;
+    frame.data[0] = vibrator1_;
+    frame.data[1] = vibrator3_;
+    frame.data[2] = vibrator4_;
     if (write(can_socket_, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
       RCLCPP_ERROR(this->get_logger(), "Error sending Vibrator frame");
     }
@@ -1014,6 +1011,10 @@ private:
   double target_tof_touch_fps_;
   double target_push_fps_;
   double target_servo_pos_fps_;
+
+  uint8_t vibrator1_ = 0;
+  uint8_t vibrator3_ = 0;
+  uint8_t vibrator4_ = 0;
 };
 
 int main(int argc, char * argv[])

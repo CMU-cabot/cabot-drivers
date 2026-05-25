@@ -38,6 +38,7 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <std_msgs/msg/float32.hpp>
+#include <std_msgs/msg/u_int8.hpp>
 
 namespace MotorAdapter
 {
@@ -108,9 +109,22 @@ private:
   std::atomic<float> currentLidarDist_;
   std::atomic<float> currentLowLidarDist_;
 
+  std::atomic<float> leftLidarDist_ = 0;
+  std::atomic<float> rightLidarDist_ = 0;
+  bool isLeftCorridor = false;
+  bool isRightCorridor = false;
+
+  bool isLeftIntersection = false;
+  bool isRightIntersection = false;
+  bool isLeftPreviouslyIntersecting = false;
+  bool isRightPreviouslyIntersecting = false;
+
   rclcpp::Publisher<odriver_msgs::msg::MotorTarget>::SharedPtr motorPub;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPub;
   rclcpp::Publisher<odriver_msgs::msg::PIControlData>::SharedPtr PIPub;
+
+  rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr leftVibPub;
+  rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr rightVibPub;
 
   rclcpp::Subscription<odriver_msgs::msg::MotorStatus>::SharedPtr encoderSub;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub;

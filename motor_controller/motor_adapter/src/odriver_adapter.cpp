@@ -98,6 +98,10 @@ ODriverNode::ODriverNode(rclcpp::NodeOptions options)
     pauseControlInput_, 10, std::bind(&ODriverNode::pauseControlCallback, this, _1));
 
 
+  leftVibPub = create_publisher<std_msgs::msg::UInt8>("/cabot/vibrator4", 10);
+  rightVibPub = create_publisher<std_msgs::msg::UInt8>("/cabot/vibrator3", 10);
+
+
   imuSub = create_subscription<sensor_msgs::msg::Imu>("/imu", rclcpp::SensorDataQoS(), std::bind(&ODriverNode::imuCallback, this, _1));
 
 // if self.free_mode_detect_lidar_obstacles:
@@ -268,6 +272,60 @@ void ODriverNode::cmdVelLoop(int publishRate)
       control_data_msg.integral_turn = integral_turn_;
       PIPub->publish(control_data_msg);*/
 
+      //
+      // if(isLeftCorridor && leftLidarDist_ > 2.51f){
+      //   isLeftCorridor = false;
+      //   // small vibration
+      //   std_msgs::msg::UInt8 vib_msg;
+      //   vib_msg.data = 10;
+      //   RCLCPP_INFO(get_logger(), "Left SMALL vibration");
+      //   leftVibPub->publish(vib_msg);
+      // }
+      // else if (!isLeftCorridor && leftLidarDist_ < 2.5f){
+      //   isLeftCorridor = true;
+      //   // big vibration
+      //   std_msgs::msg::UInt8 vib_msg;
+      //   vib_msg.data = 50;
+      //   RCLCPP_INFO(get_logger(), "Left BIG vibration");
+      //   leftVibPub->publish(vib_msg);
+      // }
+
+      // if(isRightCorridor && rightLidarDist_ > 2.51f){
+      //   isRightCorridor = false;
+      //   // small vibration
+      //   std_msgs::msg::UInt8 vib_msg;
+      //   vib_msg.data = 10;
+      //   RCLCPP_INFO(get_logger(), "Right SMALL vibration");
+      //   rightVibPub->publish(vib_msg);
+      // }
+      // else if (!isRightCorridor && rightLidarDist_ < 2.5f){
+      //   isRightCorridor = true;
+      //   // big vibration
+      //   std_msgs::msg::UInt8 vib_msg;
+      //   vib_msg.data = 50;
+      //   RCLCPP_INFO(get_logger(), "Right BIG vibration");
+      //   rightVibPub->publish(vib_msg);
+      // }
+
+      // if(isLeftIntersection && !isLeftPreviouslyIntersecting){
+      //   // small vibration
+      //   std_msgs::msg::UInt8 vib_msg;
+      //   vib_msg.data = 10;
+      //   RCLCPP_INFO(get_logger(), "Left SMALL vibration");
+      //   leftVibPub->publish(vib_msg);
+      // }
+
+      // isLeftPreviouslyIntersecting = isLeftIntersection;
+
+      // if(isRightIntersection && !isRightPreviouslyIntersecting){
+      //   // small vibration
+      //   std_msgs::msg::UInt8 vib_msg;
+      //   vib_msg.data = 10;
+      //   RCLCPP_INFO(get_logger(), "Right SMALL vibration");
+      //   rightVibPub->publish(vib_msg);
+      // }
+      // isRightPreviouslyIntersecting = isRightIntersection;
+
       loopRate.sleep();
     }
     else{
@@ -385,6 +443,12 @@ void ODriverNode::LidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr inp
   const float center = (N - 1) / 2.0f;
   float min_val_weighted = std::numeric_limits<float>::max();
 
+  float left_weighted = 0;
+  float left_weight_sum = 0;
+
+  float right_weighted = 0;
+  float right_weight_sum = 0;
+
   for (int i = 0; i < N; ++i) {
       // norm_dist vaut 0 au centre, -1 au tout premier élément, et +1 au dernier
       float norm_dist = (i - center) / center; 
@@ -392,7 +456,17 @@ void ODriverNode::LidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr inp
       // Parabole stricte : 1.0 + (0)^2 = 1x au centre | 1.0 + (1)^2 = 2x aux bords
       float weight = 1.0f + (norm_dist * norm_dist); 
       
+      float left_weight = std::max(0.0f, 1.0f-2.0f*fabs(0.5f+norm_dist));
+      float right_weight = std::max(0.0f, 1.0f-2.0f*fabs(0.5f-norm_dist)); // 0 à gauche et au centre, 1x à droite
+      
       float weighted_dist = ranges[i] * weight;
+
+      if(ranges[i] > 0.0f && weighted_dist < 10.0f){
+        left_weighted += ranges[i] * left_weight;
+        left_weight_sum += left_weight;
+        right_weighted += ranges[i] * right_weight;
+        right_weight_sum += right_weight;
+      }
 
       if (weighted_dist < min_val_weighted) {
           min_val_weighted = weighted_dist;
@@ -401,7 +475,83 @@ void ODriverNode::LidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr inp
 
   currentLidarDist_ = min_val_weighted;
 
-  RCLCPP_INFO(get_logger(), "Min Lidar Range: %f", min_val_weighted);
+
+  leftLidarDist_ = (left_weight_sum > 0) ? (left_weighted / left_weight_sum) : std::numeric_limits<float>::max();
+  rightLidarDist_ = (right_weight_sum > 0) ? (right_weighted / right_weight_sum) : std::numeric_limits<float>::max();
+
+  float displayedDist = currentLidarDist_;
+  float displayedLeftDist = leftLidarDist_;
+  float displayedRightDist = rightLidarDist_;
+
+  // // --- Intersection Detection Parameters ---
+  // const int WIN_SIZE = 15;                // Reduced window size for sharper edge detection
+  // const float STEP_MIN = 1.0f;            // Minimum jump (meters) to be considered an edge
+  // const float MIN_CORRIDOR_WIDTH = 0.8f;  // Minimum depth required to validate a walkable corridor
+  // const int GAP_CHECK_OFFSET = 15;        // How far into the gap we check for depth validation
+
+  // // Assuming standard LiDAR (Counter-Clockwise): 
+  // // Lower indices = Right side, Higher indices = Left side
+  // const int SCAN_START = 300;
+  // const int SCAN_END = 900;
+
+  // bool leftIntersectionDetected = false;
+  // bool rightIntersectionDetected = false;
+
+  // for (int i = SCAN_START + WIN_SIZE; i < SCAN_END - WIN_SIZE; ++i) {
+      
+  //     float mean_prev = 0.0f; // Average of indices < i (Towards the RIGHT of the robot)
+  //     float mean_next = 0.0f; // Average of indices > i (Towards the LEFT of the robot)
+
+  //     // 1. Calculate local averages
+  //     for (int j = 1; j <= WIN_SIZE; ++j) {
+  //         mean_prev += ranges[i - j];
+  //         mean_next += ranges[i + j];
+  //     }
+  //     mean_prev /= WIN_SIZE;
+  //     mean_next /= WIN_SIZE;
+
+  //     // 2. Detect gap on the LEFT side
+  //     // If next indices (left) are much further than prev indices (right), the wall ended on the left.
+  //     if (mean_next - mean_prev > STEP_MIN) {
+          
+  //         // Check deeper into the newly found gap (higher index = further left)
+  //         int check_idx = i + GAP_CHECK_OFFSET;
+          
+  //         if (check_idx < N) {
+  //             float depth_in_gap = ranges[check_idx];
+              
+  //             // Validate: Is the gap deep enough to be a corridor?
+  //             if (depth_in_gap > (mean_prev + MIN_CORRIDOR_WIDTH)) {
+  //                 leftIntersectionDetected = true;
+  //                 i += WIN_SIZE * 3; // Debounce to avoid multiple triggers on the same edge
+  //                 continue;          // Skip to the next region
+  //             }
+  //         }
+  //     }
+      
+  //     // 3. Detect gap on the RIGHT side
+  //     // If prev indices (right) are much further than next indices (left), the wall ended on the right.
+  //     else if (mean_prev - mean_next > STEP_MIN) {
+          
+  //         // Check deeper into the newly found gap (lower index = further right)
+  //         int check_idx = i - GAP_CHECK_OFFSET;
+          
+  //         if (check_idx >= 0) {
+  //             float depth_in_gap = ranges[check_idx];
+              
+  //             // Validate: Is the gap deep enough to be a corridor?
+  //             if (depth_in_gap > (mean_next + MIN_CORRIDOR_WIDTH)) {
+  //                 rightIntersectionDetected = true;
+  //                 i += WIN_SIZE * 3; // Debounce 
+  //                 continue;
+  //             }
+  //         }
+  //     }
+  // }
+  // isLeftIntersection = leftIntersectionDetected;
+  // isRightIntersection = rightIntersectionDetected;
+
+  RCLCPP_INFO(get_logger(), "Min Lidar Range: %f, Left: %f, Right: %f", min_val_weighted, displayedLeftDist, displayedRightDist);
 }
 
 void ODriverNode::LowLidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr input)
@@ -418,7 +568,7 @@ void ODriverNode::LowLidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr 
   if (ranges.empty()) return;
 
   // On définit la limite du 1er quartile (25%)
-  size_t q1_end = 3 * ranges.size() / 4;
+  size_t q1_end = 9 * ranges.size() / 10;
   if (q1_end == 0) q1_end = 1;
 
   // On place les Q1 plus petites valeurs au début du vecteur (O(n))
@@ -431,7 +581,7 @@ void ODriverNode::LowLidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr 
   }
   
   if (q1_end > 0) {
-      currentLowLidarDist_ = ranges[q1_end - 1]; // moyenne du 1er quartile
+      currentLowLidarDist_ = currentLowLidarDist_ * 0.9 + ranges[q1_end - 1] * 0.1; 
   } else {
       return;
   }
