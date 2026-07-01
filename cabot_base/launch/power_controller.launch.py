@@ -115,6 +115,8 @@ def generate_launch_description():
                 executable='power_controller_node.py',
                 name='power_controller',
                 output=output,
+                respawn=True,
+                respawn_delay=5.0,
                 parameters=[
                     *param_files
                 ],
@@ -125,6 +127,8 @@ def generate_launch_description():
                 executable='power_controller',
                 name='power_controller',
                 output=output,
+                respawn=True,
+                respawn_delay=5.0,
                 parameters=[
                     *param_files
                 ],

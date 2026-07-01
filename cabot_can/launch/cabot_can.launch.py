@@ -92,6 +92,8 @@ def generate_launch_description():
             namespace='/cabot',
             name='cabot_can',
             output=output,
+            respawn=True,
+            respawn_delay=5.0,
             parameters=[
                 {
                     'can_interface': 'can0',
@@ -115,6 +117,8 @@ def generate_launch_description():
             namespace='/cabot',
             name='esp32_wifi_scan_converter',
             output=output,
+            respawn=True,
+            respawn_delay=5.0,
             parameters=[
                 {
                     'use_sim_time': use_sim_time,
